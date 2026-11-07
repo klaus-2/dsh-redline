@@ -1,24 +1,57 @@
 # Changelog
 
-## 1.0.1 — 2026-11-07
+All notable changes to this project will be documented in this file.
 
-- Plugin icon and list metadata: `meta.title` / `meta.description` in `locale/*.json` and a `package.json` `icon`, so the plugin manager shows Redline with its icon and description in every install mode.
-## 1.0.0 — 2026-11-06
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [1.0.1] - 2026-11-07
+
+### Added
+
+- **The plugin manager now shows Redline with its icon and description.** The
+  list reads `meta.title` and `meta.description` from the plugin locales and an
+  `icon` path from the package manifest; the npm tarball ships the icon file.
+  ([`cbea413`](https://github.com/klaus-2/dsh-redline/commit/cbea413))
+
+## [1.0.0] - 2026-11-06
 
 First public release.
 
-- Overlay design system derived from [tencil](https://tencil.dev/) (Apache-2.0, modified) — see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
-- Element picking with hover highlight on any page rendered by the harness
-  browser (`C` comment, `V` adjust, `Esc` cancel).
-- Per-pin comments with in-place editing, resolve/reopen/delete.
-- Live style inspector with rollback: colors, typography, size, spacing,
-  borders, constraints, shadow and transform; drag-to-scrub numbers, presets,
-  linked box-model and radius edits, per-row reset.
-- Cropped screenshots per pin (element region with context, not the full
-  viewport).
-- Annotations attach to the next message of the viewed session as structured
-  context; the chat renders them as a native card.
-- Reconciliation between the composer card and the page overlay.
-- Overlay UI in English, Português (Brasil) and 简体中文.
-- Free-form annotation canvas (`D`): brush, line, arrow, rectangle, ellipse and numbered step markers, text typed directly on the canvas, five colors, three stroke widths, undo/redo, clear and a selection mode that moves or deletes any drawing. One click sends the full page to the chat with every drawing composited into the screenshot.
-- Review modes are exclusive: comment, adjust and draw never run at the same time.
+### Added
+
+- **Point at any element on the page and comment on it.** Hover highlight on
+  any page rendered by the harness browser; the pin captures the selector,
+  role, text and a cropped screenshot of exactly the marked region, with an
+  adjustable context padding. Per-pin comments edit in place and support
+  resolve, reopen and delete. The overlay design system is derived from
+  [tencil](https://tencil.dev/) (Apache-2.0, modified — see
+  [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)).
+  ([`e9702aa`](https://github.com/klaus-2/dsh-redline/commit/e9702aa))
+- **Adjust styles live with rollback.** The inspector covers colors,
+  typography, size, spacing, borders, constraints, shadow and transform, with
+  drag-to-scrub numbers, presets, linked box-model and radius edits and a
+  per-row reset; every tweak records as `before → after` and Esc rolls it back.
+  ([`e9702aa`](https://github.com/klaus-2/dsh-redline/commit/e9702aa))
+- **Annotations reach the agent as structured context.** Confirming collects
+  the pins into a card above the composer; sending attaches the snapshot to the
+  next message of the viewed session, rendered natively in the chat, with
+  reconciliation between the card and the page overlay.
+  ([`e9702aa`](https://github.com/klaus-2/dsh-redline/commit/e9702aa))
+- **A free annotation canvas sketches over the whole page.** Brush, lines,
+  arrows, rectangles, ellipses, numbered step markers, text typed directly on
+  the canvas, five colors, three stroke widths, undo and redo, and a selection
+  mode that moves or deletes any drawing. One click sends the full page to the
+  chat with every drawing composited into the screenshot.
+  ([`1ae66f9`](https://github.com/klaus-2/dsh-redline/commit/1ae66f9))
+- **Review modes are exclusive.** Comment, adjust and draw never run at the
+  same time; entering one leaves the others, and deselecting a tool returns to
+  the canvas selection.
+  ([`aacdd1d`](https://github.com/klaus-2/dsh-redline/commit/aacdd1d))
+- **Works out of the box.** The overlay ships in English, Português (Brasil)
+  and 简体中文, html2canvas is vendored so installs need no build step, and a
+  settings page inside the harness settings covers language, hotkeys, screenshot
+  padding and the update check.
+  ([`5fdc41f`](https://github.com/klaus-2/dsh-redline/commit/5fdc41f))
