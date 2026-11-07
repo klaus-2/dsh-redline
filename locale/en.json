@@ -38,7 +38,7 @@
   "linkOff": "Link values",
   "rawHint": "raw value (CSS syntax)",
   "adjustSaved": "Adjustments saved — they attach to your next prompt",
-  "deliveredToast": "Annotations delivered to the agent with your message",
+  "deliveredToast": "✅ Annotations delivered to the agent with your message",
   "secText": "Text",
   "secFill": "Fill",
   "secTypography": "Typography",
@@ -144,5 +144,10 @@
   "drawThick": "Thick",
   "drawSentHint": "Added to chat — it will follow your next message",
   "drawShotFail": "Could not capture the screen",
-  "drawWhite": "White"
+  "drawWhite": "White",
+  "eyeTitle": "Show/hide pins",
+  "statusTitle": "Live Review active",
+  "pendingTitle": "Annotations waiting for your next prompt in the chat",
+  "pendingCount": "{n} pending",
+  "restoredPins": "Redline: {n} pin(s) restored"
 }

@@ -38,7 +38,7 @@
   "linkOff": "Vincular valores",
   "rawHint": "valor bruto (sintaxe CSS)",
   "adjustSaved": "Ajustes guardados — anexam ao seu próximo prompt",
-  "deliveredToast": "Anotações entregues ao agente com sua mensagem",
+  "deliveredToast": "✅ Anotações entregues ao agente com sua mensagem",
   "secText": "Texto",
   "secFill": "Preenchimento",
   "secTypography": "Tipografia",
@@ -144,5 +144,10 @@
   "drawThick": "Grossa",
   "drawSentHint": "Adicionado ao chat — segue com a sua próxima mensagem",
   "drawShotFail": "Não foi possível capturar a tela",
-  "drawWhite": "Branco"
+  "drawWhite": "Branco",
+  "eyeTitle": "Mostrar/ocultar pins",
+  "statusTitle": "Live Review ativo",
+  "pendingTitle": "Anotações aguardando seu próximo prompt no chat",
+  "pendingCount": "{n} pendente(s)",
+  "restoredPins": "Redline: {n} pin(s) restaurado(s)"
 }

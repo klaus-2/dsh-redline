@@ -38,7 +38,7 @@
   "linkOff": "关联数值",
   "rawHint": "原始值（CSS 语法）",
   "adjustSaved": "调整已保存 — 将附加到你的下一个提示",
-  "deliveredToast": "标注已随消息发送给智能体",
+  "deliveredToast": "✅ 标注已随你的消息发送给智能体",
   "secText": "文本",
   "secFill": "填充",
   "secTypography": "排版",
@@ -144,5 +144,10 @@
   "drawThick": "粗",
   "drawSentHint": "已添加到聊天 — 将随你的下一条消息发送",
   "drawShotFail": "无法截取屏幕",
-  "drawWhite": "白色"
+  "drawWhite": "白色",
+  "eyeTitle": "显示/隐藏图钉",
+  "statusTitle": "Live Review 运行中",
+  "pendingTitle": "标注将随你的下一条消息发送",
+  "pendingCount": "{n} 条待发送",
+  "restoredPins": "Redline: 已恢复 {n} 个图钉"
 }

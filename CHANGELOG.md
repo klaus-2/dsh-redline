@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-11-07
+
+### Added
+
+- **Changing the language in the settings now applies to the live overlay.** The
+  overlay resolved its language once per page load and kept it until the page
+  reloaded; the status poll now carries the configured language and the toolbar
+  labels, titles, hotkey chips and pending counter re-render when it changes.
+  The pending counter, restored-pins toast and delivered toast are locale-driven
+  instead of hardcoded Portuguese.
+
+
 ## [1.0.4] - 2026-11-07
 
 ### Fixed
