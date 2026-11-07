@@ -17,3 +17,5 @@ First public release.
   context; the chat renders them as a native card.
 - Reconciliation between the composer card and the page overlay.
 - Overlay UI in English, Português (Brasil) and 简体中文.
+- Free-form annotation canvas (`D`): brush, line, arrow, rectangle, ellipse and numbered step markers, text typed directly on the canvas, five colors, three stroke widths, undo/redo, clear and a selection mode that moves or deletes any drawing. One click sends the full page to the chat with every drawing composited into the screenshot.
+- Review modes are exclusive: comment, adjust and draw never run at the same time.
