@@ -1130,8 +1130,16 @@
       });
       savePins();
       renderPins();
-      await postSnapshot();
-      setHint(t("drawSentHint"), 3600);
+      const sent = await postSnapshot();
+      if (sent) {
+        snapshotDraw();
+        drawItems = [];
+        drawSel = null;
+        saveDrawings();
+        redrawDrawings();
+        updateDrawBarState();
+        setHint(t("drawSentHint"), 3600);
+      }
     } finally {
       drawSending = false;
       updateDrawBarState();
@@ -1384,8 +1392,8 @@
         else if (event.key.length === 1) { drawTyping.text += event.key; redrawDrawings(); }
         return;
       }
-      if (event.key === KEY_COMMENT || event.key === KEY_COMMENT.toUpperCase()) setMode(mode === "picking" ? null : "picking");
-      if (event.key === KEY_ADJUST || event.key === KEY_ADJUST.toUpperCase()) setMode(mode === "adjust" ? null : "adjust");
+      if (event.key === KEY_COMMENT || event.key === KEY_COMMENT.toUpperCase()) { if (drawMode) toggleDraw(false); setMode(mode === "picking" ? null : "picking"); }
+      if (event.key === KEY_ADJUST || event.key === KEY_ADJUST.toUpperCase()) { if (drawMode) toggleDraw(false); setMode(mode === "adjust" ? null : "adjust"); }
       if (event.key === "d" || event.key === "D") toggleDraw();
       if (event.key === "Escape") {
         if (drawMode) { toggleDraw(false); return; }
@@ -1416,8 +1424,8 @@
     }
     updateToolbar();
   }
-  commentBtn.addEventListener("click", () => setMode("picking"));
-  adjustBtn.addEventListener("click", () => setMode("adjust"));
+  commentBtn.addEventListener("click", () => { if (drawMode) toggleDraw(false); setMode("picking"); });
+  adjustBtn.addEventListener("click", () => { if (drawMode) toggleDraw(false); setMode("adjust"); });
   eyeBtn.addEventListener("click", () => {
     hidden = !hidden;
     updateToolbar();
@@ -1683,8 +1691,10 @@
       if (!response.ok || data.ok !== true) throw new Error(data.error ?? `HTTP ${response.status}`);
       setHint(t("savedHint"), 4200);
       updateToolbar();
+      return true;
     } catch (error) {
       toast(`Falha ao guardar: ${String(error).slice(0, 80)}`);
+      return false;
     }
   }
 
