@@ -1,0 +1,11 @@
+node_modules/
+*.log
+boot-status.json
+client-status.json
+.DS_Store
+
+# internal ops (never public)
+.sisyphus/
+docs/REGISTER.md
+docs/RESEARCH.md
+docs/capture.md
