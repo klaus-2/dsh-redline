@@ -645,29 +645,30 @@
 /* canvas livre */
 .lr-draw-canvas { position: fixed; inset: 0; pointer-events: none; touch-action: none; z-index: 2147483590; }
 .lr-draw-canvas[data-on] { pointer-events: auto; cursor: crosshair; }
+.lr-draw-canvas[data-tool="select"] { cursor: default; }
 /* keep popovers and the toolbar above the drawing canvas */
 .popover, .toolbar-wrap { z-index: 2147483592; }
-.lr-drawbar { position: fixed; left: 14px; top: 50%; transform: translateY(-50%); display: none; flex-direction: column; align-items: stretch; gap: 2px; background: #262624; border: 1px solid rgba(255,255,255,.09); border-radius: 12px; padding: 5px; box-shadow: 0 8px 24px rgba(0,0,0,.35); z-index: 2147483601; }
+.lr-drawbar { position: fixed; left: 14px; top: 50%; transform: translateY(-50%); display: none; flex-direction: column; align-items: stretch; gap: 2px; background: var(--n-100); border: 1px solid var(--line); border-radius: 12px; padding: 6px; box-shadow: var(--shadow); z-index: 2147483601; }
 .lr-drawbar[data-on] { display: flex; }
 .lr-dicon { display: inline-flex; width: 14px; height: 14px; }
 .lr-dicon svg { display: block; }
-.lr-dtool { all: unset; box-sizing: border-box; cursor: pointer; height: 30px; min-width: 30px; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: rgba(255,255,255,.85); position: relative; }
-.lr-dtool:hover { background: rgba(255,255,255,.1); color: #fff; }
-.lr-dtool[data-on] { background: rgba(255,255,255,.17); color: #fff; }
-.lr-dtool[data-disabled] { opacity: .35; pointer-events: none; }
+.lr-dtool { all: unset; box-sizing: border-box; cursor: pointer; height: 30px; min-width: 30px; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--n-700); position: relative; }
+.lr-dtool:hover { background: var(--n-200); color: var(--n-950); }
+.lr-dtool[data-on] { background: var(--accent); color: #fff; }
+.lr-dtool[data-disabled] { opacity: .45; pointer-events: none; }
 .lr-dtool[data-hidden] { display: none; }
-.lr-dchev { position: absolute; right: 3px; bottom: 2px; display: inline-flex; opacity: .7; }
+.lr-dchev { position: absolute; right: 3px; bottom: 2px; display: inline-flex; opacity: .55; }
 .lr-dchev svg { display: block; }
-.lr-dcolor { width: 13px; height: 13px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); flex: none; }
-.lr-dwdemo { display: block; width: 16px; border-bottom: 2px solid currentColor; flex: none; }
-.lr-dsend { all: unset; box-sizing: border-box; cursor: pointer; height: 30px; padding: 0 10px; border-radius: 8px; background: #fff; color: #1a1a19; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; white-space: nowrap; }
-.lr-dsend:hover { background: #e9e9e6; }
-.lr-dsend[data-disabled] { opacity: .4; pointer-events: none; }
-.lr-dmenu { position: fixed; display: none; flex-direction: column; gap: 1px; background: #262624; border: 1px solid rgba(255,255,255,.09); border-radius: 10px; padding: 4px; box-shadow: 0 10px 28px rgba(0,0,0,.4); z-index: 2147483602; min-width: 132px; }
+.lr-dcolor { width: 13px; height: 13px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--line); flex: none; }
+.lr-dwdemo { display: block; width: 16px; border-bottom: 2px solid var(--n-700); flex: none; }
+.lr-dsend { all: unset; box-sizing: border-box; cursor: pointer; height: 30px; padding: 0 10px; border-radius: 8px; background: var(--n-950); color: var(--n-50); font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; white-space: nowrap; transition: opacity 150ms ease; }
+.lr-dsend:not([data-disabled]):active { transform: var(--press); }
+.lr-dsend[data-disabled] { opacity: .3; pointer-events: none; }
+.lr-dmenu { position: fixed; display: none; flex-direction: column; gap: 1px; background: var(--n-50); border: 1px solid var(--line); border-radius: 10px; padding: 4px; box-shadow: var(--shadow); z-index: 2147483602; min-width: 132px; }
 .lr-dmenu[data-on] { display: flex; }
-.lr-ditem { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 9px; border-radius: 6px; color: rgba(255,255,255,.85); font-size: 12px; }
-.lr-ditem:hover { background: rgba(255,255,255,.1); color: #fff; }
-.lr-ditem[data-on] { background: rgba(255,255,255,.14); color: #fff; }
+.lr-ditem { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 9px; border-radius: 6px; color: var(--n-700); font-size: 12px; }
+.lr-ditem:hover { background: var(--n-100); color: var(--n-950); }
+.lr-ditem[data-on] { background: var(--n-100); color: var(--n-950); }
 .lr-dinput { all: unset; position: fixed; z-index: 2147483603; min-width: 170px; background: var(--n-50); border: 1px solid var(--accent); border-radius: 6px; color: var(--n-950); font-size: 12px; padding: 4px 6px; box-shadow: var(--shadow); }
   
 `;
@@ -682,18 +683,18 @@
   // ---------------------------------------------------------------- canvas livre
 
   const ICONS_CANVAS = {
-    cursor: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>',
-    brush: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
-    text: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>',
-    rect: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>',
-    circle: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>',
-    arrow: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>',
+    cursor: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="m13 13 6 6"/></svg>',
+    brush: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>',
+    text: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>',
+    rect: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>',
+    circle: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>',
+    arrow: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>',
     line: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 19L19 5"/></svg>',
-    step: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/></svg>',
-    undo: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>',
-    redo: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>',
-    trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
-    chev: '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'
+    step: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><text x="12" y="16" text-anchor="middle" font-size="11" font-weight="600" fill="currentColor" stroke="none">1</text></svg>',
+    undo: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>',
+    redo: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0-5.5 5.5v0a5.5 5.5 0 0 0 5.5 5.5H13"/></svg>',
+    trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>',
+    chev: '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>'
   };
 
   let drawMode = false;
@@ -974,6 +975,7 @@
 
   function syncDrawTools() {
     if (drawBar === null) return;
+    if (drawCanvas !== null) drawCanvas.dataset.tool = drawTool;
     const shape = SHAPE_DEFS.find((def) => def.id === drawTool);
     drawBar.querySelectorAll(".lr-dtool").forEach((btn) => {
       btn.toggleAttribute("data-on", btn.dataset.tool === drawTool || (btn.dataset.tool === "shapes" && shape !== undefined));
