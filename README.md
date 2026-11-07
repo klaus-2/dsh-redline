@@ -2,6 +2,8 @@
 
 English · [Português (Brasil)](README.pt-BR.md) · [简体中文](README.zh-CN.md)
 
+[![npm](https://img.shields.io/npm/v/dsh-redline)](https://www.npmjs.com/package/dsh-redline) [![downloads](https://img.shields.io/npm/dm/dsh-redline)](https://www.npmjs.com/package/dsh-redline) [![license](https://img.shields.io/github/license/klaus-2/dsh-redline)](LICENSE) [![release](https://img.shields.io/github/v/release/klaus-2/dsh-redline)](https://github.com/klaus-2/dsh-redline/releases) [![discussions](https://img.shields.io/github/discussions/klaus-2/dsh-redline)](https://github.com/klaus-2/dsh-redline/discussions)
+
 **Point at any element on the page. Your agent fixes the code.**
 
 `dsh-redline` is a [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that puts visual review inside the harness browser: select an element, leave a comment, adjust styles live, and confirm — the annotations travel to your agent as structured context attached to your next message, with a cropped screenshot of exactly the region you marked.
@@ -22,6 +24,7 @@ Describing a UI problem in words loses the pointer. "The button in the middle se
 2. Click an element. A popover opens anchored to it.
 3. Write the comment, or open the inspector and adjust text, colors, typography, size, spacing, borders and effects — every change previews live on the page.
 4. Confirm. The card above the composer collects your pins. Send, and the annotations reach the agent as a snapshot alongside your message — rendered natively in the chat.
+5. Press **D** for the free annotation canvas: brush, lines, arrows, rectangles, ellipses, numbered step markers and text — send the full page to the chat with every drawing composited into the screenshot.
 
 ## What the agent receives
 

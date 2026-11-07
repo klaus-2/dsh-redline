@@ -2,6 +2,8 @@
 
 [English](README.md) · Português (Brasil) · [简体中文](README.zh-CN.md)
 
+[![npm](https://img.shields.io/npm/v/dsh-redline)](https://www.npmjs.com/package/dsh-redline) [![downloads](https://img.shields.io/npm/dm/dsh-redline)](https://www.npmjs.com/package/dsh-redline) [![license](https://img.shields.io/github/license/klaus-2/dsh-redline)](LICENSE) [![release](https://img.shields.io/github/v/release/klaus-2/dsh-redline)](https://github.com/klaus-2/dsh-redline/releases) [![discussions](https://img.shields.io/github/discussions/klaus-2/dsh-redline)](https://github.com/klaus-2/dsh-redline/discussions)
+
 **Aponte para qualquer elemento da página. Seu agente corrige o código.**
 
 `dsh-redline` é um plugin do [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) que traz a revisão visual para dentro do navegador do harness: selecione um elemento, escreva um comentário, ajuste estilos ao vivo e confirme — as anotações chegam ao agente como contexto estruturado anexado à sua próxima mensagem, com um recorte de screenshot exatamente da região marcada.
@@ -20,6 +22,7 @@ Descrever um problema de UI em palavras perde o ponteiro. "O botão do meio pare
 2. Clique em um elemento; o popover abre ancorado nele.
 3. Escreva o comentário ou abra o inspetor e ajuste texto, cores, tipografia, tamanho, espaçamento, bordas e efeitos — cada mudança faz preview ao vivo.
 4. Confirme. O card acima do composer coleta seus pins. Envie e as anotações chegam ao agente como snapshot junto da sua mensagem — renderizadas nativamente no chat.
+5. Pressione **D** para o canvas livre de anotações: pincel, linhas, setas, retângulos, elipses, passos numerados e texto — envie a página inteira ao chat com os desenhos compostos na captura.
 
 ## Funcionalidades
 

@@ -2,6 +2,8 @@
 
 [English](README.md) · [Português (Brasil)](README.pt-BR.md) · 简体中文
 
+[![npm](https://img.shields.io/npm/v/dsh-redline)](https://www.npmjs.com/package/dsh-redline) [![downloads](https://img.shields.io/npm/dm/dsh-redline)](https://www.npmjs.com/package/dsh-redline) [![license](https://img.shields.io/github/license/klaus-2/dsh-redline)](LICENSE) [![release](https://img.shields.io/github/v/release/klaus-2/dsh-redline)](https://github.com/klaus-2/dsh-redline/releases) [![discussions](https://img.shields.io/github/discussions/klaus-2/dsh-redline)](https://github.com/klaus-2/dsh-redline/discussions)
+
 **指向页面上的任意元素，你的智能体直接改代码。**
 
 `dsh-redline` 是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的插件，把可视化评审放进内置浏览器：选中元素、写批注、实时调整样式并确认——批注会作为结构化上下文附加到你的下一条消息，并附带精确裁剪的截图。
@@ -20,6 +22,7 @@ dsh plugin --profile web add dsh-redline
 2. 点击元素，弹出的面板会锚定在元素上。
 3. 写评论，或打开检查器实时调整文本、颜色、排版、尺寸、间距、边框和效果——每次修改都会即时预览。
 4. 确认后，composer 上方的卡片收集所有标注；发送时，标注作为快照随消息一起送达智能体，并在聊天中原生渲染。
+5. 按 **D** 打开自由批注画布：画笔、直线、箭头、矩形、椭圆、编号步骤和文字——发送整页截图，所有批注都会合成在截图上。
 
 ## 功能
 
