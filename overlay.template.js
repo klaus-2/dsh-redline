@@ -1295,7 +1295,7 @@
   const statusDot = el("span", { class: "status-dot status-ok", title: "Live Review ativo" });
   const divider = el("button", { class: "divider", title: "Mover (arraste)", "aria-label": "Mover toolbar" });
   const commentBtn = el("button", { class: "tool", title: t("commentTitle") + " (" + KEY_COMMENT.toUpperCase() + ")", html: ICONS.comment }, el("span", { class: "tool-label" }, t("commentTool")), el("kbd", {}, KEY_COMMENT.toUpperCase()));
-  const pendingSpan = el("span", { class: "tool-label", style: "display:none", title: "Anotações aguardando seu próximo prompt no chat" }, "0 pendente(s)");
+  const pendingSpan = el("span", { class: "tool-label", style: "display:none", title: t("pendingTitle") }, t("pendingCount").replace("{n}", 0));
   const adjustBtn = el("button", { class: "tool", title: t("adjustTitle") + " (" + KEY_ADJUST.toUpperCase() + ")", html: ICONS.sliders }, el("span", { class: "tool-label" }, t("adjustTool")));
   const eyeBtn = el("button", { class: "tool", title: "Mostrar/ocultar pins", html: ICONS.eye });
     drawBtn = el("button", { class: "tool", title: t("drawTitle"), html: ICONS_CANVAS.brush }, el("span", { class: "tool-label" }, t("drawTool")), el("kbd", {}, "D"));
@@ -2634,7 +2634,7 @@
 
     body.append(inspectorSection(t("secTypography"), true, (sec) => {
       sec.append(propertyRow("font-family"));
-      const styleRow = inspectorRow("Estilo da fonte", el("span", { class: "lr-row-ctl" }), { changed: () => adjustChanged("font-weight") || adjustChanged("font-style") || adjustChanged("text-decoration"), onReset: () => { adjustReset("font-weight"); adjustReset("font-style"); adjustReset("text-decoration"); }, rerender: adjustRerender });
+      const styleRow = inspectorRow(t("prop.font-style"), el("span", { class: "lr-row-ctl" }), { changed: () => adjustChanged("font-weight") || adjustChanged("font-style") || adjustChanged("text-decoration"), onReset: () => { adjustReset("font-weight"); adjustReset("font-style"); adjustReset("text-decoration"); }, rerender: adjustRerender });
       const group = styleRow.querySelector(".lr-row-ctl");
       const refresh = () => {
         const weight = Number(adjustValues.get("font-weight") ?? "");
@@ -2662,7 +2662,7 @@
       refresh();
       sec.append(styleRow);
       sec.append(propertyRow("font-weight"), propertyRow("font-size"), propertyRow("line-height"), propertyRow("letter-spacing"));
-      const alignRow = inspectorRow("Alinhamento", el("span", { class: "lr-row-ctl" }), { changed: () => adjustChanged("text-align"), onReset: () => adjustReset("text-align"), rerender: adjustRerender });
+      const alignRow = inspectorRow(t("prop.text-align"), el("span", { class: "lr-row-ctl" }), { changed: () => adjustChanged("text-align"), onReset: () => adjustReset("text-align"), rerender: adjustRerender });
       const alignCtl = alignRow.querySelector(".lr-row-ctl");
       const ALIGN_OPTIONS = [["left", t("alignL")], ["center", t("alignC")], ["right", t("alignR")], ["justify", t("alignJ")]];
       const alignWrap = segmentedControl(ALIGN_OPTIONS.map(([value, label]) => ({ value, label, content: label })), ALIGN_OPTIONS.some(([v]) => v === (adjustValues.get("text-align") || "left")) ? (adjustValues.get("text-align") || "left") : "left", (next) => { adjustUpdateProperty("text-align", next); alignWrap.__refresh(next); });
@@ -2716,8 +2716,8 @@
     body.append(inspectorSection(t("secEffects"), false, (sec) => {
       const shadowWrap = shadowControl("box-shadow");
       const transformWrap = transformControl("transform");
-      const shadowRowEl = inspectorRow("Sombra", shadowWrap, { wide: true, staticLabel: true, changed: () => adjustChanged("box-shadow"), onReset: () => { adjustReset("box-shadow"); shadowWrap.__render(); }, rerender: adjustRerender });
-      const transformRowEl = inspectorRow("Transformação", transformWrap, { wide: true, staticLabel: true, changed: () => adjustChanged("transform"), onReset: () => { adjustReset("transform"); transformWrap.__render(); }, rerender: adjustRerender });
+      const shadowRowEl = inspectorRow(t("prop.box-shadow"), shadowWrap, { wide: true, staticLabel: true, changed: () => adjustChanged("box-shadow"), onReset: () => { adjustReset("box-shadow"); shadowWrap.__render(); }, rerender: adjustRerender });
+      const transformRowEl = inspectorRow(t("prop.transform"), transformWrap, { wide: true, staticLabel: true, changed: () => adjustChanged("transform"), onReset: () => { adjustReset("transform"); transformWrap.__render(); }, rerender: adjustRerender });
       sec.append(shadowRowEl, transformRowEl);
     }));
 
