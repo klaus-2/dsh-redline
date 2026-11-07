@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Redline icon">
+  <rect width="256" height="256" rx="56" fill="#0d0d10"/>
+  <rect x="40" y="72" width="176" height="136" rx="16" fill="#e5484d" fill-opacity="0.10" stroke="#e5484d" stroke-width="8"/>
+  <rect x="30" y="56" width="54" height="26" rx="7" fill="#f59e0b"/>
+  <circle cx="128" cy="140" r="34" fill="#e5484d"/>
+  <text x="128" y="156" text-anchor="middle" font-family="Segoe UI, system-ui, sans-serif" font-size="38" font-weight="700" fill="#ffffff">1</text>
+</svg>

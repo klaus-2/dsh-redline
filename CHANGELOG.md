@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.1 — 2026-11-07
+
+- Plugin icon and list metadata: `meta.title` / `meta.description` in `locale/*.json` and a `package.json` `icon`, so the plugin manager shows Redline with its icon and description in every install mode.
 ## 1.0.0 — 2026-11-06
 
 First public release.

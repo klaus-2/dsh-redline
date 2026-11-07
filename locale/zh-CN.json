@@ -1,4 +1,8 @@
 {
+  "meta": {
+    "title": "Redline",
+    "description": "指向页面上的任意元素，添加评论、实时调整样式、在自由画布上批注——智能体收到带合成截图的结构化标注。"
+  },
   "pickHint": "点击页面元素以附加提示 · Esc 取消",
   "adjustHint": "点击要调整的元素 · Esc 取消",
   "commentTool": "评论",

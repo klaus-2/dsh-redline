@@ -1,4 +1,8 @@
 {
+  "meta": {
+    "title": "Redline",
+    "description": "Point at any element on the page, comment, adjust styles live and sketch on a free annotation canvas — your agent receives structured annotations with composited screenshots."
+  },
   "pickHint": "Click any element to attach a prompt · Esc cancels",
   "adjustHint": "Click an element to adjust · Esc cancels",
   "commentTool": "Comment",

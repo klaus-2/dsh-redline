@@ -1,4 +1,8 @@
 {
+  "meta": {
+    "title": "Redline",
+    "description": "Aponte para qualquer elemento da página, comente, ajuste estilos ao vivo e rabisque no canvas livre — o agente recebe anotações estruturadas com screenshots compostos."
+  },
   "pickHint": "Clique em qualquer elemento para fixar um prompt · Esc cancela",
   "adjustHint": "Clique em um elemento para ajustar · Esc cancela",
   "commentTool": "Comentar",
