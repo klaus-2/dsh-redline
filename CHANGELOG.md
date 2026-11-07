@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-11-07
+
+### Fixed
+
+- **The adjust inspector and the draw dock follow the language setting.** Property
+  labels (text color, background, font, weight, line height, letter spacing and
+  the rest) were hardcoded in Portuguese and looked up by their own text; they
+  now resolve through the locale keys, the dock tooltips re-render on a language
+  change, and the counter, restored-pins and delivered toasts are locale-driven.
+
+
 ## [1.0.5] - 2026-11-07
 
 ### Added
