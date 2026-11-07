@@ -1760,14 +1760,11 @@
         const dscale = canvas.width / Math.max(1, drawCanvas.width);
         canvas.getContext("2d").drawImage(drawCanvas, 0, 0, drawCanvas.width * dscale, drawCanvas.height * dscale);
       }
-      reportDiag(`capture: render ok canvas=${canvas.width}x${canvas.height} rect=${Math.round(rect.x)},${Math.round(rect.y)},${Math.round(rect.w)},${Math.round(rect.h)} pad=${cropPad} draw=${withDrawings ? "sim" : "nao"}`);
       if (withDrawings && drawCtx !== null && drawItems.length > 0) {
         const dscale = canvas.width / Math.max(1, drawCanvas.width);
         canvas.getContext("2d").drawImage(drawCanvas, 0, 0, drawCanvas.width * dscale, drawCanvas.height * dscale);
       }
-      const data = cropCanvas(canvas, rect);
-      if (data === null) reportDiag("capture: cropCanvas null");
-      else reportDiag(`capture: crop ok ${data.length} chars`);
+      const data = cropCanvas(canvas, rect, cropPad);
       return data;
     } catch (error) {
       reportDiag(`capture: exceção ${String(error && error.message ? error.message : error).slice(0, 200)}`);
@@ -1775,13 +1772,13 @@
     }
   }
 
-  function cropCanvas(canvas, rect) {
+  function cropCanvas(canvas, rect, pad = CROP_PAD) {
     try {
       const scale = canvas.width / Math.max(1, window.innerWidth);
-      let sx = (rect.x - cropPad) * scale;
-      let sy = (rect.y - cropPad) * scale;
-      let sw = (rect.w + cropPad * 2) * scale;
-      let sh = (rect.h + cropPad * 2) * scale;
+      let sx = (rect.x - pad) * scale;
+      let sy = (rect.y - pad) * scale;
+      let sw = (rect.w + pad * 2) * scale;
+      let sh = (rect.h + pad * 2) * scale;
       sx = Math.max(0, Math.min(sx, canvas.width - 1));
       sy = Math.max(0, Math.min(sy, canvas.height - 1));
       sw = Math.max(32, Math.min(sw, canvas.width - sx));
@@ -1795,7 +1792,8 @@
       ctx.fillRect(0, 0, out.width, out.height);
       ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, out.width, out.height);
       return out.toDataURL("image/jpeg", 0.8);
-    } catch {
+    } catch (error) {
+      reportDiag(`crop: ${String(error && error.message ? error.message : error).slice(0, 200)}`);
       return null;
     }
   }
