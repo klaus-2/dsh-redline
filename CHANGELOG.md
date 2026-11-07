@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-07
+
+### Fixed
+
+- **The card's send button now delivers with an empty composer, with or without composer-plus.**
+  The send path only carried the annotations when the composer draft was non-empty; with an empty
+  draft it fell back to a conversation call that, outside composer-plus, queued the message instead
+  of starting the turn, leaving the pins pending. The prompt is now written into the composer through
+  the native value setter plus an input event and submitted through the shell, with the conversation
+  call kept only as a reported fallback.
+
+
 ## [1.0.1] - 2026-11-07
 
 ### Added
