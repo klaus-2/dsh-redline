@@ -112,5 +112,19 @@
   "prop.border-color": "Border color",
   "prop.border-radius": "Border radius",
   "prop.box-shadow": "Shadow",
-  "prop.transform": "Transform"
+  "prop.transform": "Transform",
+  "drawTool": "Draw",
+  "drawTitle": "Free canvas (D)",
+  "drawHint": "Canvas mode — draw over the page · Esc exits",
+  "drawBrush": "Brush",
+  "drawText": "Text",
+  "drawRect": "Rectangle",
+  "drawCircle": "Circle",
+  "drawArrow": "Arrow",
+  "drawClear": "Clear drawings",
+  "drawExit": "Exit canvas",
+  "drawBlack": "Black",
+  "drawRed": "Red — corrections",
+  "drawBlue": "Blue — highlights",
+  "drawGreen": "Green"
 }

@@ -112,5 +112,19 @@
   "prop.border-color": "Cor da borda",
   "prop.border-radius": "Raio da borda",
   "prop.box-shadow": "Sombra",
-  "prop.transform": "Transformação"
+  "prop.transform": "Transformação",
+  "drawTool": "Desenhar",
+  "drawTitle": "Canvas livre (D)",
+  "drawHint": "Modo canvas — desenhe sobre a página · Esc sai",
+  "drawBrush": "Pincel",
+  "drawText": "Texto",
+  "drawRect": "Retângulo",
+  "drawCircle": "Círculo",
+  "drawArrow": "Seta",
+  "drawClear": "Limpar desenhos",
+  "drawExit": "Sair do canvas",
+  "drawBlack": "Preto",
+  "drawRed": "Vermelho — correções",
+  "drawBlue": "Azul — destaques",
+  "drawGreen": "Verde"
 }

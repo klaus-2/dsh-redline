@@ -112,5 +112,19 @@
   "prop.border-color": "边框颜色",
   "prop.border-radius": "圆角",
   "prop.box-shadow": "阴影",
-  "prop.transform": "变换"
+  "prop.transform": "变换",
+  "drawTool": "绘制",
+  "drawTitle": "自由画布 (D)",
+  "drawHint": "画布模式 — 在页面上绘制 · Esc 退出",
+  "drawBrush": "画笔",
+  "drawText": "文本",
+  "drawRect": "矩形",
+  "drawCircle": "圆形",
+  "drawArrow": "箭头",
+  "drawClear": "清空绘图",
+  "drawExit": "退出画布",
+  "drawBlack": "黑色",
+  "drawRed": "红色 — 修改",
+  "drawBlue": "蓝色 — 强调",
+  "drawGreen": "绿色"
 }
