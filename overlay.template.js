@@ -1829,6 +1829,8 @@
             pins = pins.filter((x) => x !== pin);
             savePins();
             openPinId = null;
+            pinPanelNode?.remove();
+            pinPanelNode = null;
             renderPins();
           }
         }, t("del"))
@@ -2747,19 +2749,17 @@
       const events = Array.isArray(data.events) ? data.events : [];
       for (const entry of events) {
         if (entry.at === lastStatusAt) continue;
-        if (entry.kind === "ack") {
-
-          pins.forEach((p) => {
-            if (p.status === "queued") p.status = "enviado";
-          });
-          savePins();
-          toast("✅ Anotações entregues ao agente com sua mensagem", 3200);
-        }
-        if (entry.kind === "sent") {
-          pins.forEach((p) => {
-            if (p.status === "queued") p.status = "enviado";
-          });
-          savePins();
+        if (entry.kind === "ack" || entry.kind === "sent") {
+          const had = pins.some((p) => p.status === "queued");
+          if (had) {
+            pins = pins.filter((p) => p.status !== "queued");
+            savePins();
+            draft = null;
+            renderDraft();
+            closePanels();
+            clearHighlight();
+            toast("✅ Anotações entregues ao agente com sua mensagem", 3200);
+          }
         }
         if (entry.kind === "tool" || entry.kind === "agent" || entry.kind === "result") lastAgentActivity = Date.now();
       }

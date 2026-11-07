@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-11-07
+
+### Fixed
+
+- **The overlay resets after the annotations are delivered.** Sent pins stayed on the
+  page as dimmed markers with their popovers; the delivery event now clears the queued
+  pins, the draft popover and the highlight, so the overlay starts clean for the next
+  review.
+  ([`e7c8f83`](https://github.com/klaus-2/dsh-redline/commit/e7c8f83))
+- **The delete button closes the pin popover.** It removed the pin but left the
+  comment panel open on screen.
+  ([`e7c8f83`](https://github.com/klaus-2/dsh-redline/commit/e7c8f83))
+
 ## [1.0.2] - 2026-11-07
 
 ### Fixed
