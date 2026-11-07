@@ -139,5 +139,6 @@
   "drawMedium": "Medium",
   "drawThick": "Thick",
   "drawSentHint": "Added to chat — it will follow your next message",
-  "drawShotFail": "Could not capture the screen"
+  "drawShotFail": "Could not capture the screen",
+  "drawWhite": "White"
 }

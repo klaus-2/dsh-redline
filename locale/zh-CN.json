@@ -139,5 +139,6 @@
   "drawMedium": "中",
   "drawThick": "粗",
   "drawSentHint": "已添加到聊天 — 将随你的下一条消息发送",
-  "drawShotFail": "无法截取屏幕"
+  "drawShotFail": "无法截取屏幕",
+  "drawWhite": "白色"
 }
