@@ -1,0 +1,37 @@
+name: Publish Node.js Package
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish-npm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Guard v-tag
+        run: |
+          if [[ "$GITHUB_REF_NAME" != v* ]]; then
+            echo "release $GITHUB_REF_NAME is not a v-tag; skipping publish"
+            exit 0
+          fi
+      - name: Version consistency
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          PLG=$(grep -m1 'PLUGIN_VERSION' lib/index.js | sed 's/.*"\(.*\)".*/\1/')
+          echo "package.json=$PKG PLUGIN_VERSION=$PLG"
+          test "$PKG" = "$PLG"
+      - name: Smoke suite
+        run: npm test
+      - name: Publish
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
