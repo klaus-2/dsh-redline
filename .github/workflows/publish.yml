@@ -36,7 +36,12 @@ jobs:
       - name: Smoke suite
         run: npm test
       - name: Publish
-        if: steps.guard.outputs.publish == 'true'
-        run: npm publish --access public
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "dsh-redline@$VERSION" version > /dev/null 2>&1; then
+            echo "dsh-redline@$VERSION is already on npm; publish skipped"
+          else
+            npm publish --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
