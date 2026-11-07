@@ -107,6 +107,11 @@ One harness instance, pages rendered by its built-in browser, viewport-based cro
   modified: accent palette, comment removal, inspector additions).
   Full notice: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
+- **[html2canvas](https://html2canvas.hertzen.com/)** — `vendor/html2canvas.min.js`
+  bundles version 1.4.1 (Copyright 2022 Niklas von Hertzen, MIT) to render
+  screenshot crops without any install-time dependency.
+  Full notice: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
 ### Inspired by
 
 - **[dsh-web-review](https://github.com/CanglongCl/dsh-web-review)** —
