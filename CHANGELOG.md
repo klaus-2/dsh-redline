@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-11-07
+
+### Fixed
+
+- **Internal server errors no longer masquerade as CORS failures.** The catch-all
+  error response omitted the `Access-Control-Allow-Origin` header, so a failing
+  route surfaced in the app console as a blocked cross-origin request instead of
+  the real 500. Error responses now carry the CORS header and the underlying
+  error is logged to the host console.
+
+
 ## [1.0.3] - 2026-11-07
 
 ### Fixed
