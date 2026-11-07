@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-11-07
+
+### Added
+
+- **In-app updates, Composer Plus style.** When a newer release exists, the
+  Updates row offers Update now: the host fetches the release files from the
+  version tag, stages and verifies them, swaps them into the plugin directory
+  and reports installed — restart the dsh to load it. Local development copies
+  (a `.git` in the plugin directory) are refused with a git-pull note.
+
+### Fixed
+
+- **Settings actually load from disk now.** The host used `readFileSync` without
+  importing it, so every boot silently fell back to defaults and the language,
+  hotkeys and screenshot padding reset on each restart.
+
+
 ## [1.0.6] - 2026-11-07
 
 ### Fixed
