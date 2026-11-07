@@ -71,7 +71,6 @@
     "drawRed": "Red — corrections",
     "drawBlue": "Blue — highlights",
     "drawGreen": "Green",
-    "drawSelect": "Select",
     "drawShapes": "Shapes",
     "drawLine": "Line",
     "drawStep": "Step",
@@ -215,7 +214,6 @@
     "drawRed": "Vermelho — correções",
     "drawBlue": "Azul — destaques",
     "drawGreen": "Verde",
-    "drawSelect": "Selecionar",
     "drawShapes": "Formas",
     "drawLine": "Linha",
     "drawStep": "Passo",
@@ -359,7 +357,6 @@
     "drawRed": "红色 — 修改",
     "drawBlue": "蓝色 — 强调",
     "drawGreen": "绿色",
-    "drawSelect": "选择",
     "drawShapes": "形状",
     "drawLine": "直线",
     "drawStep": "步骤",
@@ -645,23 +642,21 @@
 /* canvas livre */
 .lr-draw-canvas { position: fixed; inset: 0; pointer-events: none; touch-action: none; z-index: 2147483590; }
 .lr-draw-canvas[data-on] { pointer-events: auto; cursor: crosshair; }
-.lr-draw-canvas[data-tool="select"] { cursor: default; }
 /* keep popovers and the toolbar above the drawing canvas */
 .popover, .toolbar-wrap { z-index: 2147483592; }
-.lr-drawbar { position: fixed; left: 14px; top: 50%; transform: translateY(-50%); display: none; flex-direction: column; align-items: stretch; gap: 2px; background: var(--n-100); border: 1px solid var(--line); border-radius: 12px; padding: 6px; box-shadow: var(--shadow); z-index: 2147483601; }
+.lr-drawbar { position: fixed; left: 14px; top: 50%; transform: translateY(-50%); display: none; flex-direction: column; align-items: center; gap: 2px; background: var(--n-100); border: 1px solid var(--line); border-radius: 12px; padding: 6px; box-shadow: var(--shadow); z-index: 2147483601; }
 .lr-drawbar[data-on] { display: flex; }
 .lr-dicon { display: inline-flex; width: 14px; height: 14px; }
 .lr-dicon svg { display: block; }
-.lr-dtool { all: unset; box-sizing: border-box; cursor: pointer; height: 30px; min-width: 30px; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--n-700); position: relative; }
+.lr-dtool { all: unset; box-sizing: border-box; cursor: pointer; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--n-700); position: relative; }
 .lr-dtool:hover { background: var(--n-200); color: var(--n-950); }
 .lr-dtool[data-on] { background: var(--accent); color: #fff; }
 .lr-dtool[data-disabled] { opacity: .45; pointer-events: none; }
-.lr-dtool[data-hidden] { display: none; }
 .lr-dchev { position: absolute; right: 3px; bottom: 2px; display: inline-flex; opacity: .55; }
 .lr-dchev svg { display: block; }
 .lr-dcolor { width: 13px; height: 13px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--line); flex: none; }
 .lr-dwdemo { display: block; width: 16px; border-bottom: 2px solid var(--n-700); flex: none; }
-.lr-dsend { all: unset; box-sizing: border-box; cursor: pointer; height: 30px; padding: 0 10px; border-radius: 8px; background: var(--n-950); color: var(--n-50); font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; white-space: nowrap; transition: opacity 150ms ease; }
+.lr-dsend { all: unset; box-sizing: border-box; cursor: pointer; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--n-950); color: var(--n-50); transition: opacity 150ms ease; }
 .lr-dsend:not([data-disabled]):active { transform: var(--press); }
 .lr-dsend[data-disabled] { opacity: .3; pointer-events: none; }
 .lr-dmenu { position: fixed; display: none; flex-direction: column; gap: 1px; background: var(--n-50); border: 1px solid var(--line); border-radius: 10px; padding: 4px; box-shadow: var(--shadow); z-index: 2147483602; min-width: 132px; }
@@ -669,7 +664,6 @@
 .lr-ditem { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 9px; border-radius: 6px; color: var(--n-700); font-size: 12px; }
 .lr-ditem:hover { background: var(--n-100); color: var(--n-950); }
 .lr-ditem[data-on] { background: var(--n-100); color: var(--n-950); }
-.lr-dinput { all: unset; position: fixed; z-index: 2147483603; min-width: 170px; background: var(--n-50); border: 1px solid var(--accent); border-radius: 6px; color: var(--n-950); font-size: 12px; padding: 4px 6px; box-shadow: var(--shadow); }
   
 `;
   const absLayer = document.createElement("div");
@@ -683,7 +677,6 @@
   // ---------------------------------------------------------------- canvas livre
 
   const ICONS_CANVAS = {
-    cursor: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="m13 13 6 6"/></svg>',
     brush: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>',
     text: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>',
     rect: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>',
@@ -694,6 +687,7 @@
     undo: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>',
     redo: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0-5.5 5.5v0a5.5 5.5 0 0 0 5.5 5.5H13"/></svg>',
     trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>',
+    plus: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>',
     chev: '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>'
   };
 
@@ -704,14 +698,12 @@
   let drawItems = [];
   let drawUndo = [];
   let drawRedo = [];
-  let drawSel = null;
+  let drawTyping = null;
   let drawCanvas = null;
   let drawCtx = null;
   let drawBar = null;
   let drawBtn = null;
-  let drawInput = null;
   let drawLive = null;
-  let drawDrag = null;
   let drawMenu = null;
   let drawShapeIcon = null;
   let drawColorDot = null;
@@ -763,7 +755,6 @@
     if (drawUndo.length === 0) return;
     drawRedo.push(cloneItems(drawItems));
     drawItems = drawUndo.pop();
-    drawSel = null;
     saveDrawings();
     redrawDrawings();
     updateDrawBarState();
@@ -772,7 +763,6 @@
     if (drawRedo.length === 0) return;
     drawUndo.push(cloneItems(drawItems));
     drawItems = drawRedo.pop();
-    drawSel = null;
     saveDrawings();
     redrawDrawings();
     updateDrawBarState();
@@ -781,7 +771,6 @@
     if (drawItems.length === 0) return;
     snapshotDraw();
     drawItems = [];
-    drawSel = null;
     saveDrawings();
     redrawDrawings();
     updateDrawBarState();
@@ -808,46 +797,6 @@
     }
     if (item.type === "step") return { x: item.x - 11, y: item.y - 11, w: 22, h: 22 };
     return { x: Math.min(item.x, item.x2), y: Math.min(item.y, item.y2), w: Math.abs(item.x2 - item.x), h: Math.abs(item.y2 - item.y) };
-  }
-
-  function moveDrawItem(item, dx, dy) {
-    if (item.type === "path") {
-      for (const pt of item.points) { pt.x += dx; pt.y += dy; }
-      return;
-    }
-    if (item.type === "text" || item.type === "step") { item.x += dx; item.y += dy; return; }
-    item.x += dx;
-    item.y += dy;
-    item.x2 += dx;
-    item.y2 += dy;
-  }
-
-  function drawHit(item, x, y) {
-    const tol = Math.max(6, (item.w ?? 2.5) + 4);
-    if (item.type === "path") return item.points.some((pt) => Math.hypot(pt.x - x, pt.y - y) <= tol);
-    if (item.type === "text") {
-      const b = itemBBox(item);
-      return x >= b.x - 4 && x <= b.x + b.w + 4 && y >= b.y - 4 && y <= b.y + b.h + 4;
-    }
-    if (item.type === "step") return Math.hypot(item.x - x, item.y - y) <= 14;
-    if (item.type === "rect" || item.type === "ellipse") {
-      const b = itemBBox(item);
-      if (x < b.x - tol || x > b.x + b.w + tol || y < b.y - tol || y > b.y + b.h + tol) return false;
-      const nearEdge = Math.min(Math.abs(x - b.x), Math.abs(x - (b.x + b.w)), Math.abs(y - b.y), Math.abs(y - (b.y + b.h)));
-      return nearEdge <= tol;
-    }
-    const dx = item.x2 - item.x, dy = item.y2 - item.y;
-    const len2 = dx * dx + dy * dy || 1;
-    let t = ((x - item.x) * dx + (y - item.y) * dy) / len2;
-    t = Math.max(0, Math.min(1, t));
-    return Math.hypot(x - (item.x + t * dx), y - (item.y + t * dy)) <= tol;
-  }
-
-  function hitTestDraw(x, y) {
-    for (let i = drawItems.length - 1; i >= 0; i -= 1) {
-      if (drawHit(drawItems[i], x, y)) return drawItems[i];
-    }
-    return null;
   }
 
   function drawingsBBox() {
@@ -927,14 +876,14 @@
     drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
     for (const item of drawItems) renderDrawItem(drawCtx, item);
     if (drawLive !== null) renderDrawItem(drawCtx, drawLive.item, drawLive.to);
-    if (drawSel !== null && drawItems.includes(drawSel)) {
-      const b = itemBBox(drawSel);
-      drawCtx.save();
-      drawCtx.strokeStyle = "#3b82f6";
-      drawCtx.lineWidth = 1;
-      drawCtx.setLineDash([4, 3]);
-      drawCtx.strokeRect(b.x - 5, b.y - 5, b.w + 10, b.h + 10);
-      drawCtx.restore();
+    if (drawTyping !== null) {
+      drawCtx.font = "13px Segoe UI, system-ui, sans-serif";
+      drawCtx.textAlign = "start";
+      drawCtx.textBaseline = "top";
+      drawCtx.fillStyle = drawTyping.color;
+      drawCtx.fillText(drawTyping.text, drawTyping.x, drawTyping.y);
+      const tw = drawCtx.measureText(drawTyping.text).width;
+      drawCtx.fillRect(drawTyping.x + tw + 1, drawTyping.y, 1.5, 14);
     }
   }
 
@@ -945,10 +894,25 @@
     redrawDrawings();
   }
 
+  function commitDrawTyping() {
+    if (drawTyping === null) return;
+    const text = drawTyping.text;
+    const item = { type: "text", x: drawTyping.x, y: drawTyping.y, color: drawTyping.color, text };
+    drawTyping = null;
+    if (text !== "") {
+      snapshotDraw();
+      drawItems.push(item);
+      saveDrawings();
+      updateDrawBarState();
+    }
+    redrawDrawings();
+  }
+
   function toggleDraw(on) {
     drawMode = typeof on === "boolean" ? on : !drawMode;
     if (drawMode) { setMode(null); closePanels(); }
     closeDrawMenu();
+    if (!drawMode && drawTyping !== null) commitDrawTyping();
     drawCanvas.toggleAttribute("data-on", drawMode);
     drawBar.toggleAttribute("data-on", drawMode);
     if (drawBtn !== null) drawBtn.classList.toggle("tool-active", drawMode);
@@ -958,9 +922,6 @@
       setHint(t("drawHint"), 2600);
     } else {
       drawLive = null;
-      drawDrag = null;
-      drawSel = null;
-      if (drawInput !== null) { const input = drawInput; drawInput = null; input.remove(); }
       redrawDrawings();
     }
   }
@@ -975,14 +936,11 @@
 
   function syncDrawTools() {
     if (drawBar === null) return;
-    if (drawCanvas !== null) drawCanvas.dataset.tool = drawTool;
     const shape = SHAPE_DEFS.find((def) => def.id === drawTool);
     drawBar.querySelectorAll(".lr-dtool").forEach((btn) => {
       btn.toggleAttribute("data-on", btn.dataset.tool === drawTool || (btn.dataset.tool === "shapes" && shape !== undefined));
     });
     if (drawShapeIcon !== null) drawShapeIcon.innerHTML = shape !== undefined ? ICONS_CANVAS[shape.icon] : ICONS_CANVAS.rect;
-    const colorable = drawTool !== "select";
-    drawBar.querySelectorAll("[data-colorable]").forEach((btn) => btn.toggleAttribute("data-hidden", !colorable));
   }
 
   function closeDrawMenu() {
@@ -1011,8 +969,8 @@
 
   function openShapesMenu(anchor) {
     openDrawMenu(anchor, SHAPE_DEFS.map((def) => ({ value: def.id, label: t(def.label), icon: ICONS_CANVAS[def.icon] })), (value) => {
+      if (drawTyping !== null) commitDrawTyping();
       drawTool = value;
-      drawSel = null;
       redrawDrawings();
       syncDrawTools();
     }, SHAPE_DEFS.some((def) => def.id === drawTool) ? drawTool : null);
@@ -1043,8 +1001,8 @@
       if (onPick === undefined) {
         btn.addEventListener("click", () => {
           closeDrawMenu();
+          if (drawTyping !== null) commitDrawTyping();
           drawTool = id;
-          drawSel = null;
           redrawDrawings();
           syncDrawTools();
         });
@@ -1055,7 +1013,6 @@
       drawBar.append(btn);
       return btn;
     };
-    addTool("select", "drawSelect", ICONS_CANVAS.cursor);
     addTool("brush", "drawBrush", ICONS_CANVAS.brush);
     const shapeBtn = addTool("shapes", "drawShapes", ICONS_CANVAS.rect, (btn) => openShapesMenu(btn));
     drawShapeIcon = shapeBtn.querySelector(".lr-dicon");
@@ -1066,17 +1023,15 @@
     drawColorDot.style.background = drawColor;
     colorBtn.prepend(drawColorDot);
     colorBtn.append(el("span", { class: "lr-dchev" }, ICONS_CANVAS.chev));
-    colorBtn.dataset.colorable = "";
     const widthBtn = addTool("width", "drawWidth", "", (btn) => openWidthMenu(btn));
     drawWidthDemo = el("span", { class: "lr-dwdemo" });
     drawWidthDemo.style.borderBottomWidth = `${drawWidth}px`;
     widthBtn.prepend(drawWidthDemo);
     widthBtn.append(el("span", { class: "lr-dchev" }, ICONS_CANVAS.chev));
-    widthBtn.dataset.colorable = "";
     drawUndoBtn = addTool("undo", "drawUndo", ICONS_CANVAS.undo, () => undoDraw());
     drawRedoBtn = addTool("redo", "drawRedo", ICONS_CANVAS.redo, () => redoDraw());
     drawTrashBtn = addTool("trash", "drawClear", ICONS_CANVAS.trash, () => clearDraw());
-    drawSendBtn = el("button", { class: "lr-dsend", type: "button", title: t("drawSend") }, t("drawSend"));
+    drawSendBtn = el("button", { class: "lr-dsend", type: "button", title: t("drawSend") }, ICONS_CANVAS.plus);
     drawSendBtn.addEventListener("click", () => sendDrawingToChat());
     drawBar.append(drawSendBtn);
     const exit = el("button", { class: "lr-dtool", type: "button", title: t("drawExit") }, "✕");
@@ -1085,36 +1040,6 @@
     fixedLayer.append(drawBar);
     syncDrawTools();
     updateDrawBarState();
-  }
-
-  function commitText(x, y) {
-    if (drawInput !== null) { const prev = drawInput; drawInput = null; prev.remove(); }
-    const input = el("input", { class: "lr-dinput", type: "text", placeholder: t("drawText") });
-    input.style.left = `${Math.min(x, window.innerWidth - 190)}px`;
-    input.style.top = `${Math.min(y, window.innerHeight - 36)}px`;
-    drawInput = input;
-    const commit = () => {
-      if (drawInput !== input) return;
-      drawInput = null;
-      const text = input.value.trim();
-      if (text !== "") {
-        snapshotDraw();
-        drawItems.push({ type: "text", x, y, color: drawColor, text });
-        saveDrawings();
-        redrawDrawings();
-        updateDrawBarState();
-      }
-      input.remove();
-    };
-    input.addEventListener("keydown", (e) => {
-      e.stopPropagation();
-      if (e.key === "Enter") { e.preventDefault(); commit(); }
-      if (e.key === "Escape") { e.preventDefault(); drawInput = null; input.remove(); }
-    });
-    input.addEventListener("blur", commit);
-    fixedLayer.append(input);
-    // pointerdown's default action would blur the input right after focus
-    requestAnimationFrame(() => { if (drawInput === input) input.focus({ preventScroll: true }); });
   }
 
   function commitStep(x, y) {
@@ -1128,6 +1053,7 @@
 
   async function sendDrawingToChat() {
     if (drawItems.length === 0 || drawSending) return;
+    if (drawTyping !== null) commitDrawTyping();
     drawSending = true;
     updateDrawBarState();
     try {
@@ -1169,32 +1095,26 @@
   }
 
   function onCanvasPointerDown(e) {
-    if (!drawMode || drawInput !== null) return;
+    if (!drawMode) return;
     if (e.button !== 0) return;
     if (drawMenu !== null) { closeDrawMenu(); return; }
     const x = e.clientX, y = e.clientY;
-    if (drawTool === "text") { e.preventDefault(); commitText(x, y); return; }
-    if (drawTool === "step") { e.preventDefault(); commitStep(x, y); return; }
-    drawCanvas.setPointerCapture?.(e.pointerId);
-    if (drawTool === "select") {
-      drawSel = hitTestDraw(x, y);
-      drawDrag = drawSel !== null ? { x, y, moved: false } : null;
+    if (drawTool !== "text" && drawTyping !== null) commitDrawTyping();
+    if (drawTool === "text") {
+      e.preventDefault();
+      if (drawTyping !== null) commitDrawTyping();
+      drawTyping = { x, y, color: drawColor, text: "" };
+      drawCanvas.focus({ preventScroll: true });
       redrawDrawings();
       return;
     }
+    if (drawTool === "step") { e.preventDefault(); commitStep(x, y); return; }
+    drawCanvas.setPointerCapture?.(e.pointerId);
     if (drawTool === "brush") drawLive = { item: { type: "path", color: drawColor, w: drawWidth, points: [{ x, y }] }, to: null };
     else drawLive = { item: { type: drawTool, color: drawColor, w: drawWidth, x, y, x2: x, y2: y }, to: { x, y } };
   }
 
   function onCanvasPointerMove(e) {
-    if (drawDrag !== null) {
-      if (!drawDrag.moved) { snapshotDraw(); drawDrag.moved = true; }
-      moveDrawItem(drawSel, e.clientX - drawDrag.x, e.clientY - drawDrag.y);
-      drawDrag.x = e.clientX;
-      drawDrag.y = e.clientY;
-      redrawDrawings();
-      return;
-    }
     if (drawLive === null) return;
     const to = { x: e.clientX, y: e.clientY };
     if (drawLive.item.type === "path") drawLive.item.points.push(to);
@@ -1203,12 +1123,6 @@
   }
 
   function onCanvasPointerUp() {
-    if (drawDrag !== null) {
-      const moved = drawDrag.moved;
-      drawDrag = null;
-      if (moved) { saveDrawings(); updateDrawBarState(); }
-      return;
-    }
     if (drawLive === null) return;
     const item = drawLive.item;
     const to = drawLive.to;
@@ -1226,6 +1140,7 @@
   function setupDrawCanvas() {
     loadDrawings();
     drawCanvas = el("canvas", { class: "lr-draw-canvas" });
+    drawCanvas.tabIndex = -1;
     resizeDrawCanvas();
     rootDiv.append(drawCanvas);
     drawCtx = drawCanvas.getContext("2d");
@@ -1234,7 +1149,7 @@
     drawCanvas.addEventListener("pointerdown", onCanvasPointerDown);
     drawCanvas.addEventListener("pointermove", onCanvasPointerMove);
     drawCanvas.addEventListener("pointerup", onCanvasPointerUp);
-    drawCanvas.addEventListener("pointercancel", () => { drawLive = null; drawDrag = null; redrawDrawings(); });
+    drawCanvas.addEventListener("pointercancel", () => { drawLive = null; redrawDrawings(); });
     window.addEventListener("resize", resizeDrawCanvas);
   }
 
@@ -1382,14 +1297,12 @@
       const from = event.composedPath?.()[0] ?? event.target;
       const tag = from?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || from?.isContentEditable === true) return;
-      if (drawMode && drawSel !== null && (event.key === "Delete" || event.key === "Backspace")) {
+      if (drawMode && drawTyping !== null && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
-        snapshotDraw();
-        drawItems = drawItems.filter((item) => item !== drawSel);
-        drawSel = null;
-        saveDrawings();
-        redrawDrawings();
-        updateDrawBarState();
+        if (event.key === "Enter") commitDrawTyping();
+        else if (event.key === "Escape") { drawTyping = null; redrawDrawings(); }
+        else if (event.key === "Backspace") { drawTyping.text = drawTyping.text.slice(0, -1); redrawDrawings(); }
+        else if (event.key.length === 1) { drawTyping.text += event.key; redrawDrawings(); }
         return;
       }
       if (event.key === KEY_COMMENT || event.key === KEY_COMMENT.toUpperCase()) setMode(mode === "picking" ? null : "picking");
