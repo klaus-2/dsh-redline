@@ -216,6 +216,77 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
   }
 
+  harness.section("client: the update survives the plugin going away");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const pluginManager = {
+      async installBundle() {
+        return { ok: true, value: { application: "applied", version: "1.0.19" } };
+      }
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url) => {
+        const target = String(url);
+        if (target.includes("/.lr/update")) {
+          return new Response(JSON.stringify({ ok: true, version: "1.0.17", installed: "1.0.17", update: { latest: "v1.0.19", newer: true, url: "https://github.com/klaus-2/dsh-redline/releases/tag/v1.0.19" } }), { status: 200, headers: { "content-type": "application/json" } });
+        }
+        if (target.includes("/.lr/settings")) {
+          return new Response(JSON.stringify({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.17" }), { status: 200, headers: { "content-type": "application/json" } });
+        }
+        if (target.includes("/api/dsh-redline.secret")) {
+          return new Response(JSON.stringify({ ok: true, secret: "a".repeat(64) }), { status: 200, headers: { "content-type": "application/json" } });
+        }
+        return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+      }
+    });
+    const client = fakeClientCtx({ remote: { pluginManager } });
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const withButton = renderOnce(stub, section.component, {});
+    const buttons = findElements(withButton.tree, (element) => element.props?.children === "Update now");
+    harness.eq("the update button appears", buttons.length, 1);
+    if (buttons.length === 1) {
+      await buttons[0].props.onClick();
+      await flush(4);
+      harness.check("the installed version is remembered", (localStorage.getItem("dsh-redline.updated") ?? "") === "1.0.19", String(localStorage.getItem("dsh-redline.updated")));
+    }
+  }
+
+  harness.section("client: the row keeps working when the plugin goes away");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    localStorage.setItem("dsh-redline.updated", "1.0.19");
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async () => { throw new Error("the plugin is gone"); }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const after = renderOnce(stub, section.component, {});
+    const unreachable = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("unreachable"));
+    harness.eq("the row does not claim the service is unreachable", unreachable.length, 0);
+    const restart = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("1.0.19"));
+    harness.check("the row asks for a restart with the installed version", restart.length > 0, JSON.stringify(after.tree).slice(0, 200));
+    const fake = findElements(after.tree, (element) => element.props?.children === "1.0.0");
+    harness.eq("the row does not show a made up version", fake.length, 0);
+  }
+
   harness.section("client: the release page link is always there");
   {
     const stub = createReactStub();
