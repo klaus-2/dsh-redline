@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.19] - 2026-11-08
+
+### Fixed
+
+- **The update check no longer fails when GitHub's hourly quota runs out.**
+  The row asked GitHub for the latest release, and that API answers 403 once
+  an unauthenticated caller spends its sixty requests an hour — so the row
+  could say the check had failed even with a release waiting. The version now
+  comes from the registry, which says what can actually be installed and has
+  no such quota; the release notes are read from GitHub on a best effort
+  basis, and a blocked notes request no longer breaks the check.
+
 ## [1.0.18] - 2026-11-08
 
 ### Fixed
