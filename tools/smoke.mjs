@@ -56,6 +56,8 @@ const targetUrl = `http://127.0.0.1:${TARGET_PORT}/`;
   check("auth: secret certo → 200", granted.status === 200);
   const attacker = await fetch(`${base}/.lr/status`, { headers: { origin: "https://example.com" } });
   check("auth: origin de terceiro sem secret → 401 sem CORS", attacker.status === 401 && attacker.headers.get("access-control-allow-origin") === null);
+  const vendor = await fetch(`${base}/.lr/vendor/html2canvas.min.js`);
+  check("vendor público para <script src>", vendor.status === 200 && (await vendor.text()).length > 1000);
 }
 
 let sessionCookie = "";
