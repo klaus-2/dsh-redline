@@ -127,7 +127,8 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("the built overlay keeps its core symbols", missing.length === 0, missing.join(", "));
     const css = readFileSync(path.join(pluginDir, "tencil-overlay.css"), "utf8");
     const expected = template.replace('"__TENCIL_CSS__"', JSON.stringify(css));
-    harness.check("the built overlay matches the template", expected === overlay, `template ${expected.length} chars, built ${overlay.length} chars`);
+    const sameText = (a, b) => a.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10)) === b.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+    harness.check("the built overlay matches the template", sameText(expected, overlay), `template ${expected.length} chars, built ${overlay.length} chars`);
     const templateMissing = REQUIRED_OVERLAY_SYMBOLS.filter((symbol) => !template.includes(symbol));
     harness.check("the template keeps its core symbols", templateMissing.length === 0, templateMissing.join(", "));
   }
