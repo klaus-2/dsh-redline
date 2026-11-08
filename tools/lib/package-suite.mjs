@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { packedFiles } from "./harness.mjs";
 import { listPublishedReleases, readPublishedReleases } from "./release-suite.mjs";
 
 export async function runPackageSuite(harness, { pluginDir, packageName }) {
@@ -44,6 +45,30 @@ export async function runPackageSuite(harness, { pluginDir, packageName }) {
   }
   harness.check("the license exists", existsSync(path.join(pluginDir, "LICENSE")));
   harness.check("the changelog exists", existsSync(path.join(pluginDir, "CHANGELOG.md")));
+
+  harness.section("package: what npm would publish");
+  {
+    const files = await packedFiles(pluginDir);
+    if (files === undefined) {
+      harness.skip("the published file list can be read", "npm pack is not available here");
+    } else {
+      const required = [
+        "lib/index.js",
+        "lib/client.js",
+        "lib/overlay.js",
+        "cordis.patch.yml",
+        "package.json",
+        "tencil-overlay.css",
+        "vendor/html2canvas.min.js",
+        "locale/en.json",
+        "locale/pt-BR.json",
+        "locale/zh-CN.json",
+        "docs/assets/icon.png"
+      ];
+      const missing = required.filter((file) => !files.includes(file));
+      harness.check("the published package carries what the host loads", missing.length === 0, missing.join(", "));
+    }
+  }
 
   harness.section("package: release invariants");
   const changelog = readFileSync(path.join(pluginDir, "CHANGELOG.md"), "utf8");

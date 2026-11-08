@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -22,7 +23,7 @@ export function createHarness({ title }) {
     eq(name, actual, expected) {
       const a = JSON.stringify(actual);
       const b = JSON.stringify(expected);
-      const clip = (value) => (value.length > 160 ? `${value.slice(0, 157)}...` : value);
+      const clip = (value) => (typeof value === "string" && value.length > 160 ? `${value.slice(0, 157)}...` : value);
       return harness.check(name, a === b, a === b ? "" : `got ${clip(a)}, want ${clip(b)}`);
     },
     includes(name, haystack, needle) {
@@ -167,6 +168,7 @@ export function fakeClientCtx(overrides = {}) {
   const services = { styles: { insert() {} }, ...overrides };
   const ctx = {
     get(name) {
+      if (name === "remote") return undefined;
       return services[name];
     },
     slots: {
@@ -190,7 +192,19 @@ export function fakeClientCtx(overrides = {}) {
       effects.push({ fn, label });
       return () => {};
     },
-    remote: { get: async () => undefined }
+    inject(deps, setup) {
+      const scope = {
+        ...services,
+        remote: services.remote,
+        effect: (fn, label) => {
+          effects.push({ fn, label });
+          return () => {};
+        }
+      };
+      setup(scope);
+      return { dispose() {} };
+    },
+    remote: services.remote ?? { get: async () => undefined }
   };
   const api = {
     ctx,
@@ -506,6 +520,23 @@ export async function freePort() {
   const port = typeof address === "object" && address !== null ? address.port : 0;
   await new Promise((resolve) => server.close(resolve));
   return port;
+}
+
+export async function packedFiles(dir) {
+  try {
+    const stdout = await new Promise((resolve, reject) => {
+      execFile("npm", ["pack", "--dry-run", "--json"], { cwd: dir, timeout: 120000, windowsHide: true, maxBuffer: 8 * 1024 * 1024, shell: true }, (error, out) => {
+        if (error) reject(error);
+        else resolve(out);
+      });
+    });
+    const parsed = JSON.parse(stdout);
+    if (!Array.isArray(parsed)) return undefined;
+    return (parsed[0]?.files ?? []).map((entry) => entry.path);
+  } catch (error) {
+    if (process.env.DSH_SUITE_DEBUG === '1') console.error('packedFiles falhou:', String(error?.message ?? error).slice(0, 300));
+    return undefined;
+  }
 }
 
 export function jsonResponse(body, status = 200) {
