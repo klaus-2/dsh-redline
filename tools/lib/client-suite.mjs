@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { collectCallArguments, evaluateObjectLiteral, extractObjectLiteral } from "./harness.mjs";
+import { collectCallArguments, createReactStub, evaluateObjectLiteral, extractObjectLiteral, fakeClientCtx, findElements, flush, loadClientModule, makeLocalStorage, renderOnce } from "./harness.mjs";
 
 const REQUIRED_OVERLAY_SYMBOLS = [
   "function loadPins",
@@ -143,5 +143,126 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
     const icon = path.join(pluginDir, "docs", "assets", "icon.png");
     harness.check("the icon exists", existsSync(icon));
+  }
+
+  harness.section("client: the update flow");
+  {
+    const build = (pluginManager, calls) => {
+      const stub = createReactStub();
+      const localStorage = makeLocalStorage();
+      const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+        react: stub.React,
+        localStorage,
+        console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+        fetch: async (url, options) => {
+          const target = String(url);
+          calls.push({ url: target, method: options?.method ?? "GET", body: options?.body });
+          if (target.includes("/.lr/update")) {
+            return new Response(JSON.stringify({ ok: true, version: "1.0.16", installed: "1.0.16", update: { latest: "v1.0.17", newer: true } }), { status: 200, headers: { "content-type": "application/json" } });
+          }
+          if (target.includes("/.lr/settings")) {
+            return new Response(JSON.stringify({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.16" }), { status: 200, headers: { "content-type": "application/json" } });
+          }
+          if (target.includes("/api/dsh-redline.secret")) {
+            return new Response(JSON.stringify({ ok: true, secret: "a".repeat(64) }), { status: 200, headers: { "content-type": "application/json" } });
+          }
+          return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+        }
+      });
+      const client = fakeClientCtx(pluginManager === undefined ? {} : { remote: { pluginManager } });
+      module.apply(client.ctx);
+      client.resolve();
+      const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+      return { stub, section, client };
+    };
+
+    const managerCalls = [];
+    const manager = {
+      async installBundle(spec, options) {
+        managerCalls.push({ spec, options });
+        return { ok: true, value: { application: "applied", version: "1.0.17" } };
+      }
+    };
+    const withManager = build(manager, []);
+    const rendered = renderOnce(withManager.stub, withManager.section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const withButton = renderOnce(withManager.stub, withManager.section.component, {});
+    const buttons = findElements(withButton.tree, (element) => element.props?.children === "Update now");
+    harness.eq("the update button appears when a release is available", buttons.length, 1);
+    if (buttons.length === 1) {
+      await buttons[0].props.onClick();
+      await flush(4);
+      harness.eq("the plugin manager is asked to install", managerCalls.length, 1);
+      harness.eq("the plugin manager receives the package and the version", managerCalls[0]?.spec, "dsh-redline@1.0.17");
+      harness.check("the plugin manager receives a request id", typeof managerCalls[0]?.options?.requestId === "string", JSON.stringify(managerCalls[0]?.options));
+    }
+
+    const fallbackCalls = [];
+    const withoutManager = build(undefined, fallbackCalls);
+    const renderedFallback = renderOnce(withoutManager.stub, withoutManager.section.component, {});
+    for (const effect of renderedFallback.effects) effect();
+    await flush(4);
+    const withButtonFallback = renderOnce(withoutManager.stub, withoutManager.section.component, {});
+    const fallbackButtons = findElements(withButtonFallback.tree, (element) => element.props?.children === "Update now");
+    harness.eq("the update button appears without a plugin manager", fallbackButtons.length, 1);
+    if (fallbackButtons.length === 1) {
+      await fallbackButtons[0].props.onClick();
+      await flush(4);
+      const installCall = fallbackCalls.find((entry) => entry.url.includes("/.lr/update/install"));
+      harness.check("the own install route is used when there is no plugin manager", installCall !== undefined, JSON.stringify(fallbackCalls.map((entry) => entry.url.slice(0, 60))));
+      harness.check("the own install route carries the version", String(installCall?.body ?? "").includes("1.0.17"), String(installCall?.body ?? ""));
+    }
+  }
+
+  harness.section("client: the update shows the real error");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const diagnostic = [
+      "Progress: resolved 254, reused 2, downloaded 0, added 1, done",
+      "dsh: installation rejected: Cannot validate installed package dsh-redline: Error: ENOENT",
+      "dsh: restored package.json, pnpm-lock.yaml, and node_modules."
+    ].join(String.fromCharCode(10));
+    const pluginManager = {
+      async installBundle() {
+        return { ok: true, value: { application: "failed", error: { code: "operation-error", diagnostic } } };
+      }
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url) => {
+        const target = String(url);
+        if (target.includes("/.lr/update")) {
+          return new Response(JSON.stringify({ ok: true, version: "1.0.16", installed: "1.0.16", update: { latest: "v1.0.17", newer: true } }), { status: 200, headers: { "content-type": "application/json" } });
+        }
+        if (target.includes("/.lr/settings")) {
+          return new Response(JSON.stringify({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.16" }), { status: 200, headers: { "content-type": "application/json" } });
+        }
+        if (target.includes("/api/dsh-redline.secret")) {
+          return new Response(JSON.stringify({ ok: true, secret: "a".repeat(64) }), { status: 200, headers: { "content-type": "application/json" } });
+        }
+        return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+      }
+    });
+    const client = fakeClientCtx({ remote: { pluginManager } });
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const withButton = renderOnce(stub, section.component, {});
+    const buttons = findElements(withButton.tree, (element) => element.props?.children === "Update now");
+    harness.eq("the update button appears", buttons.length, 1);
+    if (buttons.length === 1) {
+      await buttons[0].props.onClick();
+      await flush(4);
+      const after = renderOnce(stub, section.component, {});
+      const errors = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("installation rejected"));
+      harness.check("the message names the real failure", errors.length === 1, JSON.stringify(after.tree).slice(0, 120));
+    }
   }
 }

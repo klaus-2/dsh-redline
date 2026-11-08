@@ -278,11 +278,29 @@ export async function runHostSuite(harness, { pluginDir }) {
 
     harness.section("host: version and update");
     {
-      await withStubbedFetch([{ match: "api.github.com", reply: async () => new Response(JSON.stringify({ tag_name: "v99.0.0", body: "notes", html_url: "https://github.com/klaus-2/dsh-redline/releases/tag/v99.0.0" }), { status: 200, headers: { "content-type": "application/json" } }) }], async () => {
+      await withStubbedFetch([
+        { match: "api.github.com", reply: async () => new Response(JSON.stringify({ tag_name: "v99.0.0", body: "notes", html_url: "https://github.com/klaus-2/dsh-redline/releases/tag/v99.0.0" }), { status: 200, headers: { "content-type": "application/json" } }) },
+        { match: "registry.npmjs.org/dsh-redline", reply: async () => new Response(JSON.stringify({ version: "99.0.0" }), { status: 200, headers: { "content-type": "application/json" } }) }
+      ], async () => {
         const update = await (await fetch(`${base}/.lr/update`, { headers: auth })).json();
         harness.check("the update route answers", update.ok === true && update.update.latest === "v99.0.0" && update.update.newer === true, JSON.stringify(update.update));
         const settings = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
         harness.check("the settings carry the update information", settings.update !== null && settings.update.latest === "v99.0.0");
+      });
+      await withStubbedFetch([
+        { match: "api.github.com", reply: async () => new Response(JSON.stringify({ tag_name: "v99.0.0", body: "notes", html_url: "https://github.com/klaus-2/dsh-redline/releases/tag/v99.0.0" }), { status: 200, headers: { "content-type": "application/json" } }) },
+        { match: "registry.npmjs.org/dsh-redline", reply: async () => new Response("{}", { status: 404 }) }
+      ], async () => {
+        const withoutRegistry = await (await fetch(`${base}/.lr/update`, { headers: auth })).json();
+        harness.check("a release the registry does not have is not offered", withoutRegistry.update.newer === false, JSON.stringify(withoutRegistry.update).slice(0, 120));
+      });
+      await withStubbedFetch([
+        { match: "api.github.com", reply: async () => new Response(JSON.stringify({ tag_name: "v99.0.0", body: "notes", html_url: "https://github.com/klaus-2/dsh-redline/releases/tag/v99.0.0" }), { status: 200, headers: { "content-type": "application/json" } }) },
+        { match: "registry.npmjs.org/dsh-redline", reply: async () => { throw new Error("This operation was aborted"); } }
+      ], async () => {
+        const brokenRegistry = await (await fetch(`${base}/.lr/update`, { headers: auth })).json();
+        harness.check("a registry failure does not break the update check", brokenRegistry.error === undefined && brokenRegistry.update.latest === "v99.0.0", JSON.stringify(brokenRegistry).slice(0, 140));
+        harness.check("a release is still offered when the registry cannot be reached", brokenRegistry.update.newer === true, JSON.stringify(brokenRegistry.update).slice(0, 140));
       });
       const badVersion = await fetch(`${base}/.lr/update/install`, { method: "POST", headers: json(), body: JSON.stringify({ version: "abc" }) });
       harness.check("a malformed version is refused", badVersion.status === 400);
