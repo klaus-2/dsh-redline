@@ -5,6 +5,101 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.16] - 2026-11-08
+
+### Fixed
+
+- **Update now works on profiles that enforce a package age policy.** The in-app
+  update runs `pnpm add` in the user's profile, and a profile with a minimum
+  release age (or a lockfile entry for a package published in the last 24 hours)
+  made that install fail with a supply-chain policy error. The update now passes
+  `minimumReleaseAge=0` and `minimumReleaseAgeStrict=false` for its own install,
+  so it updates the plugin it was asked to update and nothing else.
+
+## [1.0.15] - 2026-11-08
+
+### Fixed
+
+- **Screenshots work again.** The overlay loads the vendored html2canvas with a
+  plain `<script src>`, which cannot carry the instance secret — since v1.0.14
+  that request was rejected and every screenshot failed to capture. The vendored
+  library under `/.lr/vendor/` is a public MIT asset with no review data in it,
+  so it is served without the secret again. Every other `/.lr/*` route keeps the
+  instance-secret requirement and the restricted origins.
+
+## [1.0.14] - 2026-11-08
+
+### Changed
+
+- **The protected loopback contract shipped again with the full security
+  notes.** The loopback server keeps the instance secret and the restricted
+  origins; this release republishes it so the install notes describe the whole
+  contract.
+
+## [1.0.13] - 2026-11-07
+
+### Security
+
+- **The loopback server no longer serves review data and screenshots to anyone
+  who can reach 127.0.0.1.**
+  - *Instance secret*: the host creates a random 32-byte secret on first boot
+    and keeps it in the profile
+    (`~/.dsh/profiles/<profile>/dsh-redline/instance.secret`, mode 0600). Every
+    `/.lr/*` route except the public health probe now requires it — as a
+    header, a `Bearer` token, or a `key` query parameter for image loads.
+    Requests without it get `401` and no CORS headers, so a page on any other
+    site can neither read the review data nor drive the control routes.
+  - *The secret travels over the authenticated Harness connection*: the client
+    reads it from `GET /api/dsh-redline.secret`, the same authenticated channel
+    the dsh uses for plugin routes, and hands it to the overlay it injects into
+    the harness browser. The secret file itself stays inside the profile and is
+    not served.
+  - *Origins restricted*: no more `access-control-allow-origin: *`. A response
+    echoes the caller's origin only when the request carries the valid secret;
+    unauthenticated answers carry no CORS headers at all.
+
+### Fixed
+
+- **The in-app update survives a reboot.** The update installed with the `pnpm`
+  found on `PATH`; the harness ships its own runtime pnpm, so the install did
+  not survive the next restart. The update now goes through the runtime pnpm
+  the harness itself uses.
+
+## [1.0.12] - 2026-11-07
+
+### Fixed
+
+- **The updates row no longer overflows the settings panel.** A long release
+  note pushed the row past the panel width. The row wraps now, and the release
+  notes open inside the same panel instead of under the row.
+
+## [1.0.11] - 2026-11-07
+
+### Fixed
+
+- **The plugin manager shows the name and the description.** The plugin did not
+  declare the locale service, so the metadata carried by
+  `locale/<lang>.json` never reached the manager and the entry showed up
+  blank.
+
+## [1.0.10] - 2026-11-07
+
+### Fixed
+
+- **A profile install resolves the locale files and the manifest.** The package
+  only exported its main entry, so `dsh-redline/locale/<lang>.json` and
+  `dsh-redline/package.json` could not be read from an installed copy. Both
+  subpaths are exported now.
+
+## [1.0.9] - 2026-11-07
+
+### Fixed
+
+- **The inspector rows and the pending counter follow the language.** They
+  looked up their translation by passing the Portuguese label as the key, so
+  they fell back to the untranslated text. They resolve through the `prop.*`
+  and pending keys now, which every language carries.
+
 ## [1.0.8] - 2026-11-07
 
 ### Fixed
