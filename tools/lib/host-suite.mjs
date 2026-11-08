@@ -1,0 +1,337 @@
+import { createServer } from "node:http";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { freePort, withIsolatedHome, withStubbedFetch } from "./harness.mjs";
+
+const enc = (value) => Buffer.from(value, "utf8").toString("base64url");
+const SHOT = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwcJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==";
+
+const PROTECTED_ROUTES = [
+  { path: "/.lr/status", method: "GET" },
+  { path: "/.lr/settings", method: "GET" },
+  { path: "/.lr/update", method: "GET" },
+  { path: "/.lr/drawings", method: "GET" },
+  { path: "/.lr/pending", method: "GET" },
+  { path: "/.lr/pending-pins", method: "GET" },
+  { path: "/.lr/client-cmd", method: "GET" },
+  { path: "/.lr/overlay.js", method: "GET" },
+  { path: "/.lr/proxy/abc", method: "GET" },
+  { path: "/.lr/attachments/missing.jpg", method: "GET" },
+  { path: "/.lr/annotations", method: "POST" },
+  { path: "/.lr/deliver", method: "POST" },
+  { path: "/.lr/resolve", method: "POST" },
+  { path: "/.lr/pending/clear", method: "POST" },
+  { path: "/.lr/pending/remove-pin", method: "POST" },
+  { path: "/.lr/client-ping", method: "POST" },
+  { path: "/.lr/settings", method: "POST" },
+  { path: "/.lr/drawings", method: "POST" },
+  { path: "/.lr/update/install", method: "POST" }
+];
+
+export async function runHostSuite(harness, { pluginDir }) {
+  await withIsolatedHome(async (home) => {
+    const modulePath = path.join(pluginDir, "lib", "index.js");
+    const moduleUrl = pathToFileURL(modulePath).href;
+    const source = readFileSync(modulePath, "utf8");
+    const secretHeader = /SECRET_HEADER = "([^"]+)"/.exec(source)?.[1] ?? "";
+    const pluginVersion = /PLUGIN_VERSION = "([^"]+)"/.exec(source)?.[1] ?? "";
+    const { startServer, formatContext, apply } = await import(moduleUrl);
+
+    const targetPort = await freePort();
+    const target = createServer((req, res) => {
+      const pathname = new URL(req.url, "http://x").pathname;
+      if (pathname === "/style.css") {
+        res.writeHead(200, { "content-type": "text/css" });
+        res.end("body { background: url('/bg.png'); }");
+        return;
+      }
+      if (pathname === "/") {
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(`<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src 'self'"><link rel="stylesheet" href="/style.css"></head><body><h1 id="t">Alvo</h1><img src="/img.png" srcset="/img.png 1x, /img2.png 2x"><a href="/about">sobre</a><script src="/app.js"></script></body></html>`);
+        return;
+      }
+      if (pathname === "/about") {
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end("<html><body><h1>Sobre</h1></body></html>");
+        return;
+      }
+      res.writeHead(200, { "content-type": "image/png" });
+      res.end(Buffer.from([0x89, 0x50]));
+    });
+    await new Promise((resolve) => target.listen(targetPort, "127.0.0.1", resolve));
+    const targetUrl = `http://127.0.0.1:${targetPort}/`;
+
+    const server = await startServer({ port: await freePort() });
+    const port = server.port ?? server.address().port;
+    const base = `http://127.0.0.1:${port}`;
+    const secret = readFileSync(path.join(home, ".dsh", "profiles", "desktop", "dsh-redline", "instance.secret"), "utf8").trim();
+    const auth = { [secretHeader]: secret };
+    const api = (extra) => ({ ...auth, ...(extra ?? {}) });
+    const json = (extra) => api({ "content-type": "application/json", ...(extra ?? {}) });
+
+    harness.section("host: boot and instance secret");
+    harness.check("the server binds a port", typeof port === "number" && port > 0, String(port));
+    harness.check("the secret file lives in the profile", existsSync(path.join(home, ".dsh", "profiles", "desktop", "dsh-redline", "instance.secret")));
+    harness.check("the secret is 64 hex characters", /^[0-9a-f]{64}$/.test(secret), secret.slice(0, 12));
+    {
+      const restarted = await import(`${moduleUrl}?restart=1`);
+      const again = await restarted.startServer({ port: await freePort() });
+      again.close();
+      const reread = readFileSync(path.join(home, ".dsh", "profiles", "desktop", "dsh-redline", "instance.secret"), "utf8").trim();
+      harness.check("the secret survives a restart", reread === secret);
+    }
+    {
+      const health = await fetch(`${base}/.lr/health`);
+      const body = await health.json();
+      harness.check("the health route answers", health.status === 200 && body.ok === true && body.name === "dsh-redline");
+    }
+
+    harness.section("host: auth matrix");
+    {
+      let denied = 0;
+      let leaked = 0;
+      for (const route of PROTECTED_ROUTES) {
+        const response = await fetch(`${base}${route.path}`, { method: route.method, headers: { "content-type": "application/json" }, body: route.method === "POST" ? "{}" : undefined });
+        if (response.status !== 401) denied += 1;
+        if (response.headers.get("access-control-allow-origin") !== null) leaked += 1;
+      }
+      harness.check("every protected route answers 401 without the secret", denied === 0, `${denied} route(s) answered otherwise`);
+      harness.check("a 401 never carries a CORS header", leaked === 0, `${leaked} route(s) leaked CORS`);
+
+      let wrong = 0;
+      for (const route of PROTECTED_ROUTES) {
+        const response = await fetch(`${base}${route.path}`, { method: route.method, headers: { ...auth, [secretHeader]: "0".repeat(64) }, body: route.method === "POST" ? "{}" : undefined });
+        if (response.status !== 401) wrong += 1;
+      }
+      harness.check("every protected route rejects a wrong secret", wrong === 0, `${wrong} route(s) accepted it`);
+
+      let granted = 0;
+      for (const route of PROTECTED_ROUTES) {
+        const response = await fetch(`${base}${route.path}`, { method: route.method, headers: json(), body: route.method === "POST" ? "{}" : undefined });
+        if (response.status === 401) granted += 1;
+      }
+      harness.check("every protected route accepts the right secret", granted === 0, `${granted} route(s) refused it`);
+    }
+    {
+      const health = await fetch(`${base}/.lr/health`);
+      harness.check("the health route stays public", health.status === 200);
+      const vendor = await fetch(`${base}/.lr/vendor/html2canvas.min.js`);
+      harness.check("the vendor script stays public (a script tag cannot send headers)", vendor.status === 200 && (await vendor.text()).length > 1000);
+    }
+    {
+      const bearer = await fetch(`${base}/.lr/status`, { headers: { authorization: `Bearer ${secret}` } });
+      harness.check("a bearer token authenticates", bearer.status === 200);
+      const query = await fetch(`${base}/.lr/status?key=${secret}`);
+      harness.check("the key query parameter authenticates", query.status === 200);
+      const short = await fetch(`${base}/.lr/status`, { headers: { [secretHeader]: secret.slice(0, 10) } });
+      harness.check("a truncated secret is rejected", short.status === 401);
+    }
+    {
+      const preflight = await fetch(`${base}/.lr/annotations`, { method: "OPTIONS", headers: { ...auth, origin: "https://example.com" } });
+      harness.check("the preflight advertises the secret header", preflight.status === 204 && (preflight.headers.get("access-control-allow-headers") ?? "").includes(secretHeader));
+      const allowed = await fetch(`${base}/.lr/status`, { headers: { ...auth, origin: "https://example.com" } });
+      harness.check("an authorized request echoes the origin", allowed.headers.get("access-control-allow-origin") === "https://example.com");
+      const appOrigin = await fetch(`${base}/.lr/health`, { headers: { origin: "http://127.0.0.1:5173" } });
+      harness.check("the app origin is allowed on a public route", appOrigin.headers.get("access-control-allow-origin") === "http://127.0.0.1:5173");
+      const attacker = await fetch(`${base}/.lr/status`, { headers: { origin: "https://evil.example" } });
+      harness.check("a third-party origin without the secret is refused without CORS", attacker.status === 401 && attacker.headers.get("access-control-allow-origin") === null);
+    }
+
+    harness.section("host: settings");
+    {
+      const response = await fetch(`${base}/.lr/settings`, { headers: auth });
+      const body = await response.json();
+      harness.check("the defaults come back", body.ok === true && body.settings.lang === "auto" && body.settings.keys.comment === "c" && body.settings.keys.adjust === "v" && body.settings.screenshot === true && body.settings.cropPad === 72, JSON.stringify(body.settings));
+      harness.check("the settings expose the version and the repo", body.version === pluginVersion && body.current === pluginVersion && body.repo === "https://github.com/klaus-2/dsh-redline");
+    }
+    {
+      const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "pt", keys: { comment: "x", adjust: "z" }, screenshot: false, cropPad: 96 }) });
+      const body = await response.json();
+      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z" }, screenshot: false, cropPad: 96 });
+    }
+    {
+      const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "klingon", keys: { comment: "xx", adjust: "!" }, screenshot: "yes", cropPad: 5 }) });
+      const body = await response.json();
+      harness.eq("an invalid language is ignored", body.settings.lang, "pt");
+      harness.eq("an invalid shortcut is ignored", body.settings.keys, { comment: "x", adjust: "z" });
+      harness.eq("a non-boolean screenshot is ignored", body.settings.screenshot, false);
+      harness.eq("the crop padding is clamped", body.settings.cropPad, 16);
+      const high = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ cropPad: 9999 }) })).json();
+      harness.eq("the crop padding is clamped at the top", high.settings.cropPad, 200);
+    }
+    {
+      const restarted = await import(`${moduleUrl}?restart=2`);
+      const server2 = await restarted.startServer({ port: await freePort() });
+      const port2 = server2.port ?? server2.address().port;
+      const response = await fetch(`http://127.0.0.1:${port2}/.lr/settings`, { headers: { [secretHeader]: secret } });
+      const body = await response.json();
+      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z" }, screenshot: false, cropPad: 200 });
+      server2.close();
+    }
+
+    harness.section("host: drawings");
+    {
+      const empty = await (await fetch(`${base}/.lr/drawings`, { headers: auth })).json();
+      harness.check("the drawings start empty", empty.ok === true && Array.isArray(empty.items));
+      const stored = await (await fetch(`${base}/.lr/drawings`, { method: "POST", headers: json(), body: JSON.stringify({ items: [{ type: "stroke", points: [1, 2] }, { nope: true }, null] }) })).json();
+      harness.eq("only the shaped items are stored", stored.count, 1);
+      const listed = await (await fetch(`${base}/.lr/drawings`, { headers: auth })).json();
+      harness.eq("the drawings come back", listed.items.length, 1);
+      const many = Array.from({ length: 450 }, () => ({ type: "stroke" }));
+      await fetch(`${base}/.lr/drawings`, { method: "POST", headers: json(), body: JSON.stringify({ items: many }) });
+      const capped = await (await fetch(`${base}/.lr/drawings`, { headers: auth })).json();
+      harness.eq("the drawings are capped", capped.items.length, 400);
+    }
+
+    harness.section("host: annotations lifecycle");
+    {
+      const posted = await (await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [
+        { id: "1", tag: "h1", selector: "body h1:nth-of-type(1)", text: "Alvo", comment: "mude o título", changes: [{ prop: "color", before: "#000", after: "red" }], shot: SHOT },
+        { id: "2", tag: "img", selector: "body img:nth-of-type(1)", text: "", comment: "aumente a logo", changes: [] }
+      ], screenshot: null }) })).json();
+      harness.check("the pins wait for the next message", posted.ok === true && posted.delivered === "pending-next-message" && posted.kind === "pending" && posted.count === 2, JSON.stringify(posted).slice(0, 140));
+
+      const pending = await (await fetch(`${base}/.lr/pending`, { headers: auth })).json();
+      harness.check("the pending snapshot lists the pins", pending.count === 2 && pending.pins.length === 2 && pending.pins[0].comment === "mude o título", JSON.stringify(pending).slice(0, 140));
+
+      const ids = await (await fetch(`${base}/.lr/pending-pins`, { headers: auth })).json();
+      harness.check("the pending ids are listed", ids.ids.includes("1") && ids.ids.includes("2"), JSON.stringify(ids.ids));
+
+      const shotDir = path.join(home, ".dsh", "attachments", "live-review");
+      const files = existsSync(shotDir) ? readdirSync(shotDir) : [];
+      harness.check("the per-pin screenshot is stored", files.length >= 1, `${files.length} file(s)`);
+      if (files.length > 0) {
+        const served = await fetch(`${base}/.lr/attachments/${files[0]}`, { headers: auth });
+        harness.check("the stored screenshot is served", served.status === 200 && (served.headers.get("content-type") ?? "").startsWith("image/"));
+      }
+      const traversal = await fetch(`${base}/.lr/attachments/..%2F..%2Fsettings.yaml`, { headers: auth });
+      harness.check("a traversal attempt is blocked", traversal.status === 404);
+
+      const removed = await (await fetch(`${base}/.lr/pending/remove-pin`, { method: "POST", headers: json(), body: JSON.stringify({ pinId: "2" }) })).json();
+      harness.check("a pin can be removed", removed.removed === true && removed.count === 1, JSON.stringify(removed));
+      const removedAgain = await (await fetch(`${base}/.lr/pending/remove-pin`, { method: "POST", headers: json(), body: JSON.stringify({ pinId: "2" }) })).json();
+      harness.check("removing an unknown pin is a no-op", removedAgain.removed === false);
+
+      const cleared = await (await fetch(`${base}/.lr/pending/clear`, { method: "POST", headers: json(), body: JSON.stringify({}) })).json();
+      harness.check("the snapshot is discarded", cleared.ok === true);
+      const afterClear = await (await fetch(`${base}/.lr/pending`, { headers: auth })).json();
+      harness.eq("nothing is pending after the clear", afterClear.count, 0);
+
+      const emptyPost = await (await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [], screenshot: null }) })).json();
+      harness.check("an empty post reports the initial empty state", emptyPost.kind === "initial-empty", JSON.stringify(emptyPost));
+      const badBody = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: "not json" });
+      harness.check("a malformed body answers 400", badBody.status === 400);
+    }
+    {
+      const { text } = formatContext({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "1", tag: "h1", selector: "body h1", text: "Alvo", comment: "mude o título", changes: [{ prop: "color", before: "#000", after: "red" }], textChange: { before: "a", after: "b" } }], screenshotPath: null });
+      harness.check("the context carries the header", text.startsWith("# Browser comments (Redline)"));
+      harness.includes("the context carries the selector", text, "body h1");
+      harness.includes("the context carries the comment", text, "mude o título");
+      harness.includes("the context carries the visual change", text, "color: #000 -> red");
+      harness.includes("the context carries the text change", text, "a -> b");
+    }
+
+    harness.section("host: proxy and page rewriting");
+    {
+      const response = await fetch(`${base}/p/${enc(targetUrl)}`);
+      const html = await response.text();
+      const cookie = /lr_session=[a-z0-9-]+/i.exec(response.headers.get("set-cookie") ?? "")?.[0] ?? "";
+      harness.check("the page answers 200", response.status === 200);
+      harness.includes("the overlay is injected", html, "/.lr/overlay.js");
+      harness.includes("the config is injected", html, "window.__LR__=");
+      harness.excludes("the CSP meta is removed", html, "http-equiv=\"Content-Security-Policy\"");
+      harness.check("the CSP header is removed", (response.headers.get("content-security-policy") ?? "ausente") === "ausente");
+      harness.includes("a link points to the page proxy", html, `/p/${enc(`http://127.0.0.1:${targetPort}/about`)}`);
+      harness.includes("an image points to the asset proxy", html, `/.lr/proxy/${enc(`http://127.0.0.1:${targetPort}/img.png`)}`);
+      harness.includes("a script points to the asset proxy", html, `/.lr/proxy/${enc(`http://127.0.0.1:${targetPort}/app.js`)}`);
+      harness.includes("a srcset is rewritten", html, `/.lr/proxy/${enc(`http://127.0.0.1:${targetPort}/img2.png`)}`);
+      harness.check("a session cookie is issued", cookie !== "");
+
+      const css = await (await fetch(`${base}/.lr/proxy/${enc(`http://127.0.0.1:${targetPort}/style.css`)}`, { headers: auth })).text();
+      harness.includes("a CSS url is rewritten", css, `/.lr/proxy/${enc(`http://127.0.0.1:${targetPort}/bg.png`)}`);
+
+      const fallthrough = await fetch(`${base}/about`, { headers: { cookie } });
+      const fallthroughHtml = await fallthrough.text();
+      harness.check("the fallthrough proxies the target", fallthrough.status === 200 && fallthroughHtml.includes("Sobre"));
+      harness.includes("the fallthrough is rewritten too", fallthroughHtml, "window.__LR__=");
+
+      const raw = await fetch(`${base}/p/http://127.0.0.1:${targetPort}/`);
+      harness.check("the raw target form works", raw.status === 200 && (await raw.text()).includes("/.lr/overlay.js"));
+      const noScheme = await fetch(`${base}/p/127.0.0.1:${targetPort}`);
+      harness.check("the scheme-less target form works", noScheme.status === 200 && (await noScheme.text()).includes("window.__LR__="));
+      const invalid = await fetch(`${base}/p/nao-e-url`);
+      harness.check("an invalid target answers 400", invalid.status === 400 && (await invalid.text()).includes("Redline"));
+    }
+
+    harness.section("host: overlay and vendor");
+    {
+      const overlay = await fetch(`${base}/.lr/overlay.js`, { headers: auth });
+      const overlaySource = await overlay.text();
+      harness.check("the overlay is served as javascript", overlay.status === 200 && /text\/javascript/.test(overlay.headers.get("content-type") ?? ""));
+      const REQUIRED = ["function loadPins", "function savePins", "function renderPins", "function mountShadow", "function setHint", "function postSnapshot", "function openAdjustPanel", "const EDITABLE_PROPS", "const PROP_META", "const t = (key) =>"];
+      const missing = REQUIRED.filter((symbol) => !overlaySource.includes(symbol));
+      harness.check("the overlay keeps its core symbols", missing.length === 0, missing.join(", "));
+      const selfRef = overlaySource.slice(overlaySource.indexOf("const UI_LOCALES"), overlaySource.indexOf("const t = (key)")).match(/: t\("/g);
+      harness.check("the locales do not reference themselves", selfRef === null, String(selfRef ? selfRef.length : 0));
+    }
+
+    harness.section("host: version and update");
+    {
+      await withStubbedFetch([{ match: "api.github.com", reply: async () => new Response(JSON.stringify({ tag_name: "v99.0.0", body: "notes", html_url: "https://github.com/klaus-2/dsh-redline/releases/tag/v99.0.0" }), { status: 200, headers: { "content-type": "application/json" } }) }], async () => {
+        const update = await (await fetch(`${base}/.lr/update`, { headers: auth })).json();
+        harness.check("the update route answers", update.ok === true && update.update.latest === "v99.0.0" && update.update.newer === true, JSON.stringify(update.update));
+        const settings = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
+        harness.check("the settings carry the update information", settings.update !== null && settings.update.latest === "v99.0.0");
+      });
+      const badVersion = await fetch(`${base}/.lr/update/install`, { method: "POST", headers: json(), body: JSON.stringify({ version: "abc" }) });
+      harness.check("a malformed version is refused", badVersion.status === 400);
+      const local = await (await fetch(`${base}/.lr/update/install`, { method: "POST", headers: json(), body: JSON.stringify({ version: pluginVersion }) })).json();
+      harness.check("a development copy refuses the in-app install", local.ok === false && local.error === "local-development", JSON.stringify(local));
+    }
+
+    harness.section("host: agent delivery");
+    {
+      const { fakeHostCtx } = await import("./harness.mjs");
+      const host = fakeHostCtx();
+      await apply(host.ctx);
+      harness.check("the secret route is registered", host.routes.has("/api/dsh-redline.secret"));
+      const secretRoute = host.routes.get("/api/dsh-redline.secret");
+      harness.eq("the secret route declares GET", secretRoute.methods, ["GET"]);
+      harness.eq("the secret route buffers the body", secretRoute.requestBody, "buffered");
+      const secretBody = await (await secretRoute.fetch(new Request("http://x/api/dsh-redline.secret"))).json();
+      harness.check("the secret route hands the instance secret over", secretBody.ok === true && secretBody.secret === secret);
+      harness.check("the system prompt section is registered", host.sections.some((section) => section.name === "plugin:dsh-redline"));
+      harness.check("the slash command is registered", host.commands.has("redline-send"));
+      harness.check("the pre-step hook is registered", host.listeners.has("agent/pre-step"));
+
+      await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: json(), body: JSON.stringify({ kind: "view", sessionId: "session-1" }) });
+      await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "9", tag: "h1", selector: "body h1", text: "Alvo", comment: "mude o título", changes: [] }], screenshot: null }) });
+      const preStep = host.listeners.get("agent/pre-step");
+      const decision = await preStep(
+        { agent: { id: "session-1" }, messages: [{ id: "m1", source: { kind: "user", rpcId: "rpc-1" } }], signal: undefined },
+        async () => ({ kind: "enter", messages: [{ id: "m1", source: { kind: "user" } }] })
+      );
+      const annotation = (decision.messages ?? []).find((message) => message.source?.kind === "dsh-redline");
+      harness.check("the pending snapshot reaches the agent message", annotation !== undefined);
+      harness.includes("the annotation carries the comment", annotation?.content?.[0]?.text ?? "", "mude o título");
+      harness.check("the annotation carries the sections", Array.isArray(annotation?.source?.sections) && annotation.source.sections.length > 1);
+
+      const status = await (await fetch(`${base}/.lr/status`, { headers: auth })).json();
+      harness.check("the status reports the delivery", status.lastDelivered !== null && status.lastDelivered.sessionId === "session-1");
+
+      const emptyCommand = await host.commands.get("redline-send").handler({ agent: { id: "session-1" }, rawInput: "" });
+      harness.check("the command reports when nothing is pending", emptyCommand.kind === "error");
+
+      await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "10", tag: "h1", selector: "body h1", text: "Alvo", comment: "outro comentário", changes: [] }], screenshot: null }) });
+      const followups = [];
+      const sent = await host.commands.get("redline-send").handler({ agent: { id: "session-1", followup: (message) => followups.push(message) }, rawInput: "extra" });
+      harness.check("the command sends the annotations", sent.kind === "success" && followups.length === 1, JSON.stringify(sent));
+      harness.includes("the command carries the comment", followups[0]?.content?.[0]?.text ?? "", "outro comentário");
+      harness.check("the command carries the extra text", (followups[0]?.content ?? []).some((part) => part.text === "extra"));
+    }
+
+    server.close();
+    target.close();
+  });
+}
