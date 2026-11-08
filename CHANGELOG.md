@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.17] - 2026-11-08
+
+### Fixed
+
+- **The update goes through the host, so a broken package never reaches your
+  profile.** The plugin used to install the new version with its own `pnpm`
+  call, which meant the host never checked the package it had just installed —
+  a release missing a file the host reads (the bundle patch) was installed
+  anyway and broke the dsh on the next start. The update now goes through the
+  host's plugin manager, the same way the host's own plugins do, and falls back
+  to the plugin's own route only where there is no managed profile.
+- **The update row only offers a release the registry already has.** A release
+  can reach GitHub before it reaches npm; offering it then failed the install
+  for a reason that had nothing to do with your profile.
+- **The update row names the failure instead of the install's progress.** The
+  message it showed was the first line of the install log — pnpm's own
+  progress — so a refused install looked like a network problem. It now shows
+  the line the host refused on.
+
+### Removed
+
+- **The "Release notes" link in the update row.** It opened a panel that only
+  appeared while an update was waiting, so it looked broken, and the release
+  page button next to it already carries the notes.
+
 ## [1.0.16] - 2026-11-08
 
 ### Fixed
