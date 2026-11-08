@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { startServer, formatContext } from "../lib/index.js";
@@ -36,12 +36,26 @@ await new Promise((r) => target.listen(TARGET_PORT, "127.0.0.1", r));
 const lr = await startServer({ port: 47950 });
 console.log(`plugin server on :${lr.port}, target on :${TARGET_PORT}`);
 const base = `http://127.0.0.1:${lr.port}`;
+const secret = readFileSync(join(homedir(), ".dsh", "profiles", "desktop", "dsh-redline", "instance.secret"), "utf8").trim();
+const auth = { "x-dsh-redline-secret": secret };
+const api = (extra) => ({ ...auth, ...(extra ?? {}) });
 const targetUrl = `http://127.0.0.1:${TARGET_PORT}/`;
 
 {
-  const r = await fetch(`${base}/.lr/health`);
+  const r = await fetch(`${base}/.lr/health`, { headers: auth });
   const j = await r.json();
   check("health", r.status === 200 && j.ok === true && j.port === lr.port);
+}
+
+{
+  const denied = await fetch(`${base}/.lr/status`);
+  check("auth: sem secret → 401", denied.status === 401 && denied.headers.get("access-control-allow-origin") === null);
+  const wrong = await fetch(`${base}/.lr/status`, { headers: { "x-dsh-redline-secret": "0".repeat(64) } });
+  check("auth: secret errado → 401", wrong.status === 401);
+  const granted = await fetch(`${base}/.lr/status`, { headers: auth });
+  check("auth: secret certo → 200", granted.status === 200);
+  const attacker = await fetch(`${base}/.lr/status`, { headers: { origin: "https://example.com" } });
+  check("auth: origin de terceiro sem secret → 401 sem CORS", attacker.status === 401 && attacker.headers.get("access-control-allow-origin") === null);
 }
 
 let sessionCookie = "";
@@ -70,13 +84,13 @@ let sessionCookie = "";
 }
 
 {
-  const r = await fetch(`${base}/.lr/proxy/${enc(`http://127.0.0.1:${TARGET_PORT}/style.css`)}`);
+  const r = await fetch(`${base}/.lr/proxy/${enc(`http://127.0.0.1:${TARGET_PORT}/style.css`)}`, { headers: auth });
   const css = await r.text();
   check("css: reescrito url()", css.includes(`/.lr/proxy/${enc(`http://127.0.0.1:${TARGET_PORT}/bg.png`)}`));
 }
 
 {
-  const r = await fetch(`${base}/.lr/overlay.js`);
+  const r = await fetch(`${base}/.lr/overlay.js`, { headers: auth });
   check("overlay.js servido", r.status === 200 && /text\/javascript/.test(r.headers.get("content-type") ?? ""));
   const overlaySource = await r.text();
   const REQUIRED_SYMBOLS = [
@@ -106,12 +120,12 @@ let sessionCookie = "";
 }
 
 {
-  const r = await fetch(`${base}/.lr/annotations`, { method: "OPTIONS" });
-  check("v2: preflight OPTIONS 204 + CORS", r.status === 204 && r.headers.get("access-control-allow-origin") === "*");
-  const s = await fetch(`${base}/.lr/status`);
+  const r = await fetch(`${base}/.lr/annotations`, { method: "OPTIONS", headers: { ...auth, origin: "https://example.com" } });
+  check("v2: preflight OPTIONS 204 + CORS", r.status === 204 && r.headers.get("access-control-allow-origin") === "https://example.com" && r.headers.get("access-control-allow-headers")?.includes("x-dsh-redline-secret") === true);
+  const s = await fetch(`${base}/.lr/status`, { headers: auth });
   const sj = await s.json();
   check("v2: status endpoint", s.status === 200 && sj.ok === true && Array.isArray(sj.events));
-  const p = await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ at: "smoke" }) });
+  const p = await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: api({ "content-type": "application/json" }), body: JSON.stringify({ at: "smoke" }) });
   check("v2: client-ping", p.status === 200 && (await p.json()).ok === true);
 }
 
@@ -130,18 +144,18 @@ let sessionCookie = "";
     ],
     screenshot: null
   };
-  let r = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+  let r = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: api({ "content-type": "application/json" }), body: JSON.stringify(payload) });
   let j = await r.json();
   check("annotations: pendente para próxima mensagem", r.status === 200 && j.ok === true && j.delivered === "pending-next-message" && j.kind === "pending" && j.count === 2, JSON.stringify(j).slice(0, 120));
   check("annotations: crop por pin salvo em attachments (+1 arquivo)", countShots() === shotsBefore + 1, `${shotsBefore} → ${countShots()}`);
 
 
   const newShot = readdirSync(shotDir).find((f) => f.endsWith(".jpg") || f.endsWith(".png"));
-  let ar = await fetch(`${base}/.lr/attachments/${newShot}`);
+  let ar = await fetch(`${base}/.lr/attachments/${newShot}`, { headers: auth });
   check("attachments: recorte servido (200 image/jpeg)", ar.status === 200 && (ar.headers.get("content-type") ?? "").includes("image/") && (await ar.arrayBuffer()).byteLength > 0);
-  ar = await fetch(`${base}/.lr/attachments/..%2F..%2Fsettings.yaml`);
+  ar = await fetch(`${base}/.lr/attachments/..%2F..%2Fsettings.yaml`, { headers: auth });
   check("attachments: traversal bloqueado (404)", ar.status === 404);
-  ar = await fetch(`${base}/.lr/attachments/inexistente.jpg`);
+  ar = await fetch(`${base}/.lr/attachments/inexistente.jpg`, { headers: auth });
   check("attachments: arquivo inexistente (404)", ar.status === 404);
 
 
@@ -155,13 +169,13 @@ let sessionCookie = "";
   check("context: screenshot por comentário presente", text.includes("Screenshot (cropped around the target)"));
 
 
-  r = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [], screenshot: null }) });
+  r = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: api({ "content-type": "application/json" }), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [], screenshot: null }) });
   j = await r.json();
   check("annotations: limpar pendente", r.status === 200 && j.kind === "cleared", JSON.stringify(j));
-  r = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [], screenshot: null }) });
+  r = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: api({ "content-type": "application/json" }), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [], screenshot: null }) });
   j = await r.json();
   check("annotations: limpar sem pendente", r.status === 200 && j.kind === "initial-empty", JSON.stringify(j));
-  r = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [], screenshot: null }) });
+  r = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: api({ "content-type": "application/json" }), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [], screenshot: null }) });
   j = await r.json();
   check("annotations: limpar sem pendente", r.status === 200 && j.kind === "initial-empty", JSON.stringify(j));
 }
