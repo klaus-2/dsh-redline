@@ -134,6 +134,20 @@ export async function runClientSuite(harness, { pluginDir }) {
     const delivered = await pending;
     harness.check("the client mode resolves with the answer", delivered.ok === true && delivered.count === 1);
 
+    // A queue larger than the batch drains in slices: the pump takes 20 per
+    // tick and the rest stays queued for the next tick.
+    const batched = loadBridgeModule(bridgePath, { window: { __LR__: { apiBase: "http://127.0.0.1:47477" }, __LR_BRIDGE_MODE__: "client" } });
+    const batchedPending = Array.from({ length: 25 }, (_, index) => batched.window.__LR_BRIDGE__.send("state.get", { n: index }));
+    const firstBatch = JSON.parse(batched.window.__LR_BRIDGE_DRAIN__(20));
+    harness.check("the drain returns at most the batch limit", firstBatch.length === 20, String(firstBatch.length));
+    const secondBatch = JSON.parse(batched.window.__LR_BRIDGE_DRAIN__(20));
+    harness.check("the second drain returns the remainder", secondBatch.length === 5, String(secondBatch.length));
+    for (const message of [...firstBatch, ...secondBatch]) {
+      batched.window.__LR_BRIDGE_DELIVER__(JSON.stringify([{ id: message.id, ok: true, data: { ok: true } }]));
+    }
+    const batchedAnswers = await Promise.all(batchedPending.map((queued) => queued.then(() => true, () => false)));
+    harness.check("every queued message past the batch resolves", batchedAnswers.length === 25 && batchedAnswers.every((resolved) => resolved === true));
+
     // The relay failure paths: a page must never wait forever.
     const emptyError = await mediated.window.__LR_BRIDGE__.send("", {}).then(() => "resolved", (error) => String(error?.message ?? error));
     harness.check("the relay refuses a message without a type", emptyError.includes("without a type"), emptyError);
@@ -166,6 +180,7 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.includes("the client fetches the bridge source", client, "/.lr/bridge.js");
     harness.includes("the client injects the relay before the overlay", client, "${relay}\\n${source}");
     harness.includes("the client drains the page queue", client, "__LR_BRIDGE_DRAIN__");
+    harness.includes("the client drains with the batch limit", client, "window.__LR_BRIDGE_DRAIN__(${BRIDGE_BATCH})");
     harness.includes("the client delivers the answers back", client, "__LR_BRIDGE_DELIVER__");
     harness.includes("the client calls the bridge with the secret", client, "/.lr/bridge");
   }

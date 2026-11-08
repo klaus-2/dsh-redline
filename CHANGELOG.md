@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.23] - 2026-11-08
+
+### Security
+
+- **The OPTIONS preflight answers under the gate's authority.** It used to
+  echo a CORS grant to any origin that asked; now it answers `204` with the
+  CORS echo only when the request carries the secret or comes from the app
+  origin, and every other preflight gets a bare `401` with no CORS headers.
+- **The bridge is rate limited.** Pages that a browser served from this origin
+  can annotate — and third-party content proxied on this origin could hammer
+  that channel. The bridge now keeps a per-origin token bucket (60 tokens,
+  10/s) and answers `429` when a page bursts past it.
+- **`annotations.submit` from the bridge caps the pins at 40.** The pending
+  snapshot stays small and cheap to render no matter what a page sends.
+  The bridge is an annotation channel; pages with third-party content
+  delivered through the proxy can annotate, and the context labels everything
+  as untrusted page evidence.
+
+### Fixed
+
+- **The bridge drain drops messages beyond the batch of 20 per tick no
+  more.** A queue larger than the batch used to lose the excess; the drain
+  now takes at most 20 messages per tick and leaves the rest queued, so the
+  next 200 ms tick picks them up and every `send()` promise resolves.
+
 ## [1.0.22] - 2026-11-08
 
 ### Security

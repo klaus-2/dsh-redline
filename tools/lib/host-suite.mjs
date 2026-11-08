@@ -198,12 +198,20 @@ export async function runHostSuite(harness, { pluginDir }) {
     {
       const preflight = await fetch(`${base}/.lr/annotations`, { method: "OPTIONS", headers: { ...auth, origin: "https://example.com" } });
       harness.check("the preflight advertises the secret header", preflight.status === 204 && (preflight.headers.get("access-control-allow-headers") ?? "").includes(secretHeader));
+      const publicPreflight = await fetch(`${base}/.lr/health`, { method: "OPTIONS", headers: { origin: "https://example.com" } });
+      harness.check("the preflight of a public path answers 401 without CORS too", publicPreflight.status === 401 && publicPreflight.headers.get("access-control-allow-origin") === null);
       const allowed = await fetch(`${base}/.lr/status`, { headers: { ...auth, origin: "https://example.com" } });
       harness.check("an authorized request echoes the origin", allowed.headers.get("access-control-allow-origin") === "https://example.com");
       const appOrigin = await fetch(`${base}/.lr/health`, { headers: { origin: "http://127.0.0.1:5173" } });
       harness.check("the app origin is allowed on a public route", appOrigin.headers.get("access-control-allow-origin") === "http://127.0.0.1:5173");
       const attacker = await fetch(`${base}/.lr/status`, { headers: { origin: "https://evil.example" } });
       harness.check("a third-party origin without the secret is refused without CORS", attacker.status === 401 && attacker.headers.get("access-control-allow-origin") === null);
+    }
+    {
+      const unauthorizedPreflight = await fetch(`${base}/.lr/annotations`, { method: "OPTIONS", headers: { origin: "https://example.com" } });
+      harness.check("the preflight answers 401 without CORS to an unauthorized origin", unauthorizedPreflight.status === 401 && unauthorizedPreflight.headers.get("access-control-allow-origin") === null, `status=${unauthorizedPreflight.status}`);
+      const appPreflight = await fetch(`${base}/.lr/annotations`, { method: "OPTIONS", headers: { origin: "dsh-app://app" } });
+      harness.check("the preflight answers 204 to the app origin", appPreflight.status === 204 && appPreflight.headers.get("access-control-allow-origin") === "dsh-app://app", `status=${appPreflight.status}`);
     }
 
     harness.section("host: settings");
@@ -285,6 +293,10 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.check("the snapshot is discarded", cleared.ok === true);
       const afterClear = await (await fetch(`${base}/.lr/pending`, { headers: auth })).json();
       harness.eq("nothing is pending after the clear", afterClear.count, 0);
+
+      const uncapped = await (await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: Array.from({ length: 45 }, (_, index) => ({ id: `q${index}`, tag: "h1", selector: "body h1", comment: `pin ${index}` })) }) })).json();
+      harness.check("the privileged annotation route is not pin-capped", uncapped.ok === true && uncapped.count === 45, JSON.stringify(uncapped).slice(0, 120));
+      await (await fetch(`${base}/.lr/pending/clear`, { method: "POST", headers: json(), body: JSON.stringify({}) })).json();
 
       const emptyPost = await (await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [], screenshot: null }) })).json();
       harness.check("an empty post reports the initial empty state", emptyPost.kind === "initial-empty", JSON.stringify(emptyPost));
@@ -418,5 +430,34 @@ export async function runHostSuite(harness, { pluginDir }) {
 
     server.close();
     target.close();
+
+    // The bridge limiter has its own server instance: the burst below would
+    // poison the shared one's bucket for the other asserts. The pin cap runs
+    // first, because the burst empties this origin's bucket.
+    harness.section("host: bridge rate limit and pin cap");
+    {
+      const limitedServer = await startServer({ port: await freePort() });
+      const limitedPort = limitedServer.port ?? limitedServer.address().port;
+      const limitedBase = `http://127.0.0.1:${limitedPort}`;
+      const bridgePost = (type, payload, headers = {}) =>
+        fetch(`${limitedBase}/.lr/bridge`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ type, payload }) });
+
+      const capped = await bridgePost("annotations.submit", { pageUrl: targetUrl, pageTitle: "Alvo", pins: Array.from({ length: 45 }, (_, index) => ({ id: `p${index}`, tag: "h1", selector: "body h1", comment: `pin ${index}` })) }, { origin: limitedBase });
+      harness.check("the bridge caps submit pins at 40", capped.status === 200 && (await capped.json()).count === 40);
+
+      // 121 requests: even a slow burst window refills at most a few tokens
+      // (60 capacity + 10/s), so at least one 429 is guaranteed.
+      const burst = [];
+      for (let index = 0; index < 121; index += 1) burst.push(bridgePost("state.get", {}, { origin: limitedBase }));
+      const burstStatuses = (await Promise.all(burst)).map((response) => response.status);
+      harness.check("the bridge rate limits a spamming origin with 429", burstStatuses.includes(200) && burstStatuses.includes(429), JSON.stringify({ 200: burstStatuses.filter((status) => status === 200).length, 429: burstStatuses.filter((status) => status === 429).length }));
+
+      const secretBurst = [];
+      for (let index = 0; index < 61; index += 1) secretBurst.push(fetch(`${limitedBase}/.lr/bridge`, { method: "POST", headers: { "content-type": "application/json", [secretHeader]: secret }, body: JSON.stringify({ type: "state.get", payload: {} }) }));
+      const secretStatuses = (await Promise.all(secretBurst)).map((response) => response.status);
+      harness.check("the limiter never applies to calls carrying the secret", secretStatuses.every((status) => status === 200), JSON.stringify({ 429: secretStatuses.filter((status) => status === 429).length }));
+
+      limitedServer.close();
+    }
   });
 }
