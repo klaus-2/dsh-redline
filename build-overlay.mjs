@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
-const template = readFileSync(new URL("./overlay.template.js", import.meta.url), "utf8");
-const css = readFileSync(new URL("./tencil-overlay.css", import.meta.url), "utf8");
+const template = readFileSync(new URL("./overlay.template.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+const css = readFileSync(new URL("./tencil-overlay.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 if (css.includes("__TENCIL_CSS__") || !template.includes("__TENCIL_CSS__")) {
   console.error("missing placeholders");
   process.exit(1);
