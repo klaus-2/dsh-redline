@@ -216,6 +216,42 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
   }
 
+  harness.section("client: the release page link is always there");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const releaseUrl = "https://github.com/klaus-2/dsh-redline/releases/tag/v1.0.17";
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url) => {
+        const target = String(url);
+        if (target.includes("/.lr/update")) {
+          return new Response(JSON.stringify({ ok: true, version: "1.0.17", installed: "1.0.17", update: { latest: "v1.0.17", newer: false, url: releaseUrl } }), { status: 200, headers: { "content-type": "application/json" } });
+        }
+        if (target.includes("/.lr/settings")) {
+          return new Response(JSON.stringify({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.17" }), { status: 200, headers: { "content-type": "application/json" } });
+        }
+        if (target.includes("/api/dsh-redline.secret")) {
+          return new Response(JSON.stringify({ ok: true, secret: "a".repeat(64) }), { status: 200, headers: { "content-type": "application/json" } });
+        }
+        return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const withRow = renderOnce(stub, section.component, {});
+    const links = findElements(withRow.tree, (element) => element.props?.href === releaseUrl);
+    harness.eq("the release page link is shown when the plugin is up to date", links.length, 1);
+    harness.check("the release page link opens a new tab", links[0]?.props?.target === "_blank", JSON.stringify(links[0]?.props?.target));
+  }
+
   harness.section("client: the update shows the real error");
   {
     const stub = createReactStub();
