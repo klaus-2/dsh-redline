@@ -75,7 +75,11 @@ Pins collect in the card above the composer. **Send** dispatches them with your 
 
 ## Security notes
 
-The loopback server binds to 127.0.0.1 only and validates the Host header, so remote origins cannot reach it. Pages running in the harness browser can submit annotations by design — that is the plugin working as intended, so treat comments arriving through Redline like any other user-authored input. The status endpoint exposes recent activity summaries (no secrets; no cookies are forwarded through the proxy).
+The loopback server binds to 127.0.0.1 only, answers only for its own host names (so a name that resolves to 127.0.0.1 cannot reach it) and validates the Host header, so remote origins cannot reach it. Every private route requires an instance secret that the host keeps in the profile (`~/.dsh/profiles/<profile>/dsh-redline/instance.secret`, mode 0600) and that never reaches the page: the overlay holds no secret, no header and no secret in a URL.
+
+The page talks to the host through a limited message bridge instead. It can submit the annotations, save the drawings, read the narrow state the overlay draws (language, delivery, pending ids, settings) and report a diagnostic — every other route answers `401`. The host half calls the bridge with the secret; the page calls it from a browser request that carries this origin, and the `Origin` header cannot be forged by a script. That origin also carries the pages the plugin proxies, so the bridge is an annotation channel and never a data channel.
+
+Pages running in the harness browser can submit annotations by design — that is the plugin working as intended, so treat comments arriving through Redline like any other user-authored input: a comment is the text the Redline overlay captured on the page, and the pending annotations are shown in the card above the composer before they attach to your next message. The agent ticker (tool arguments, agent text) stays in the host; the page only ever sees the narrow projection above. No cookies are forwarded through the proxy.
 
 ## Configure
 
@@ -83,7 +87,7 @@ Nothing to configure by default. The plugin starts a loopback server (`127.0.0.1
 
 ## How it works
 
-The client face injects the overlay into every page the harness browser renders. Annotations POST to the loopback server, which stores a pending snapshot keyed by the session you are viewing. When you send a message, the host attaches the snapshot to the agent's turn as a producer-owned context message with section metadata, and the chat renders it as a collapsible card.
+The client face injects the overlay into every page the harness browser renders. The overlay sends the annotations through the message bridge, and the loopback server stores a pending snapshot keyed by the session you are viewing. When you send a message, the host attaches the snapshot to the agent's turn as a producer-owned context message with section metadata, and the chat renders it as a collapsible card.
 
 ## Develop
 

@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import vm from "node:vm";
 import { startServer, formatContext } from "../lib/index.js";
 
 const enc = (u) => Buffer.from(u, "utf8").toString("base64url");
@@ -68,6 +69,7 @@ let sessionCookie = "";
   sessionCookie = /lr_session=[a-z0-9-]+/i.exec(setCookie)?.[0] ?? "";
   check("page: status 200 + html", r.status === 200 && /text\/html/.test(r.headers.get("content-type") ?? ""));
   check("page: overlay injetado", html.includes("/.lr/overlay.js"));
+  check("page: bridge injetado", html.includes("/.lr/bridge.js"));
   check("page: config window.__LR__", html.includes("window.__LR__="));
   check("page: CSP meta removida", !/http-equiv="Content-Security-Policy"/i.test(html));
   check("page: CSP header removido", !/content-security-policy/i.test(r.headers.get("content-type") ?? "") && (r.headers.get("content-security-policy") ?? "ausente") === "ausente");
@@ -94,6 +96,10 @@ let sessionCookie = "";
 {
   const r = await fetch(`${base}/.lr/overlay.js`, { headers: auth });
   check("overlay.js servido", r.status === 200 && /text\/javascript/.test(r.headers.get("content-type") ?? ""));
+  const publicOverlay = await fetch(`${base}/.lr/overlay.js`);
+  check("overlay.js é asset público (a tag <script> não manda header)", publicOverlay.status === 200);
+  const publicBridge = await fetch(`${base}/.lr/bridge.js`);
+  check("bridge.js é asset público", publicBridge.status === 200 && (await publicBridge.text()).includes("__LR_BRIDGE__"));
   const overlaySource = await r.text();
   const REQUIRED_SYMBOLS = [
     "function loadPins",
@@ -182,6 +188,85 @@ let sessionCookie = "";
   r = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: api({ "content-type": "application/json" }), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [], screenshot: null }) });
   j = await r.json();
   check("annotations: limpar sem pendente", r.status === 200 && j.kind === "initial-empty", JSON.stringify(j));
+}
+
+{
+  // The bridge is the only route the page may reach without the instance
+  // secret. Node lets us set Origin by hand; a browser sets it and forbids
+  // scripts from changing it, which is the whole point of the check.
+  const bridgeBody = (type, payload = {}) => JSON.stringify({ type, payload });
+  const bridgePost = (type, payload = {}, headers = {}) =>
+    fetch(`${base}/.lr/bridge`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: bridgeBody(type, payload) });
+
+  const denied = await bridgePost("state.get");
+  check("bridge: sem credencial → 401", denied.status === 401);
+
+  const own = await bridgePost("state.get", {}, { origin: base });
+  check("bridge: página do próprio host → 200", own.status === 200);
+  const ownState = await own.json();
+  check("bridge: state.get devolve só a projeção estreita", ownState.ok === true && typeof ownState.lang === "string" && Array.isArray(ownState.pendingIds) && ownState.settings !== undefined && ownState.events === undefined && ownState.diag === undefined, JSON.stringify(ownState).slice(0, 120));
+
+  const foreign = await bridgePost("state.get", {}, { origin: "https://evil.example" });
+  check("bridge: origem de terceiro → 401", foreign.status === 401);
+
+  const unsupported = await bridgePost("settings.update", {}, { ...auth });
+  check("bridge: tipo fora da allowlist → 400", unsupported.status === 400);
+
+  const read = await fetch(`${base}/.lr/status`, { headers: { origin: base } });
+  check("bridge: a origem do host não abre as rotas de leitura", read.status === 401);
+  const control = await fetch(`${base}/.lr/settings`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ lang: "en" }) });
+  check("bridge: a origem do host não abre as rotas de controle", control.status === 401);
+
+  const submitted = await bridgePost("annotations.submit", { pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "b1", tag: "h1", selector: "#t", comment: "pela bridge" }] }, { origin: base });
+  const submittedBody = await submitted.json();
+  check("bridge: annotations.submit guarda o snapshot", submitted.status === 200 && submittedBody.ok === true && submittedBody.count === 1);
+  const pending = await (await fetch(`${base}/.lr/pending`, { headers: auth })).json();
+  check("bridge: o snapshot da bridge vira pendente", pending.count === 1 && pending.pins[0].comment === "pela bridge", JSON.stringify(pending).slice(0, 120));
+
+  const drawings = await bridgePost("drawings.save", { items: [{ type: "stroke", x: 1, y: 2 }] }, { origin: base });
+  check("bridge: drawings.save guarda os traços", drawings.status === 200 && (await drawings.json()).count === 1);
+  const diag = await bridgePost("diag", { detail: "smoke" }, { origin: base });
+  check("bridge: diag aceita a linha de diagnóstico", diag.status === 200 && (await diag.json()).ok === true);
+
+  const emptied = await bridgePost("annotations.submit", { pageUrl: targetUrl, pageTitle: "Alvo", pins: [] }, { origin: base });
+  const emptiedBody = await emptied.json();
+  const stillPending = await (await fetch(`${base}/.lr/pending`, { headers: auth })).json();
+  check("bridge: annotations.submit vazio não apaga o pendente", emptied.status === 200 && emptiedBody.kind === "empty" && stillPending.count === 1, JSON.stringify(emptiedBody).slice(0, 120));
+}
+
+{
+  // The whole page path, end to end: the page the host serves carries the
+  // relay and the overlay, the relay runs as a browser would run it (same
+  // origin, Origin header, no credential), and the annotation lands in the
+  // host.
+  const page = await fetch(`${base}/p/${enc(targetUrl)}`);
+  const pageHtml = await page.text();
+  const config = JSON.parse(/window\.__LR__=(\{.*?\});window\.__LR_BRIDGE_MODE__/.exec(pageHtml)[1]);
+  check("page: o config não carrega o segredo", !("secret" in config), Object.keys(config).join(", "));
+
+  const relaySource = await (await fetch(`${base}/.lr/bridge.js`)).text();
+  const windowStub = { __LR__: config };
+  const sandbox = {
+    window: windowStub,
+    fetch: async (url, init) => {
+      const headers = { ...(init.headers ?? {}), origin: base };
+      return fetch(url, { ...init, headers });
+    },
+    setTimeout,
+    clearTimeout,
+    console
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(relaySource, sandbox, { filename: "bridge.js" });
+  const answer = await windowStub.__LR_BRIDGE__.send("annotations.submit", {
+    pageUrl: targetUrl,
+    pageTitle: "Alvo",
+    pins: [{ id: "e2e", tag: "h1", selector: "#t", comment: "pela página" }]
+  });
+  check("page: a anotação da página chega ao host", answer.ok === true && answer.count === 1, JSON.stringify(answer).slice(0, 140));
+  const e2ePending = await (await fetch(`${base}/.lr/pending`, { headers: auth })).json();
+  check("page: a anotação fica pendente para a próxima mensagem", e2ePending.count === 1 && e2ePending.pins[0].comment === "pela página", JSON.stringify(e2ePending).slice(0, 140));
+  await fetch(`${base}/.lr/bridge`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ type: "annotations.submit", payload: { pageUrl: targetUrl, pageTitle: "Alvo", pins: [] } }) });
 }
 
 {

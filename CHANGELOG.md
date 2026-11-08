@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.22] - 2026-11-08
+
+### Security
+
+- **The instance secret never reaches the page any more.** The plugin used to hand
+  the secret to every page it injected the overlay into, so any script on that page
+  could read it and call the private API — the review data, the screenshots, the
+  settings and the control routes. The secret now stays in the host, and the page
+  talks to it through a limited message bridge.
+  - *The bridge*: the page can send four messages and no more — submit the
+    annotations, save the drawings, read the narrow state the overlay draws
+    (language, delivery, pending ids, settings) and report a diagnostic. Every
+    other route still answers `401` to the page, including the ones that only
+    carry the same origin, and the bridge never hands the session id back.
+  - *Two ways in, and neither of them is a credential in the page*: the host half
+    calls the bridge with the instance secret, and the page calls it from a
+    browser request that carries this origin (the `Origin` header cannot be forged
+    by a script). That origin also carries the pages the plugin proxies, so the
+    bridge is an annotation channel and never a data channel — a page can submit
+    annotations, and nothing else.
+  - *The overlay* no longer calls the private API at all: it has no secret, no
+    header and no secret in a URL — only the bridge.
+  - *The state the page reads is a projection*, not the raw status: the agent
+    ticker (tool arguments, agent text) stays in the host.
+  - *The server only answers for its own host names*, so a name that resolves to
+    127.0.0.1 (DNS rebinding) cannot reach it.
+
+### Fixed
+
+- **The overlay loads again in a page the host serves.** `/.lr/overlay.js` and
+  `/.lr/bridge.js` are static assets with no review data in them, so they are
+  served the way the vendored html2canvas already was: a `<script>` tag cannot
+  carry a header, and the secret requirement kept the overlay from loading at
+  all.
+- **The page keeps its own settings.** The client used to overwrite the page
+  config when it injected the overlay, which dropped the language and the
+  hotkeys. The config is merged now, and the settings reach the overlay in both
+  modes.
+- **A page cannot wipe the pending annotations.** Submitting an empty annotation
+  set through the bridge left the snapshot alone; the user discards it from the
+  card.
+- **The comments say where they come from.** A comment is now described as the
+  text the Redline overlay captured on the page, and the guidance asks the agent
+  to apply it together with the user's own request — never in place of it.
+
 ## [1.0.21] - 2026-11-08
 
 ### Added

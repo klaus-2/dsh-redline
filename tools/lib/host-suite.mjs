@@ -1,4 +1,4 @@
-import { createServer } from "node:http";
+import { createServer, request as httpRequest } from "node:http";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -15,7 +15,6 @@ const PROTECTED_ROUTES = [
   { path: "/.lr/pending", method: "GET" },
   { path: "/.lr/pending-pins", method: "GET" },
   { path: "/.lr/client-cmd", method: "GET" },
-  { path: "/.lr/overlay.js", method: "GET" },
   { path: "/.lr/proxy/abc", method: "GET" },
   { path: "/.lr/attachments/missing.jpg", method: "GET" },
   { path: "/.lr/annotations", method: "POST" },
@@ -26,7 +25,8 @@ const PROTECTED_ROUTES = [
   { path: "/.lr/client-ping", method: "POST" },
   { path: "/.lr/settings", method: "POST" },
   { path: "/.lr/drawings", method: "POST" },
-  { path: "/.lr/update/install", method: "POST" }
+  { path: "/.lr/update/install", method: "POST" },
+  { path: "/.lr/bridge", method: "POST" }
 ];
 
 export async function runHostSuite(harness, { pluginDir }) {
@@ -118,6 +118,74 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.check("the health route stays public", health.status === 200);
       const vendor = await fetch(`${base}/.lr/vendor/html2canvas.min.js`);
       harness.check("the vendor script stays public (a script tag cannot send headers)", vendor.status === 200 && (await vendor.text()).length > 1000);
+      const overlay = await fetch(`${base}/.lr/overlay.js`);
+      harness.check("the overlay asset stays public (a script tag cannot send headers)", overlay.status === 200);
+      const bridgeAsset = await fetch(`${base}/.lr/bridge.js`);
+      harness.check("the bridge asset stays public", bridgeAsset.status === 200 && (await bridgeAsset.text()).includes("__LR_BRIDGE__"));
+    }
+    {
+      // The page never holds the instance secret: it reaches the host through
+      // the bridge, and only the bridge.
+      const bridgeBody = (type, payload = {}) => JSON.stringify({ type, payload });
+      const post = (type, payload = {}, headers = {}) =>
+        fetch(`${base}/.lr/bridge`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: bridgeBody(type, payload) });
+
+      const denied = await post("state.get");
+      harness.check("the bridge refuses a request with no credential", denied.status === 401);
+      const foreign = await post("state.get", {}, { origin: "https://evil.example" });
+      harness.check("the bridge refuses another site", foreign.status === 401);
+      const own = await post("state.get", {}, { origin: base });
+      harness.check("the bridge answers a page the host served", own.status === 200);
+      const state = await own.json();
+      harness.check("the bridge state is the narrow projection", state.ok === true && typeof state.lang === "string" && Array.isArray(state.pendingIds) && state.settings !== undefined && state.events === undefined && state.diag === undefined, JSON.stringify(state).slice(0, 160));
+      harness.eq("the bridge state carries exactly the narrow keys", Object.keys(state).sort(), ["active", "deliveredAt", "lang", "ok", "pendingIds", "settings"]);
+      const unsupported = await post("settings.update", {}, { ...auth });
+      harness.check("the bridge refuses a message outside the allowlist", unsupported.status === 400);
+      const withSecret = await post("state.get", {}, { ...auth });
+      harness.check("the bridge accepts the instance secret too", withSecret.status === 200);
+      const malformed = await fetch(`${base}/.lr/bridge`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: "not json" });
+      harness.check("the bridge refuses a malformed body", malformed.status === 400, `status=${malformed.status}`);
+
+      // The bridge opens for this origin and for nothing that only looks like
+      // it: the rule has to stay pinned.
+      for (const origin of [`http://127.0.0.1:${port + 1}`, "http://127.0.0.1", `https://127.0.0.1:${port}`, "null", `http://127.0.0.1:${port}.`]) {
+        const near = await post("state.get", {}, { origin });
+        harness.check(`the bridge refuses the origin ${origin}`, near.status === 401, `status=${near.status}`);
+      }
+      const foreignHost = await new Promise((resolve) => {
+        const probe = httpRequest({ host: "127.0.0.1", port, path: "/.lr/health", headers: { Host: "evil.example" } }, (response) => {
+          response.resume();
+          resolve(response.statusCode);
+        });
+        probe.on("error", () => resolve(0));
+        probe.end();
+      });
+      harness.check("the server refuses a foreign host header", foreignHost === 403, `status=${foreignHost}`);
+
+      const read = await fetch(`${base}/.lr/status`, { headers: { origin: base } });
+      harness.check("the page origin does not open the reading routes", read.status === 401);
+      const control = await fetch(`${base}/.lr/settings`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ lang: "en" }) });
+      harness.check("the page origin does not open the control routes", control.status === 401);
+
+      const submitted = await post("annotations.submit", { pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "b1", tag: "h1", selector: "#t", comment: "pela bridge" }] }, { origin: base });
+      const submittedBody = await submitted.json();
+      harness.check("the bridge stores the annotations", submitted.status === 200 && submittedBody.ok === true && submittedBody.count === 1);
+      const pending = await (await fetch(`${base}/.lr/pending`, { headers: auth })).json();
+      harness.check("the bridge snapshot waits for the next message", pending.count === 1 && pending.pins[0].comment === "pela bridge", JSON.stringify(pending).slice(0, 140));
+      const emptied = await post("annotations.submit", { pageUrl: targetUrl, pageTitle: "Alvo", pins: [] }, { origin: base });
+      const emptiedBody = await emptied.json();
+      const stillPending = await (await fetch(`${base}/.lr/pending`, { headers: auth })).json();
+      harness.check("the bridge never wipes the pending snapshot with an empty submit", emptied.status === 200 && emptiedBody.kind === "empty" && stillPending.count === 1, JSON.stringify(emptiedBody).slice(0, 140));
+
+      const drawings = await post("drawings.save", { items: [{ type: "stroke" }, { nope: true }] }, { origin: base });
+      harness.check("the bridge stores the drawings", drawings.status === 200 && (await drawings.json()).count === 1);
+      const diag = await post("diag", { detail: "suite marker" }, { origin: base });
+      harness.check("the bridge takes the diagnostic line", diag.status === 200 && (await diag.json()).ok === true);
+      const status = await (await fetch(`${base}/.lr/status`, { headers: auth })).json();
+      harness.check("the page diagnostic reaches the host log", status.diag.some((entry) => entry.detail.includes("suite marker")), JSON.stringify(status.diag.slice(-2)));
+      harness.check("the page diagnostic is marked as coming from the page", status.diag.some((entry) => entry.detail.startsWith("[page]")), JSON.stringify(status.diag.slice(-2)));
+      const afterSubmit = await (await fetch(`${base}/.lr/bridge`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ type: "state.get", payload: {} }) })).text();
+      harness.check("the host log never reaches the page", !afterSubmit.includes("attaches to the next prompt") && !afterSubmit.includes("suite marker"), afterSubmit.slice(0, 160));
     }
     {
       const bearer = await fetch(`${base}/.lr/status`, { headers: { authorization: `Bearer ${secret}` } });

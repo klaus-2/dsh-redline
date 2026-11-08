@@ -339,6 +339,17 @@ export async function flush(rounds = 4) {
   for (let index = 0; index < rounds; index += 1) await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+// Wait for a condition instead of sleeping a fixed amount: a slow runner
+// must not turn a timing assumption into a failure.
+export async function waitFor(condition, timeoutMs = 5000, stepMs = 25) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (condition()) return true;
+    await new Promise((resolve) => setTimeout(resolve, stepMs));
+  }
+  return condition();
+}
+
 export function makeLocalStorage(initial = {}) {
   const map = new Map(Object.entries(initial));
   return {

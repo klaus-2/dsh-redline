@@ -1,6 +1,24 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { collectCallArguments, createReactStub, evaluateObjectLiteral, extractObjectLiteral, fakeClientCtx, findElements, flush, loadClientModule, makeLocalStorage, renderOnce } from "./harness.mjs";
+import vm from "node:vm";
+import { collectCallArguments, createReactStub, evaluateObjectLiteral, extractObjectLiteral, fakeClientCtx, findElements, flush, loadClientModule, makeLocalStorage, renderOnce, waitFor } from "./harness.mjs";
+
+// The bridge relay runs in the page, not in the app: it is loaded in its own
+// sandbox so the suite can drive both transports without a browser.
+function loadBridgeModule(file, options = {}) {
+  const source = readFileSync(file, "utf8");
+  const windowStub = { ...(options.window ?? {}) };
+  const sandbox = {
+    window: windowStub,
+    fetch: options.fetch ?? (async () => { throw new Error("fetch was not stubbed"); }),
+    setTimeout: options.setTimeout ?? setTimeout,
+    clearTimeout: options.clearTimeout ?? clearTimeout,
+    console: options.console ?? { log() {}, warn() {}, error() {} }
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(source, sandbox, { filename: file });
+  return { window: windowStub, sandbox };
+}
 
 const REQUIRED_OVERLAY_SYMBOLS = [
   "function loadPins",
@@ -60,7 +78,9 @@ export async function runClientSuite(harness, { pluginDir }) {
     const secretHeader = /SECRET_HEADER = "([^"]+)"/.exec(client)?.[1] ?? "";
     harness.check("the client knows the secret header", secretHeader !== "");
     harness.includes("the client reads the secret from the host", client, "/api/dsh-redline.secret");
-    harness.includes("the client forwards the secret to the overlay", client, "secret: INSTANCE_SECRET");
+    harness.excludes("the client never hands the secret to the page", client, "secret: INSTANCE_SECRET");
+    harness.excludes("the page config never carries a secret", client, "__LR__.secret");
+    harness.includes("the client keeps the page config it finds", client, "Object.assign({}, window.__LR__ || {}");
 
     const unprotected = [];
     for (const argument of collectCallArguments(client, "fetch")) {
@@ -70,13 +90,205 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
     harness.check("every loopback call carries the secret", unprotected.length === 0, unprotected.join(" | "));
 
-    const overlayUnprotected = [];
+    // The overlay no longer talks to the private API: it goes through the
+    // bridge, and the page holds no secret at all.
+    const overlayCalls = [];
     for (const argument of collectCallArguments(overlay, "fetch")) {
       if (!argument.includes("/.lr/") && !argument.includes("API_BASE")) continue;
-      if (!argument.includes("authHeaders") && !argument.includes("AUTH")) overlayUnprotected.push(argument.slice(0, 80));
+      overlayCalls.push(argument.slice(0, 80));
     }
-    harness.check("every overlay call carries the secret", overlayUnprotected.length === 0, overlayUnprotected.join(" | "));
-    harness.includes("the overlay reads the secret from the page config", overlay, "__LR__");
+    const overlayPrivate = overlayCalls.filter((argument) => !argument.includes("/.lr/vendor/"));
+    harness.check("the overlay never calls the private API directly", overlayPrivate.length === 0, overlayPrivate.join(" | "));
+    harness.check("the overlay makes no loopback call at all", overlayCalls.length === 0, overlayCalls.join(" | "));
+    harness.includes("the overlay still loads the public vendor asset", overlay, "/.lr/vendor/html2canvas.min.js");
+    harness.excludes("the overlay does not know the secret header", overlay, "SECRET_HEADER");
+    harness.includes("the overlay talks to the bridge", overlay, "bridgeSend");
+    harness.check("the overlay submits the annotations through the bridge", overlay.includes('bridgeSend("annotations.submit"'));
+    harness.check("the overlay reads the state through the bridge", overlay.includes('bridgeSend("state.get"'));
+    harness.check("the overlay saves the drawings through the bridge", overlay.includes('bridgeSend("drawings.save"'));
+  }
+
+  harness.section("client: the bridge relay");
+  {
+    const bridgePath = path.join(pluginDir, "lib", "bridge.js");
+    const calls = [];
+    const direct = loadBridgeModule(bridgePath, {
+      window: { __LR__: { apiBase: "http://127.0.0.1:47477" } },
+      fetch: async (url, init) => {
+        calls.push({ url, init });
+        return new Response(JSON.stringify({ ok: true, lang: "pt" }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+    });
+    const answer = await direct.window.__LR_BRIDGE__.send("state.get", {});
+    harness.check("the relay answers a direct call", answer.ok === true && answer.lang === "pt");
+    harness.check("the relay posts to the bridge", calls.length === 1 && calls[0].url === "http://127.0.0.1:47477/.lr/bridge", JSON.stringify(calls.map((call) => call.url)));
+    harness.check("the relay carries no credential", calls[0].init.credentials === "omit" && Object.keys(calls[0].init.headers ?? {}).every((key) => !/secret/i.test(key)), JSON.stringify(calls[0].init.headers));
+    harness.eq("the relay carries the message type and payload", JSON.parse(calls[0].init.body), { type: "state.get", payload: {} });
+
+    const mediated = loadBridgeModule(bridgePath, { window: { __LR__: { apiBase: "http://127.0.0.1:47477" }, __LR_BRIDGE_MODE__: "client" } });
+    const pending = mediated.window.__LR_BRIDGE__.send("annotations.submit", { pageUrl: "u" });
+    const drained = JSON.parse(mediated.window.__LR_BRIDGE_DRAIN__());
+    harness.check("the client mode queues the message", drained.length === 1 && drained[0].type === "annotations.submit" && drained[0].payload.pageUrl === "u" && typeof drained[0].id === "string", JSON.stringify(drained));
+    harness.eq("the client mode drains nothing twice", JSON.parse(mediated.window.__LR_BRIDGE_DRAIN__()).length, 0);
+    mediated.window.__LR_BRIDGE_DELIVER__(JSON.stringify([{ id: drained[0].id, ok: true, data: { ok: true, count: 1 } }]));
+    const delivered = await pending;
+    harness.check("the client mode resolves with the answer", delivered.ok === true && delivered.count === 1);
+
+    // The relay failure paths: a page must never wait forever.
+    const emptyError = await mediated.window.__LR_BRIDGE__.send("", {}).then(() => "resolved", (error) => String(error?.message ?? error));
+    harness.check("the relay refuses a message without a type", emptyError.includes("without a type"), emptyError);
+    const unknownError = await mediated.window.__LR_BRIDGE__.send("settings.update", {}).then(() => "resolved", (error) => String(error?.message ?? error));
+    harness.check("the relay refuses a message outside the allowlist", unknownError.includes("does not carry"), unknownError);
+
+    const timers = [];
+    const stalled = loadBridgeModule(bridgePath, {
+      window: { __LR__: { apiBase: "http://127.0.0.1:47477" }, __LR_BRIDGE_MODE__: "client" },
+      setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
+      clearTimeout: () => {}
+    });
+    const stalledAnswer = stalled.window.__LR_BRIDGE__.send("state.get", {}).then(() => "resolved", (error) => String(error?.message ?? error));
+    harness.check("the relay arms a timeout for a pending answer", timers.length === 1 && timers[0].ms === 20000, JSON.stringify(timers.map((timer) => timer.ms)));
+    timers[0].fn();
+    const timeoutError = await stalledAnswer;
+    harness.check("the relay gives up when the host does not answer", timeoutError.includes("did not answer"), timeoutError);
+    harness.eq("the timed out message leaves the queue", JSON.parse(stalled.window.__LR_BRIDGE_DRAIN__()).length, 0);
+
+    const refused = loadBridgeModule(bridgePath, {
+      window: { __LR__: { apiBase: "http://127.0.0.1:47477" } },
+      fetch: async () => new Response(JSON.stringify({ error: "unsupported bridge message" }), { status: 400, headers: { "content-type": "application/json" } })
+    });
+    const refusedError = await refused.window.__LR_BRIDGE__.send("state.get", {}).then(() => "resolved", (error) => String(error?.message ?? error));
+    harness.check("the relay reports the host error", refusedError.includes("unsupported bridge message"), refusedError);
+  }
+
+  harness.section("client: the bridge pump");
+  {
+    harness.includes("the client fetches the bridge source", client, "/.lr/bridge.js");
+    harness.includes("the client injects the relay before the overlay", client, "${relay}\\n${source}");
+    harness.includes("the client drains the page queue", client, "__LR_BRIDGE_DRAIN__");
+    harness.includes("the client delivers the answers back", client, "__LR_BRIDGE_DELIVER__");
+    harness.includes("the client calls the bridge with the secret", client, "/.lr/bridge");
+  }
+
+  harness.section("client: the injection and the mediated bridge");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    class FakeElement {}
+    const calls = [];
+    const executed = [];
+    const overlaySource = readFileSync(path.join(pluginDir, "lib", "overlay.js"), "utf8");
+    const bridgeSource = readFileSync(path.join(pluginDir, "lib", "bridge.js"), "utf8");
+    const fakeWebview = new FakeElement();
+    fakeWebview.dataset = { liveReviewWired: undefined };
+    fakeWebview.getAttribute = (name) => (name === "src" ? "https://example.com/" : null);
+    fakeWebview.addEventListener = (type, handler) => {
+      if (type === "dom-ready") setTimeout(() => handler(), 0);
+    };
+
+    // The guest is a real page running the real relay: the code the client
+    // injects is evaluated, so the queue, the drain and the delivery are the
+    // ones the page really uses.
+    const pageWindow = { __LR__: { settings: { keys: { comment: "x" } }, drawings: [{ id: 1 }] } };
+    const pageSandbox = {
+      window: pageWindow,
+      document: {
+        createElement: () => ({ style: {}, dataset: {}, classList: { add() {}, remove() {}, toggle() {} }, appendChild() {}, setAttribute() {}, addEventListener() {}, remove() {}, querySelector: () => null, querySelectorAll: () => [], remove() {} }),
+        head: { appendChild() {} },
+        body: { appendChild() {} },
+        documentElement: {},
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        addEventListener() {},
+        removeEventListener() {}
+      },
+      localStorage: makeLocalStorage(),
+      sessionStorage: makeLocalStorage(),
+      navigator: { language: "en-US" },
+      location: { href: "https://example.com/", origin: "https://example.com" },
+      setTimeout,
+      clearTimeout,
+      setInterval: () => 0,
+      clearInterval,
+      console: { log() {}, warn() {}, error() {}, info() {} },
+      fetch: async () => { throw new Error("the guest never talks to the network by itself"); }
+    };
+    vm.createContext(pageSandbox);
+    fakeWebview.executeJavaScript = async (code) => {
+      executed.push(code);
+      if (code.includes("window.__LR__ = Object.assign")) {
+        try {
+          vm.runInContext(code, pageSandbox, { filename: "injected.js" });
+        } catch {
+          // The overlay needs a DOM this shim does not have; the relay runs
+          // before it and is what the round trip needs.
+        }
+        return null;
+      }
+      return vm.runInContext(code, pageSandbox, { filename: "guest.js" });
+    };
+
+    const documentStub = {
+      createElement: () => ({ style: {}, dataset: {}, setAttribute() {}, appendChild() {}, remove() {} }),
+      head: { appendChild() {} },
+      body: { appendChild() {} },
+      documentElement: {},
+      readyState: "complete",
+      querySelector: () => null,
+      querySelectorAll: (selector) => (typeof selector === "string" && selector.includes("webview") ? [fakeWebview] : []),
+      addEventListener() {},
+      removeEventListener() {}
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      document: documentStub,
+      sandbox: { Element: FakeElement, MutationObserver: class { observe() {} } },
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url, options) => {
+        const target = String(url);
+        calls.push({ url: target, method: options?.method ?? "GET", body: options?.body, headers: options?.headers });
+        if (target.includes("/api/dsh-redline.secret")) return new Response(JSON.stringify({ ok: true, secret: "a".repeat(64) }), { status: 200, headers: { "content-type": "application/json" } });
+        if (target.includes("/.lr/health")) return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+        if (target.endsWith("/.lr/overlay.js")) return new Response(overlaySource, { status: 200, headers: { "content-type": "text/javascript" } });
+        if (target.endsWith("/.lr/bridge.js")) return new Response(bridgeSource, { status: 200, headers: { "content-type": "text/javascript" } });
+        if (target.endsWith("/.lr/bridge")) return new Response(JSON.stringify({ ok: true, count: 1 }), { status: 200, headers: { "content-type": "application/json" } });
+        return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    await waitFor(() => executed.some((code) => code.includes("window.__LR__ = Object.assign")), 4000);
+
+    const injection = executed.find((code) => code.includes("window.__LR__"));
+    harness.check("the client injects the overlay into the guest", injection !== undefined);
+    harness.check("the injected code carries no secret", injection !== undefined && !injection.includes("a".repeat(64)) && !/secret\s*:/i.test(injection), (injection ?? "").slice(0, 200));
+    harness.check("the guest really runs the relay", pageWindow.__LR_BRIDGE__ !== undefined && pageWindow.__LR_BRIDGE__.mode === "client");
+    harness.check("the injected code keeps the page config", pageWindow.__LR__.settings?.keys?.comment === "x" && pageWindow.__LR__.drawings?.length === 1 && pageWindow.__LR__.apiBase !== undefined && !("secret" in pageWindow.__LR__), JSON.stringify(Object.keys(pageWindow.__LR__)));
+
+    // The page asks for something; the client answers; the page is happy.
+    const pending = pageWindow.__LR_BRIDGE__.send("annotations.submit", { pageUrl: "https://example.com/", pins: [{ id: "p1" }] });
+    const answered = await Promise.race([
+      pending.then((value) => ({ ok: true, value })).catch((error) => ({ ok: false, error })),
+      new Promise((resolve) => setTimeout(() => resolve({ ok: false, error: "timeout" }), 6000))
+    ]);
+    harness.check("the page promise resolves with the host answer", answered.ok === true && answered.value?.ok === true && answered.value?.count === 1, JSON.stringify(answered).slice(0, 160));
+
+    const bridgeCall = calls.find((call) => call.url.endsWith("/.lr/bridge") && call.method === "POST");
+    harness.check("the client performs the bridge call the page asked for", bridgeCall !== undefined, JSON.stringify(calls.map((call) => call.url.slice(0, 60))));
+    harness.check("the bridge call carries the instance secret", bridgeCall !== undefined && Object.values(bridgeCall.headers ?? {}).some((value) => String(value).includes("a".repeat(64))), JSON.stringify(bridgeCall?.headers));
+    harness.check("the bridge call carries the message the page queued", String(bridgeCall?.body ?? "").includes("annotations.submit"), String(bridgeCall?.body ?? ""));
+    const delivery = executed.find((code) => /__LR_BRIDGE_DELIVER__\("/.test(code));
+    harness.check("the client delivers the answer back to the page", delivery !== undefined, (delivery ?? "").slice(0, 120));
+    const delivered = /__LR_BRIDGE_DELIVER__\(("(?:[^"\\]|\\.)*")\)/.exec(delivery ?? "");
+    let deliveredAnswers = [];
+    try {
+      deliveredAnswers = JSON.parse(JSON.parse(delivered?.[1] ?? "\"[]\""));
+    } catch {
+      deliveredAnswers = [];
+    }
+    harness.check("the client delivers the answers as an array", Array.isArray(deliveredAnswers) && deliveredAnswers.length === 1 && deliveredAnswers[0].ok === true, JSON.stringify(deliveredAnswers).slice(0, 160));
   }
 
   harness.section("client: overlay locales");
