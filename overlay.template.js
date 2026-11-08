@@ -56,6 +56,7 @@
       "sendTitle": "Save annotation (Enter)",
       "shotOn": "Screenshot attached",
       "composerClose": "Close and cancel the comment",
+      "panelDrag": "Drag to move · double-click to reset",
       "attachesTo": "attaches to the session chat",
       "savedHint": "Saved — use Send on the card above the composer to dispatch",
       "saveFailed": "Failed to save: ",
@@ -206,6 +207,7 @@
       "sendTitle": "Guardar anotação (Enter)",
       "shotOn": "Screenshot anexada",
       "composerClose": "Fechar e cancelar o comentário",
+      "panelDrag": "Arraste para mover · duplo clique para voltar ao padrão",
       "attachesTo": "anexa ao chat da sessão",
       "savedHint": "Guardada — use Enviar no card acima do composer para despachar",
       "saveFailed": "Falha ao guardar: ",
@@ -356,6 +358,7 @@
       "sendTitle": "保存标注 (Enter)",
       "shotOn": "已附加截图",
       "composerClose": "关闭并取消评论",
+      "panelDrag": "拖动移动 · 双击恢复默认位置",
       "attachesTo": "附加到会话聊天",
       "savedHint": "已保存 — 使用 composer 上方卡片的发送按钮派发",
       "saveFailed": "保存失败：",
@@ -528,6 +531,35 @@
     try {
       sessionStorage.setItem(STORE_KEY, JSON.stringify(pins));
     } catch {}
+  }
+
+  const PANEL_POS_KEY = "lr-panel-pos:" + PAGE_URL;
+  const panelPositions = loadPanelPositions();
+  function loadPanelPositions() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(PANEL_POS_KEY) ?? "null");
+      const read = (value) => (Number.isFinite(value?.x) && Number.isFinite(value?.y) ? { x: Math.round(value.x), y: Math.round(value.y) } : null);
+      const stored = { composer: read(raw?.composer), pin: read(raw?.pin), adjust: read(raw?.adjust) };
+      return stored;
+    } catch {
+      return { composer: null, pin: null, adjust: null };
+    }
+  }
+  function savePanelPositions() {
+    try {
+      localStorage.setItem(PANEL_POS_KEY, JSON.stringify(panelPositions));
+    } catch {}
+  }
+  function applyPanelPosition(panel, kind) {
+    const stored = panelPositions[kind];
+    if (stored === null) return;
+    const rect = panel.getBoundingClientRect();
+    panel.style.left = `${clampPanelAxis(stored.x, rect.width, window.innerWidth, 8)}px`;
+    panel.style.top = `${clampPanelAxis(stored.y, rect.height, window.innerHeight, 8)}px`;
+    panel.style.transform = "none";
+  }
+  function clampPanelAxis(desired, size, extent, margin) {
+    return Math.min(Math.max(margin, desired), Math.max(margin, extent - size - margin));
   }
 
 
@@ -1271,6 +1303,15 @@
     keyShieldInstalled = true;
     const stop = (e) => e.stopPropagation();
     for (const type of ["keydown", "keyup", "keypress"]) host.addEventListener(type, stop, false);
+    window.addEventListener("resize", clampOpenPanels);
+  }
+  function clampOpenPanels() {
+    for (const node of [composerNode, pinPanelNode, adjustPanel]) {
+      if (node === null || !node.isConnected) continue;
+      node.style.transform = "none";
+      node.style.left = `${clampPanelAxis(node.offsetLeft, node.offsetWidth, window.innerWidth, 8)}px`;
+      node.style.top = `${clampPanelAxis(node.offsetTop, node.offsetHeight, window.innerHeight, 8)}px`;
+    }
   }
 
   function el(tag, attrs = {}, ...children) {
@@ -1303,7 +1344,7 @@
   const divider = el("button", { class: "divider", title: "Mover (arraste)", "aria-label": "Mover toolbar" });
   const commentBtn = el("button", { class: "tool", title: t("commentTitle") + " (" + KEY_COMMENT.toUpperCase() + ")", html: ICONS.comment }, el("span", { class: "tool-label" }, t("commentTool")), el("kbd", {}, KEY_COMMENT.toUpperCase()));
   const pendingSpan = el("span", { class: "tool-label", style: "display:none", title: t("pendingTitle") }, t("pendingCount").replace("{n}", 0));
-  const adjustBtn = el("button", { class: "tool", title: t("adjustTitle") + " (" + KEY_ADJUST.toUpperCase() + ")", html: ICONS.sliders }, el("span", { class: "tool-label" }, t("adjustTool")));
+  const adjustBtn = el("button", { class: "tool", title: t("adjustTitle") + " (" + KEY_ADJUST.toUpperCase() + ")", html: ICONS.sliders }, el("span", { class: "tool-label" }, t("adjustTool")), el("kbd", {}, KEY_ADJUST.toUpperCase()));
   const eyeBtn = el("button", { class: "tool", title: "Mostrar/ocultar pins", html: ICONS.eye });
     drawBtn = el("button", { class: "tool", title: t("drawTitle"), html: ICONS_CANVAS.brush }, el("span", { class: "tool-label" }, t("drawTool")), el("kbd", {}, "D"));
     drawBtn.addEventListener("click", () => toggleDraw());
@@ -1327,6 +1368,7 @@
     commentBtn.querySelector("kbd").textContent = kbd("comment");
     adjustBtn.title = t("adjustTitle") + " (" + kbd("adjust") + ")";
     adjustBtn.querySelector(".tool-label").textContent = t("adjustTool");
+    adjustBtn.querySelector("kbd").textContent = kbd("adjust");
     drawBtn.title = t("drawTitle");
     drawBtn.querySelector(".tool-label").textContent = t("drawTool");
     eyeBtn.title = t("eyeTitle");
@@ -1615,6 +1657,139 @@
     };
   }
 
+  const PANEL_DRAG_THRESHOLD = 4;
+  function wirePanelDrag(panel, kind, placeDefault) {
+    const handle = panel.querySelector(":scope > .composer-target");
+    if (handle === null) return;
+    handle.title = t("panelDrag");
+    handle.setAttribute("aria-label", t("panelDrag"));
+    let source = null;
+    let startX = 0;
+    let startY = 0;
+    let baseLeft = 0;
+    let baseTop = 0;
+    let dragged = false;
+    let frame = 0;
+    let nextLeft = 0;
+    let nextTop = 0;
+    const freeze = () => {
+      panel.style.transform = "none";
+      panel.style.left = `${panel.offsetLeft}px`;
+      panel.style.top = `${panel.offsetTop}px`;
+      baseLeft = panel.offsetLeft;
+      baseTop = panel.offsetTop;
+    };
+    const paint = () => {
+      frame = 0;
+      panel.style.left = `${nextLeft}px`;
+      panel.style.top = `${nextTop}px`;
+    };
+    const begin = (x, y) => {
+      if (source !== null) return false;
+      startX = x;
+      startY = y;
+      dragged = false;
+      return true;
+    };
+    const stroke = (x, y) => {
+      const dx = x - startX;
+      const dy = y - startY;
+      if (!dragged) {
+        if (Math.hypot(dx, dy) < PANEL_DRAG_THRESHOLD) return;
+        dragged = true;
+        freeze();
+      }
+      handle.toggleAttribute("data-dragging", dragged);
+      nextLeft = clampPanelAxis(baseLeft + dx, panel.offsetWidth, window.innerWidth, 8);
+      nextTop = clampPanelAxis(baseTop + dy, panel.offsetHeight, window.innerHeight, 8);
+      if (frame === 0) frame = requestAnimationFrame(paint);
+    };
+    const finish = () => {
+      source = null;
+      handle.toggleAttribute("data-dragging", false);
+      if (frame !== 0) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+        if (dragged) paint();
+      }
+      if (!dragged || !panel.isConnected) return;
+      dragged = false;
+      const rect = panel.getBoundingClientRect();
+      panelPositions[kind] = { x: Math.round(rect.left), y: Math.round(rect.top) };
+      savePanelPositions();
+    };
+    if (typeof window.PointerEvent === "function") {
+      const move = (event) => {
+        if (event.pointerId !== source) return;
+        stroke(event.clientX, event.clientY);
+      };
+      const end = (event) => {
+        if (event.pointerId !== source) return;
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", end);
+        handle.removeEventListener("pointercancel", end);
+        handle.removeEventListener("lostpointercapture", end);
+        finish();
+      };
+      handle.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0 || !begin(event.clientX, event.clientY)) return;
+        source = event.pointerId;
+        event.preventDefault();
+        event.stopPropagation();
+        try {
+          handle.setPointerCapture(event.pointerId);
+        } catch {}
+        handle.addEventListener("pointermove", move);
+        handle.addEventListener("pointerup", end);
+        handle.addEventListener("pointercancel", end);
+        handle.addEventListener("lostpointercapture", end);
+      });
+    } else {
+      const move = (event) => {
+        stroke(event.clientX, event.clientY);
+      };
+      const stop = () => {
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", stop);
+        finish();
+      };
+      const touchMove = (event) => {
+        const touch = event.touches[0];
+        if (touch) stroke(touch.clientX, touch.clientY);
+        event.preventDefault();
+      };
+      const touchStop = () => {
+        window.removeEventListener("touchmove", touchMove);
+        window.removeEventListener("touchend", touchStop);
+        window.removeEventListener("touchcancel", touchStop);
+        finish();
+      };
+      handle.addEventListener("mousedown", (event) => {
+        if (event.button !== 0 || !begin(event.clientX, event.clientY)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        window.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", stop);
+      });
+      handle.addEventListener("touchstart", (event) => {
+        const touch = event.touches[0];
+        if (!touch || !begin(touch.clientX, touch.clientY)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        window.addEventListener("touchmove", touchMove, { passive: false });
+        window.addEventListener("touchend", touchStop);
+        window.addEventListener("touchcancel", touchStop);
+      });
+    }
+    handle.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      panelPositions[kind] = null;
+      savePanelPositions();
+      if (typeof placeDefault === "function") placeDefault();
+    });
+  }
+
 
   let draftNode = null;
   let composerNode = null;
@@ -1633,9 +1808,15 @@
     absLayer.append(draftNode);
 
     const WIDTH = 320;
-    const left = Math.min(Math.max(8, point.x + 16), window.innerWidth - WIDTH - 8);
-    const top = Math.min(Math.max(8, point.y - 46), window.innerHeight - 240);
-    composerNode = el("div", { class: "popover composer", style: `width:${WIDTH}px;transform-origin:top left;left:${left}px;top:${top}px` });
+    const placeComposerDefaultLeft = Math.min(Math.max(8, point.x + 16), window.innerWidth - WIDTH - 8);
+    const placeComposerDefaultTop = Math.min(Math.max(8, point.y - 46), window.innerHeight - 240);
+    const placeComposerDefault = () => {
+      const point = draftPoint();
+      composerNode.style.left = `${Math.min(Math.max(8, point.x + 16), window.innerWidth - WIDTH - 8)}px`;
+      composerNode.style.top = `${Math.min(Math.max(8, point.y - 46), window.innerHeight - 240)}px`;
+      composerNode.style.transform = "none";
+    };
+    composerNode = el("div", { class: "popover composer", style: `width:${WIDTH}px;transform-origin:top left;left:${placeComposerDefaultLeft}px;top:${placeComposerDefaultTop}px` });
     const textarea = el("textarea", { placeholder: t("composerPlaceholder") });
     const submit = el("button", { class: "send", title: t("sendTitle") }, ICONS.arrowUp);
     const shotToggle = el("button", { class: `toggle${screenshotOnSend ? " toggle-on" : ""}`, title: t("shotOn"), html: ICONS.camera });
@@ -1665,6 +1846,8 @@
       el("div", { class: "prompt-input" }, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }, shotToggle), submit))
     );
     fixedLayer.append(composerNode);
+    applyPanelPosition(composerNode, "composer");
+    wirePanelDrag(composerNode, "composer", placeComposerDefault);
     textarea.focus({ preventScroll: true });
   }
 
@@ -1893,12 +2076,20 @@
         }, t("del"))
       )
     );
+    const placePinDefault = () => {
+      const anchor = anchorPoint(pin) ?? { x: pin.rect.x, y: pin.rect.y };
+      panel.style.left = `${Math.min(Math.max(8, anchor.x + 16), window.innerWidth - 336)}px`;
+      panel.style.top = `${Math.min(Math.max(8, anchor.y - 40), window.innerHeight - 280)}px`;
+      panel.style.transform = "none";
+    };
     const left = Math.min(Math.max(8, point.x + 16), window.innerWidth - 336);
     const top = Math.min(Math.max(8, point.y - 40), window.innerHeight - 280);
     panel.style.left = `${left}px`;
     panel.style.top = `${top}px`;
     pinPanelNode = panel;
     rootDiv.append(panel);
+    applyPanelPosition(panel, "pin");
+    wirePanelDrag(panel, "pin", placePinDefault);
   }
 
 
@@ -2791,10 +2982,19 @@
     panel.append(footer);
 
     const below = rect.bottom + 12 + 460 < window.innerHeight;
+    const placeAdjustDefault = () => {
+      const liveRect = (adjustTarget ?? document.body).getBoundingClientRect();
+      const fits = liveRect.bottom + 12 + 460 < window.innerHeight;
+      panel.style.left = `${Math.min(Math.max(8, liveRect.left), Math.max(8, window.innerWidth - 372))}px`;
+      panel.style.top = fits ? `${liveRect.bottom + 12}px` : `${Math.max(8, liveRect.top - 12 - Math.min(560, window.innerHeight - 24))}px`;
+      panel.style.transform = "none";
+    };
     panel.style.left = `${Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - 372))}px`;
     panel.style.top = below ? `${rect.bottom + 12}px` : `${Math.max(8, rect.top - 12 - Math.min(560, window.innerHeight - 24))}px`;
     adjustPanel = panel;
     rootDiv.append(panel);
+    applyPanelPosition(panel, "adjust");
+    wirePanelDrag(panel, "adjust", placeAdjustDefault);
     rerenderAdjustRows();
   }
 

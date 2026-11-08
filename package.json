@@ -1,6 +1,6 @@
 {
   "name": "dsh-redline",
-  "version": "1.0.20",
+  "version": "1.0.21",
   "type": "module",
   "main": "./lib/index.js",
   "description": "Point at any element on the page, adjust it live, and send structured visual feedback to your DeepSeek Harness agent.",

@@ -175,8 +175,6 @@ kbd {
 .pin-error { --pin: #e5484d; }
 .pin-resolved { --pin: #7b7d7a; }
 .pin-resolved .pin-body { opacity: 0.8; }
-.pin-draft .pin-body { background: white; border-color: var(--accent); color: var(--accent); }
-
 .pin-queued .pin-body { background: white; color: var(--accent); border: 2px dashed var(--accent); }
 
 .pin-working .pin-body {
@@ -218,15 +216,13 @@ kbd {
   animation: pin-burst 700ms var(--ease-out);
 }
 .pin-draft .pin-body {
-  animation: pin-bloom 460ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  border-color: transparent;
+  color: white;
+  background:
+    linear-gradient(var(--pin), var(--pin)) padding-box,
+    conic-gradient(from var(--tencil-rim), #fff 0deg, #ffd9d9 26deg, color-mix(in oklab, var(--pin), white 40%) 64deg 300deg, #ffd9d9 340deg, #fff 360deg) border-box;
+  animation: pin-bloom 460ms cubic-bezier(0.34, 1.56, 0.64, 1) both, rim-travel 2.4s linear infinite;
   @starting-style { opacity: 1; transform: scale(1.1); }
-}
-.pin-draft .pin-body::before {
-  content: ""; position: absolute; inset: -2px; padding: 2px; border-radius: inherit;
-  pointer-events: none; opacity: 0;
-  background: conic-gradient(from var(--tencil-rim), #fff 0deg, #d9e8ff 30deg, transparent 120deg 360deg);
-  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
-  animation: pin-lap 800ms 180ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 .pin-leaving { pointer-events: none; }
@@ -258,11 +254,6 @@ kbd {
 }
 @keyframes pin-bloom { from { scale: 0; opacity: 0; } 30% { opacity: 1; } }
 @keyframes pin-burst { from { scale: 0.08; opacity: 1; } to { scale: 1; opacity: 0; } }
-@keyframes pin-lap {
-  from { --tencil-rim: 220deg; opacity: 0; }
-  15%, 75% { opacity: 1; }
-  to { --tencil-rim: -140deg; opacity: 0; }
-}
 @keyframes pin-done { to { background-color: var(--done); border-color: white; } }
 @keyframes pin-dissolve { to { translate: 0 -12px; scale: 1.15; opacity: 0; filter: blur(6px); } }
 @keyframes pin-glyph-out { to { scale: 0.4; opacity: 0; filter: blur(2px); } }
@@ -281,6 +272,9 @@ kbd {
 
 .composer { padding: 10px; display: grid; gap: 8px; }
 .composer-target { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0 2px; }
+.popover .composer-target { cursor: grab; touch-action: none; user-select: none; }
+.popover .composer-target:active, .popover .composer-target[data-dragging] { cursor: grabbing; }
+.composer-target button { cursor: pointer; touch-action: auto; }
 .composer-measure {
   display: flex; align-items: center; gap: 6px; min-width: 0; padding: 0 2px;
   color: var(--n-600); font-size: 12px;
@@ -926,6 +920,7 @@ kbd {
 
 @media (hover: hover) and (pointer: fine) {
   .pin:hover .pin-body { transform: scale(1.1); }
+  .pin-draft:hover .pin-body { box-shadow: 0 0 0 3px var(--accent-soft), 0 4px 14px -2px rgba(0, 0, 0, 0.35); }
   .tool:not(.tool-active):hover { background: rgba(255, 255, 255, 0.08); color: white; }
   .icon-button:hover { background: var(--n-100); color: var(--n-950); }
   .divider:hover::before { background: rgba(255, 255, 255, 0.35); }
@@ -948,7 +943,8 @@ kbd {
   }
   .w { animation: none; }
   .pin-working .pin-body::before, .pin-working .pin-body::after { animation-duration: 6s; }
-  .pin-draft::before, .pin-resolving::before, .pin-draft .pin-body::before, .pin-shine { display: none; }
+  .pin-draft .pin-body { animation: none; }
+  .pin-draft::before, .pin-resolving::before, .pin-shine { display: none; }
   @keyframes pin-bloom { from { opacity: 0; } }
   @keyframes pin-dissolve { to { opacity: 0; } }
   .shimmer > span[aria-hidden], .status-ping, .live-dot { animation: none; }

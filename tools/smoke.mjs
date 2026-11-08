@@ -104,6 +104,8 @@ let sessionCookie = "";
     "function setHint",
     "function postSnapshot",
     "function openAdjustPanel",
+    "function wirePanelDrag",
+    "const PANEL_POS_KEY",
     "const EDITABLE_PROPS",
     "const PROP_META",
     "const t = (key) =>"
