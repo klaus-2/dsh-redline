@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import { collectCallArguments, createReactStub, evaluateObjectLiteral, extractObjectLiteral, fakeClientCtx, findElements, flush, loadClientModule, makeLocalStorage, renderOnce, storageShim, waitFor } from "./harness.mjs";
+import { collectCallArguments, createReactStub, evaluateObjectLiteral, extractObjectLiteral, fakeClientCtx, findElements, flush, jsonResponse, loadClientModule, makeLocalStorage, renderOnce, storageShim, waitFor } from "./harness.mjs";
 
 // The bridge relay runs in the page, not in the app: it is loaded in its own
 // sandbox so the suite can drive both transports without a browser.
@@ -107,6 +107,222 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("the overlay submits the annotations through the bridge", overlay.includes('bridgeSend("annotations.submit"'));
     harness.check("the overlay reads the state through the bridge", overlay.includes('bridgeSend("state.get"'));
     harness.check("the overlay saves the drawings through the bridge", overlay.includes('bridgeSend("drawings.save"'));
+  }
+
+  harness.section("client: host identification before authentication");
+  {
+    const secret = "regression-placeholder-secret";
+    const validHealth = (port) => jsonResponse({ ok: true, name: "dsh-redline", port });
+    const build = (health, { secretResponse = () => jsonResponse({ ok: true, secret }), abortSignal = AbortSignal } = {}) => {
+      const stub = createReactStub();
+      const calls = [];
+      const intervals = [];
+      let observed = false;
+      const { module } = loadClientModule(clientPath, {
+        react: stub.React,
+        setTimeout: () => 0,
+        clearTimeout() {},
+        document: {
+          readyState: "complete",
+          documentElement: {},
+          createElement: () => ({ style: {}, dataset: {}, setAttribute() {}, appendChild() {}, remove() {} }),
+          head: { appendChild() {} },
+          body: { appendChild() {} },
+          querySelector: () => null,
+          querySelectorAll: () => [],
+          addEventListener() {},
+          removeEventListener() {}
+        },
+        sandbox: {
+          setTimeout: () => 0,
+          clearTimeout() {},
+          setInterval: (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; },
+          clearInterval() {},
+          MutationObserver: class { observe() { observed = true; } },
+          AbortSignal: abortSignal
+        },
+        fetch: async (url, options) => {
+          const target = String(url);
+          calls.push({ url: target, headers: options?.headers ?? {}, signal: options?.signal });
+          if (target === "/api/dsh-redline.secret") return secretResponse(options?.signal);
+          const probe = new URL(target);
+          if (probe.pathname === "/.lr/health") return health(Number(probe.port), options?.signal);
+          if (probe.pathname === "/.lr/settings") return jsonResponse({ ok: true, settings: { lang: "en", keys: { comment: "x", adjust: "y" }, screenshot: false, cropPad: 96 }, version: "1.0.23" });
+          if (probe.pathname === "/.lr/update") return jsonResponse({ ok: true, version: "1.0.23", update: { latest: "v1.0.24", newer: true } });
+          return jsonResponse({});
+        }
+      });
+      const ctx = fakeClientCtx({});
+      module.apply(ctx.ctx);
+      ctx.resolve();
+      const section = ctx.slots.find((slot) => slot.spec.name === "settings.section");
+      const rendered = renderOnce(stub, section.component, {});
+      for (const effect of rendered.effects) effect();
+      return {
+        calls, intervals, stub, section, effects: rendered.effects,
+        started: () => observed,
+        probes: () => calls.filter((call) => call.url.endsWith("/.lr/health")),
+        privateCalls: () => calls.filter((call) => call.url.includes("/.lr/") && !call.url.endsWith("/.lr/health")),
+        secretCalls: () => calls.filter((call) => call.url === "/api/dsh-redline.secret")
+      };
+    };
+    const rejected = build((port) => port === 47477 ? jsonResponse({ ok: true, name: "other-listener", port }) : port === 47478 ? validHealth(port) : jsonResponse({}, 503));
+    await flush(4);
+    for (const timer of rejected.intervals) await timer.fn();
+    harness.check("the client rejects a health answer that does not identify redline", rejected.started() && rejected.probes().length === 2 && rejected.probes()[1].url === "http://127.0.0.1:47478/.lr/health" && rejected.privateCalls().length > 0 && rejected.privateCalls().every((call) => call.url.startsWith("http://127.0.0.1:47478/")), `probes=${rejected.probes().length}, private ports=${rejected.privateCalls().map((call) => new URL(call.url).port).join(",")}`);
+
+    const exhausted = build(() => jsonResponse({}, 503));
+    await waitFor(() => exhausted.probes().length === 20);
+    await flush(4);
+    for (const timer of exhausted.intervals) await timer.fn();
+    harness.check("the exhaustion fixture probes all twenty candidates including the default", exhausted.started() && exhausted.probes().length === 20 && exhausted.probes().every((call, index) => new URL(call.url).port === String(47477 + index)), `probes=${exhausted.probes().length}`);
+    harness.check("the settings slot remains registered when discovery is exhausted", exhausted.section.spec.id === "dsh-redline" && exhausted.effects.length === 2);
+    harness.check("the client never authenticates to an unidentified fallback host", exhausted.secretCalls().length === 0 && exhausted.privateCalls().length === 0 && exhausted.calls.every((call) => !("x-dsh-redline-secret" in call.headers)), `secret acquisitions=${exhausted.secretCalls().length}, private requests=${exhausted.privateCalls().length}`);
+
+    let releaseHealth;
+    const pendingHealth = new Promise((resolve) => { releaseHealth = resolve; });
+    const delayed = build((port) => port === 47477 ? pendingHealth : jsonResponse({}, 503));
+    await flush(4);
+    const before = delayed.stub.getStates()[0];
+    harness.check("initial settings effects wait while host identification is pending", delayed.started() && delayed.effects.length === 2 && delayed.probes().length === 1 && delayed.secretCalls().length === 0 && delayed.privateCalls().length === 0 && before.loaded === false && before.checking === true, `probes=${delayed.probes().length}, private requests=${delayed.privateCalls().length}, loaded=${before.loaded}, checking=${before.checking}`);
+    releaseHealth(validHealth(47477));
+    await flush(4);
+    const loaded = await waitFor(() => delayed.stub.getStates()[0].loaded === true && delayed.stub.getStates()[0].update?.latest === "v1.0.24" && delayed.stub.getStates()[0].checking === false, 500, 10);
+    const after = delayed.stub.getStates()[0];
+    const settingsCalls = delayed.privateCalls().filter((call) => call.url.endsWith("/.lr/settings"));
+    const updateCalls = delayed.privateCalls().filter((call) => call.url.endsWith("/.lr/update"));
+    harness.check("initial settings and update effects work after delayed host identification", loaded && after.error === "" && after.version === "1.0.23" && after.settings.keys.comment === "x" && after.settings.cropPad === 96 && settingsCalls.length === 1 && updateCalls.length === 1 && [...settingsCalls, ...updateCalls].every((call) => call.url.startsWith("http://127.0.0.1:47477/") && call.headers["x-dsh-redline-secret"] === secret), `loaded=${after.loaded}, settings requests=${settingsCalls.length}, update requests=${updateCalls.length}, error=${after.error}`);
+    harness.check("concurrent startup and settings effects share one discovery", delayed.probes().length === 1 && delayed.secretCalls().length === 1, `probes=${delayed.probes().length}, secret acquisitions=${delayed.secretCalls().length}`);
+    const adopted = build((port) => port === 47477 ? validHealth(port) : jsonResponse({}, 503));
+    await flush(4);
+    harness.check("the client adopts a health answer that identifies redline", adopted.started() && adopted.probes().length === 1 && adopted.secretCalls().length === 1 && adopted.stub.getStates()[0].loaded === true && adopted.privateCalls().length === 2 && adopted.privateCalls().every((call) => call.url.startsWith("http://127.0.0.1:47477/") && call.headers["x-dsh-redline-secret"] === secret), `probes=${adopted.probes().length}, secret acquisitions=${adopted.secretCalls().length}, private requests=${adopted.privateCalls().length}`);
+
+    const invalidHealth = [
+      ["non-JSON", () => new Response("<html>not Redline</html>", { status: 200 })],
+      ["null JSON", () => jsonResponse(null)],
+      ["ok true alone", () => jsonResponse({ ok: true })],
+      ["wrong name", (port) => jsonResponse({ ok: true, name: "other-listener", port })],
+      ["wrong port", (port) => jsonResponse({ ok: true, name: "dsh-redline", port: port + 1 })],
+      ["string port", (port) => jsonResponse({ ok: true, name: "dsh-redline", port: String(port) })],
+      ["missing ok", (port) => jsonResponse({ name: "dsh-redline", port })],
+      ["false ok", (port) => jsonResponse({ ok: false, name: "dsh-redline", port })],
+      ["non-boolean ok", (port) => jsonResponse({ ok: "true", name: "dsh-redline", port })],
+      ["unsuccessful status", (port) => jsonResponse({ ok: true, name: "dsh-redline", port }, 503)],
+      ["network error", () => { throw new Error("no listener"); }]
+    ];
+    const rejectedFixtures = [];
+    for (const [name, reply] of invalidHealth) {
+      const fixture = build((port) => port === 47477 ? reply(port) : port === 47478 ? validHealth(port) : jsonResponse({}, 503));
+      rejectedFixtures.push(fixture);
+      await flush(4);
+      harness.check(`the client rejects ${name} health and adopts the later Redline host`, fixture.started() && fixture.probes().length === 2 && fixture.probes()[1].url === "http://127.0.0.1:47478/.lr/health" && fixture.secretCalls().length === 1 && fixture.stub.getStates()[0].loaded === true && fixture.privateCalls().length === 2 && fixture.privateCalls().every((call) => call.url.startsWith("http://127.0.0.1:47478/") && call.headers["x-dsh-redline-secret"] === secret), `probes=${fixture.probes().length}, secret acquisitions=${fixture.secretCalls().length}, private requests=${fixture.privateCalls().length}`);
+    }
+
+    const invalid = build((port) => jsonResponse({ ok: true, name: "other-listener", port }));
+    const absent = build(() => { throw new Error("no listener"); });
+    await flush(4);
+    for (const [name, fixture] of [["invalid payloads", invalid], ["network errors", absent]]) {
+      for (const timer of fixture.intervals) await timer.fn();
+      const state = fixture.stub.getStates()[0];
+      harness.check(`the client withholds credentials after twenty ${name}`, fixture.started() && fixture.probes().length === 20 && fixture.probes().every((call, index) => new URL(call.url).port === String(47477 + index)) && fixture.secretCalls().length === 0 && fixture.privateCalls().length === 0 && state.loaded === false && state.checking === false && state.error === "unreachable", `probes=${fixture.probes().length}, secret acquisitions=${fixture.secretCalls().length}, private requests=${fixture.privateCalls().length}, error=${state.error}`);
+    }
+    harness.check("health probes never carry credentials", [rejected, exhausted, delayed, adopted, invalid, absent, ...rejectedFixtures].every((fixture) => fixture.probes().every((call) => Object.keys(call.headers).every((key) => !/secret/i.test(key)))));
+
+    const controlledDeadlines = () => {
+      const deadlines = [];
+      return {
+        deadlines,
+        abortSignal: {
+          timeout(ms) {
+            const controller = new AbortController();
+            deadlines.push({ ms, controller });
+            return controller.signal;
+          }
+        }
+      };
+    };
+    const stalledResponse = (phase) => {
+      const state = { started: false, pending: false, aborted: false, signal: undefined, response: undefined };
+      return {
+        state,
+        respond(signal) {
+          state.started = true;
+          state.pending = true;
+          state.signal = signal;
+          if (phase === "fetch") {
+            return new Promise((resolve, reject) => {
+              signal?.addEventListener("abort", () => {
+                state.pending = false;
+                state.aborted = true;
+                reject(signal.reason);
+              }, { once: true });
+            });
+          }
+          const body = new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode('{"ok":'));
+              signal?.addEventListener("abort", () => {
+                state.pending = false;
+                state.aborted = true;
+                controller.error(signal.reason);
+              }, { once: true });
+            }
+          });
+          state.response = new Response(body, { status: 200, headers: { "content-type": "application/json" } });
+          return state.response;
+        }
+      };
+    };
+    const boundedFixtures = [];
+    for (const phase of ["fetch", "body"]) {
+      const control = controlledDeadlines();
+      const stalled = stalledResponse(phase);
+      const fixture = build((port, signal) => port === 47477 ? stalled.respond(signal) : port === 47478 ? validHealth(port) : jsonResponse({}, 503), { abortSignal: control.abortSignal });
+      boundedFixtures.push(fixture);
+      await flush(4);
+      for (const timer of fixture.intervals) await timer.fn();
+      const before = fixture.stub.getStates()[0];
+      harness.check(`the stalled health ${phase} fixture starts and remains pending`, fixture.started() && fixture.effects.length === 2 && stalled.state.started && stalled.state.pending && !stalled.state.aborted && (phase === "fetch" || (stalled.state.response?.bodyUsed === true && stalled.state.response.body.locked)) && fixture.probes().length === 1 && fixture.secretCalls().length === 0 && fixture.privateCalls().length === 0 && before.loaded === false && before.checking === true, `started=${stalled.state.started}, pending=${stalled.state.pending}, body used=${stalled.state.response?.bodyUsed}, probes=${fixture.probes().length}, private requests=${fixture.privateCalls().length}`);
+      const deadline = control.deadlines.find((entry) => entry.controller.signal === stalled.state.signal);
+      harness.check(`a stalled health ${phase} receives the 1000ms request deadline`, deadline?.ms === 1000 && stalled.state.signal instanceof AbortSignal && !stalled.state.signal.aborted, `deadline=${deadline?.ms}, signal supplied=${stalled.state.signal !== undefined}`);
+      if (deadline !== undefined) deadline.controller.abort(new DOMException("fixture deadline expired", "TimeoutError"));
+      await flush(4);
+      const after = fixture.stub.getStates()[0];
+      harness.check(`the client advances to the next host after a health ${phase} deadline`, stalled.state.aborted && !stalled.state.pending && fixture.probes().length === 2 && fixture.probes()[1].url === "http://127.0.0.1:47478/.lr/health" && fixture.secretCalls().length === 1 && after.loaded === true && after.checking === false && after.error === "" && after.version === "1.0.23" && after.settings.cropPad === 96 && after.update?.latest === "v1.0.24" && fixture.privateCalls().length === 2 && fixture.privateCalls().every((call) => call.url.startsWith("http://127.0.0.1:47478/") && call.headers["x-dsh-redline-secret"] === secret), `aborted=${stalled.state.aborted}, probes=${fixture.probes().length}, secret acquisitions=${fixture.secretCalls().length}, private requests=${fixture.privateCalls().length}, loaded=${after.loaded}, checking=${after.checking}, error=${after.error}`);
+    }
+    for (const phase of ["fetch", "body"]) {
+      const control = controlledDeadlines();
+      const stalled = stalledResponse(phase);
+      const fixture = build((port) => port === 47477 ? validHealth(port) : jsonResponse({}, 503), { secretResponse: stalled.respond, abortSignal: control.abortSignal });
+      boundedFixtures.push(fixture);
+      await flush(4);
+      const before = fixture.stub.getStates()[0];
+      harness.check(`the stalled secret ${phase} fixture starts and remains pending`, fixture.started() && fixture.effects.length === 2 && stalled.state.started && stalled.state.pending && !stalled.state.aborted && (phase === "fetch" || (stalled.state.response?.bodyUsed === true && stalled.state.response.body.locked)) && fixture.probes().length === 1 && fixture.secretCalls().length === 1 && before.loaded === false && before.checking === true, `started=${stalled.state.started}, pending=${stalled.state.pending}, body used=${stalled.state.response?.bodyUsed}, probes=${fixture.probes().length}, secret acquisitions=${fixture.secretCalls().length}`);
+      for (const timer of fixture.intervals) await timer.fn();
+      harness.check(`the client publishes no private destination during a stalled secret ${phase}`, fixture.privateCalls().length === 0, `private requests=${fixture.privateCalls().length}`);
+      const deadline = control.deadlines.find((entry) => entry.controller.signal === stalled.state.signal);
+      harness.check(`a stalled secret ${phase} receives the 5000ms request deadline`, deadline?.ms === 5000 && stalled.state.signal instanceof AbortSignal && !stalled.state.signal.aborted, `deadline=${deadline?.ms}, signal supplied=${stalled.state.signal !== undefined}`);
+      if (deadline !== undefined) deadline.controller.abort(new DOMException("fixture deadline expired", "TimeoutError"));
+      await flush(4);
+      for (const timer of fixture.intervals) await timer.fn();
+      const after = fixture.stub.getStates()[0];
+      harness.check(`the client becomes unreachable after a secret ${phase} deadline`, stalled.state.aborted && !stalled.state.pending && fixture.probes().length === 1 && fixture.secretCalls().length === 1 && fixture.privateCalls().length === 0 && after.loaded === false && after.checking === false && after.error === "unreachable", `aborted=${stalled.state.aborted}, probes=${fixture.probes().length}, secret acquisitions=${fixture.secretCalls().length}, private requests=${fixture.privateCalls().length}, loaded=${after.loaded}, checking=${after.checking}, error=${after.error}`);
+    }
+    let releaseSecret;
+    const pendingSecret = new Promise((resolve) => { releaseSecret = resolve; });
+    const secretControl = controlledDeadlines();
+    const delayedSecret = build((port) => port === 47477 ? validHealth(port) : jsonResponse({}, 503), { secretResponse: () => pendingSecret, abortSignal: secretControl.abortSignal });
+    await flush(4);
+    for (const timer of delayedSecret.intervals) await timer.fn();
+    const secretBefore = delayedSecret.stub.getStates()[0];
+    harness.check("the client keeps private requests blocked while a valid secret is pending", delayedSecret.started() && delayedSecret.effects.length === 2 && delayedSecret.probes().length === 1 && delayedSecret.secretCalls().length === 1 && delayedSecret.privateCalls().length === 0 && secretBefore.loaded === false && secretBefore.checking === true, `probes=${delayedSecret.probes().length}, secret acquisitions=${delayedSecret.secretCalls().length}, private requests=${delayedSecret.privateCalls().length}, loaded=${secretBefore.loaded}, checking=${secretBefore.checking}`);
+    releaseSecret(jsonResponse({ ok: true, secret }));
+    await flush(4);
+    const secretAfter = delayedSecret.stub.getStates()[0];
+    const delayedSettings = delayedSecret.privateCalls().filter((call) => call.url.endsWith("/.lr/settings"));
+    const delayedUpdate = delayedSecret.privateCalls().filter((call) => call.url.endsWith("/.lr/update"));
+    harness.check("initial settings and update effects work after delayed secret acquisition", secretAfter.loaded === true && secretAfter.checking === false && secretAfter.error === "" && secretAfter.version === "1.0.23" && secretAfter.settings.keys.comment === "x" && secretAfter.settings.cropPad === 96 && secretAfter.update?.latest === "v1.0.24" && delayedSecret.probes().length === 1 && delayedSecret.secretCalls().length === 1 && delayedSettings.length === 1 && delayedUpdate.length === 1 && delayedSecret.privateCalls().every((call) => call.url.startsWith("http://127.0.0.1:47477/") && call.headers["x-dsh-redline-secret"] === secret), `loaded=${secretAfter.loaded}, checking=${secretAfter.checking}, settings requests=${delayedSettings.length}, update requests=${delayedUpdate.length}, secret acquisitions=${delayedSecret.secretCalls().length}, error=${secretAfter.error}`);
+    harness.check("bounded discovery health probes never carry credentials", [...boundedFixtures, delayedSecret].every((fixture) => fixture.probes().every((call) => Object.keys(call.headers).every((key) => !/secret/i.test(key)))));
   }
 
   harness.section("client: the bridge relay");
@@ -265,7 +481,7 @@ export async function runClientSuite(harness, { pluginDir }) {
         const target = String(url);
         calls.push({ url: target, method: options?.method ?? "GET", body: options?.body, headers: options?.headers });
         if (target.includes("/api/dsh-redline.secret")) return new Response(JSON.stringify({ ok: true, secret: "a".repeat(64) }), { status: 200, headers: { "content-type": "application/json" } });
-        if (target.includes("/.lr/health")) return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } });
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
         if (target.endsWith("/.lr/overlay.js")) return new Response(overlaySource, { status: 200, headers: { "content-type": "text/javascript" } });
         if (target.endsWith("/.lr/bridge.js")) return new Response(bridgeSource, { status: 200, headers: { "content-type": "text/javascript" } });
         if (target.endsWith("/.lr/bridge")) return new Response(JSON.stringify({ ok: true, count: 1 }), { status: 200, headers: { "content-type": "application/json" } });
@@ -465,6 +681,7 @@ export async function runClientSuite(harness, { pluginDir }) {
         fetch: async (url, options) => {
           const target = String(url);
           calls.push({ url: target, method: options?.method ?? "GET", body: options?.body });
+          if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
           if (target.includes("/.lr/update")) {
             return new Response(JSON.stringify({ ok: true, version: "1.0.16", installed: "1.0.16", update: { latest: "v1.0.17", newer: true } }), { status: 200, headers: { "content-type": "application/json" } });
           }
@@ -538,6 +755,7 @@ export async function runClientSuite(harness, { pluginDir }) {
       console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
       fetch: async (url) => {
         const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
         if (target.includes("/.lr/update")) {
           return new Response(JSON.stringify({ ok: true, version: "1.0.17", installed: "1.0.17", update: { latest: "v1.0.19", newer: true, url: "https://github.com/klaus-2/dsh-redline/releases/tag/v1.0.19" } }), { status: 200, headers: { "content-type": "application/json" } });
         }
@@ -605,6 +823,7 @@ export async function runClientSuite(harness, { pluginDir }) {
       console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
       fetch: async (url) => {
         const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
         if (target.includes("/.lr/update")) {
           return new Response(JSON.stringify({ ok: true, version: "1.0.17", installed: "1.0.17", update: { latest: "v1.0.17", newer: false, url: releaseUrl } }), { status: 200, headers: { "content-type": "application/json" } });
         }
@@ -650,6 +869,7 @@ export async function runClientSuite(harness, { pluginDir }) {
       console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
       fetch: async (url) => {
         const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
         if (target.includes("/.lr/update")) {
           return new Response(JSON.stringify({ ok: true, version: "1.0.16", installed: "1.0.16", update: { latest: "v1.0.17", newer: true } }), { status: 200, headers: { "content-type": "application/json" } });
         }
