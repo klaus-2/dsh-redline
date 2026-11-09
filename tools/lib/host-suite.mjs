@@ -1,5 +1,7 @@
 import { createServer, request as httpRequest } from "node:http";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import assert from "node:assert/strict";
@@ -455,6 +457,37 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.check("a development copy refuses the in-app install", local.ok === false && local.error === "local-development", JSON.stringify(local));
       const running = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
       harness.check("the running copy is not reported as a pending install", running.installed === null && running.update.installed === undefined, JSON.stringify({ installed: running.installed, updateInstalled: running.update.installed }));
+    }
+
+    harness.section("host: a newer copy on disk waits for the next start");
+    {
+      // The copy that runs says 1.0.24; a copy of 1.0.99 sits in the package folder waiting for a restart.
+      const staged = await mkdtemp(path.join(tmpdir(), "dsh-regression-newer-"));
+      try {
+        await mkdir(path.join(staged, "lib"), { recursive: true });
+        await writeFile(path.join(staged, "package.json"), JSON.stringify({ name: "dsh-redline", version: "1.0.99" }));
+        await copyFile(path.join(pluginDir, "lib", "index.js"), path.join(staged, "lib", "index.js"));
+        await copyFile(path.join(pluginDir, "lib", "overlay.js"), path.join(staged, "lib", "overlay.js"));
+        await copyFile(path.join(pluginDir, "lib", "bridge.js"), path.join(staged, "lib", "bridge.js"));
+        const stagedUrl = pathToFileURL(path.join(staged, "lib", "index.js")).href;
+        const stagedModule = await import(stagedUrl);
+        const newerServer = await stagedModule.startServer({ port: await freePort() });
+        const newerPort = newerServer.port ?? newerServer.address().port;
+        const newerBase = `http://127.0.0.1:${newerPort}`;
+        const newerAuth = { [secretHeader]: secret };
+        try {
+          const newer = await (await fetch(`${newerBase}/.lr/settings`, { headers: newerAuth })).json();
+          harness.eq("the newer copy on disk is the pending install", newer.installed, "1.0.99");
+          harness.eq("the update route names the newer copy too", newer.update.installed, "1.0.99");
+          harness.eq("the running copy is still the one that runs", newer.version, pluginVersion);
+          const newerUpdate = await (await fetch(`${newerBase}/.lr/update`, { headers: newerAuth })).json();
+          harness.eq("the update route reports the newer copy as installed", newerUpdate.update.installed, "1.0.99");
+        } finally {
+          newerServer.close();
+        }
+      } finally {
+        await rm(staged, { recursive: true, force: true });
+      }
     }
 
     harness.section("host: agent delivery");
