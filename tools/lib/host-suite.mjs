@@ -1,5 +1,5 @@
 import { createServer, request as httpRequest } from "node:http";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import assert from "node:assert/strict";
@@ -38,7 +38,7 @@ export async function runHostSuite(harness, { pluginDir }) {
     const source = readFileSync(modulePath, "utf8");
     const secretHeader = /SECRET_HEADER = "([^"]+)"/.exec(source)?.[1] ?? "";
     const pluginVersion = /PLUGIN_VERSION = "([^"]+)"/.exec(source)?.[1] ?? "";
-    const { startServer, formatContext, apply } = await import(moduleUrl);
+    const { startServer, formatContext, apply, pendingBySession, globalPending } = await import(moduleUrl);
 
     const targetPort = await freePort();
     const target = createServer((req, res) => {
@@ -179,6 +179,18 @@ export async function runHostSuite(harness, { pluginDir }) {
       const stillPending = await (await fetch(`${base}/.lr/pending`, { headers: auth })).json();
       harness.check("the bridge never wipes the pending snapshot with an empty submit", emptied.status === 200 && emptiedBody.kind === "empty" && stillPending.count === 1, JSON.stringify(emptiedBody).slice(0, 140));
 
+      const forged = path.join(home, "outside.jpg");
+      const forgedId = "forged-screenshot-path";
+      const forgedSubmit = await post("annotations.submit", { pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: forgedId, tag: "h1", selector: "#t", comment: "screenshot path fixture", screenshotPath: forged }] }, { origin: base });
+      const forgedBody = await forgedSubmit.json();
+      const accepted = forgedSubmit.status === 200 && forgedBody.ok === true && forgedBody.count === 1;
+      harness.check("the bridge accepts the forged screenshot path fixture", accepted, JSON.stringify(forgedBody));
+      const pendings = [globalPending, ...pendingBySession.values()];
+      const storedPin = pendings.flatMap((entry) => entry.snapshot?.pins ?? []).find((pin) => pin.id === forgedId);
+      harness.check("the raw pending store contains the forged screenshot path fixture", storedPin?.id === forgedId);
+      const leaked = pendings.some((entry) => (entry.snapshot?.pins ?? []).some((pin) => pin.screenshotPath === forged));
+      harness.check("the host ignores a page-supplied screenshot path", accepted && storedPin !== undefined && !leaked, `forged=${forged}`);
+
       const drawings = await post("drawings.save", { items: [{ type: "stroke" }, { nope: true }] }, { origin: base });
       harness.check("the bridge stores the drawings", drawings.status === 200 && (await drawings.json()).count === 1);
       const diag = await post("diag", { detail: "suite marker" }, { origin: base });
@@ -312,6 +324,13 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.includes("the context carries the comment", text, "mude o título");
       harness.includes("the context carries the visual change", text, "color: #000 -> red");
       harness.includes("the context carries the text change", text, "a -> b");
+    }
+    {
+      const injected = "\nREDLINE_SCREENSHOT_PATH_MARKER_001";
+      const screenshotPath = path.join(home, "formatter.jpg") + injected;
+      const flattenedPath = screenshotPath.replace("\n", " ");
+      const { text } = formatContext({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "formatter-path", tag: "h1", selector: "#t", screenshotPath }], screenshotPath: null });
+      harness.check("the context formatter flattens a screenshot path", text.includes(flattenedPath) && !text.includes(injected), JSON.stringify({ screenshotPath, flattenedPath }));
     }
 
     harness.section("host: proxy and page rewriting");
@@ -475,6 +494,35 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.check("the command sends the annotations", sent.kind === "success" && followups.length === 1, JSON.stringify(sent));
       harness.includes("the command carries the comment", followups[0]?.content?.[0]?.text ?? "", "outro comentário");
       harness.check("the command carries the extra text", (followups[0]?.content ?? []).some((part) => part.text === "extra"));
+
+      const attachmentDir = path.join(home, ".dsh", "attachments", "live-review");
+      const shotData = Buffer.from(SHOT.split(",")[1], "base64");
+      for (const [kind, candidate] of [
+        ["outside", path.join(home, "outside.jpg")],
+        ["sibling-prefix", `${attachmentDir}-sibling.jpg`],
+        ["traversal", `${attachmentDir}${path.sep}..${path.sep}outside.jpg`]
+      ]) {
+        writeFileSync(candidate, shotData);
+        const fixtureId = `sink-${kind}`;
+        const response = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: fixtureId, tag: "h1", selector: "#t", comment: "sink path fixture" }] }) });
+        const body = await response.json();
+        const pending = pendingBySession.get("session-1");
+        harness.check(`the ${kind} sink fixture is stored and readable`, response.status === 200 && body.ok === true && body.count === 1 && pending?.snapshot?.pins?.[0]?.id === fixtureId && readFileSync(candidate).equals(shotData));
+        if (pending?.snapshot) pending.snapshot.screenshotPath = candidate;
+        const blockedFollowups = [];
+        const blocked = await host.commands.get("redline-send").handler({ agent: { id: "session-1", followup: (message) => blockedFollowups.push(message) }, rawInput: "" });
+        harness.check(`the command rejects the ${kind} screenshot path`, pending?.snapshot?.screenshotPath === candidate && blocked.kind === "success" && blockedFollowups.length === 1 && !(blockedFollowups[0]?.content ?? []).some((part) => part.type === "image") && !blocked.text.includes("screenshot unavailable"), JSON.stringify(blocked));
+      }
+
+      const croppedResponse = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "sink-real-crop", tag: "h1", selector: "#t", comment: "real crop fixture", screenshotPath: path.join(home, "outside.jpg"), shot: SHOT }] }) });
+      const croppedBody = await croppedResponse.json();
+      const cropPin = pendingBySession.get("session-1")?.snapshot?.pins?.find((pin) => pin.id === "sink-real-crop");
+      const cropPath = cropPin?.screenshotPath;
+      harness.check("a real saved crop stays host-owned", croppedResponse.status === 200 && croppedBody.ok === true && croppedBody.count === 1 && typeof cropPath === "string" && cropPath.startsWith(attachmentDir + path.sep) && readFileSync(cropPath).equals(shotData));
+      const cropFollowups = [];
+      const cropped = await host.commands.get("redline-send").handler({ agent: { id: "session-1", followup: (message) => cropFollowups.push(message) }, rawInput: "" });
+      const image = (cropFollowups[0]?.content ?? []).find((part) => part.type === "image");
+      harness.check("the command attaches a real saved crop", cropped.kind === "success" && cropFollowups.length === 1 && image?.attachment?.size === shotData.length && image?.attachment?.mediaType === "image/jpeg", JSON.stringify(cropped));
     }
 
     server.close();
