@@ -834,6 +834,7 @@ export async function runClientSuite(harness, { pluginDir }) {
       const after = renderOnce(stub, section.component, {});
       const restart = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("1.0.24") && element.props.children.includes("was installed"));
       harness.check("the row asks for a restart with the new version", restart.length > 0, JSON.stringify(after.tree).slice(0, 200));
+      harness.eq("the row carries the restart message once", restart.length, 1);
       const old = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("1.0.23 was installed"));
       harness.eq("the row does not name the old version as installed", old.length, 0);
       const stillThere = findElements(after.tree, (element) => element.props?.children === "Update now");
@@ -1268,6 +1269,8 @@ export async function runClientSuite(harness, { pluginDir }) {
       const restart = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("1.0.17") && element.props.children.includes("was installed"));
       harness.check("the row names the copy that landed on disk", restart.length > 0, JSON.stringify(after.tree).slice(0, 200));
       harness.eq("the copy that landed on disk is remembered", localStorage.getItem("dsh-redline.updated"), "1.0.17");
+      const reason = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("did not start"));
+      harness.check("the row says why the copy did not start", reason.length > 0, JSON.stringify(after.tree).slice(0, 200));
     }
   }
 }
