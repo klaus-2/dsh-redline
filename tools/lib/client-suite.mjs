@@ -789,10 +789,11 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
   }
 
-  harness.section("client: the update that waits for a restart names the new version");
+  harness.section("client: the update that waits for a restart names the version that landed");
   {
-    // The plugin manager answers a version it could load: without a hot reload that is the copy that still
-    // runs, so the answer names the old release. The row must name the version that went on disk.
+    // The manager answers with the version of the bundle it resolved on disk. pnpm's minimumReleaseAge can
+    // hold a release back, so that answer is the truth about what landed — here it is the older 1.0.23, and
+    // the row must name it rather than the 1.0.24 that was asked for.
     const stub = createReactStub();
     const localStorage = makeLocalStorage();
     const pluginManager = {
@@ -830,15 +831,115 @@ export async function runClientSuite(harness, { pluginDir }) {
     if (buttons.length === 1) {
       await buttons[0].props.onClick();
       await flush(4);
-      harness.eq("the version that goes on disk is remembered", localStorage.getItem("dsh-redline.updated"), "1.0.24");
+      harness.eq("the version that landed on disk is remembered", localStorage.getItem("dsh-redline.updated"), "1.0.23");
       const after = renderOnce(stub, section.component, {});
-      const restart = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("1.0.24") && element.props.children.includes("was installed"));
-      harness.check("the row asks for a restart with the new version", restart.length > 0, JSON.stringify(after.tree).slice(0, 200));
-      harness.eq("the row carries the restart message once", restart.length, 1);
-      const old = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("1.0.23 was installed"));
-      harness.eq("the row does not name the old version as installed", old.length, 0);
+      const restart = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("1.0.23") && element.props.children.includes("installed"));
+      harness.check("the row names the version that landed", restart.length > 0, JSON.stringify(after.tree).slice(0, 200));
+      harness.eq("the row carries the message once", restart.length, 1);
+      const asked = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("1.0.24 was installed"));
+      harness.eq("the row does not claim the version that was only asked for", asked.length, 0);
       const stillThere = findElements(after.tree, (element) => element.props?.children === "Update now");
-      harness.eq("the update button disappears while the restart waits", stillThere.length, 0);
+      harness.eq("the update button stays so the release can be tried again", stillThere.length, 1);
+    }
+  }
+
+  harness.section("client: a copy that is already installed is asked for by its exact tarball");
+  {
+    // The manager refuses name@version because the package is already there: the row asks again with the
+    // exact tarball, and the answer that comes back is the one the row must name.
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const calls = [];
+    const pluginManager = {
+      async installBundle(spec) {
+        calls.push(spec);
+        if (calls.length === 1) return { ok: true, value: { application: "failed", error: { code: "already-installed" } } };
+        return { ok: true, value: { application: "restart-required", version: "1.0.24" } };
+      }
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/update")) {
+          return jsonResponse({ ok: true, version: "1.0.23", update: { latest: "v1.0.24", newer: true } });
+        }
+        if (target.includes("/.lr/settings")) {
+          return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.23" });
+        }
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({ remote: { pluginManager } });
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const withButton = renderOnce(stub, section.component, {});
+    const buttons = findElements(withButton.tree, (element) => element.props?.children === "Update now");
+    harness.eq("the update button appears", buttons.length, 1);
+    if (buttons.length === 1) {
+      await buttons[0].props.onClick();
+      await flush(4);
+      harness.eq("the manager is asked twice", calls.length, 2);
+      harness.eq("the retry asks for the exact tarball", calls[1], "https://registry.npmjs.org/dsh-redline/-/dsh-redline-1.0.24.tgz");
+      harness.eq("the version that landed on disk is remembered", localStorage.getItem("dsh-redline.updated"), "1.0.24");
+      const after = renderOnce(stub, section.component, {});
+      const restart = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("1.0.24") && element.props.children.includes("installed"));
+      harness.check("the row names the version that landed", restart.length > 0, JSON.stringify(after.tree).slice(0, 200));
+    }
+  }
+
+  harness.section("client: a manager that names no version falls back to the one that was asked for");
+  {
+    // The manager answers without a version: the version that was asked for is the best answer there is.
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const pluginManager = {
+      async installBundle() {
+        return { ok: true, value: { application: "restart-required" } };
+      }
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/update")) {
+          return jsonResponse({ ok: true, version: "1.0.23", update: { latest: "v1.0.24", newer: true } });
+        }
+        if (target.includes("/.lr/settings")) {
+          return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.23" });
+        }
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({ remote: { pluginManager } });
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const withButton = renderOnce(stub, section.component, {});
+    const buttons = findElements(withButton.tree, (element) => element.props?.children === "Update now");
+    harness.eq("the update button appears", buttons.length, 1);
+    if (buttons.length === 1) {
+      await buttons[0].props.onClick();
+      await flush(4);
+      harness.eq("the version that was asked for is remembered", localStorage.getItem("dsh-redline.updated"), "1.0.24");
+      const after = renderOnce(stub, section.component, {});
+      const restart = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("1.0.24") && element.props.children.includes("installed"));
+      harness.check("the row names the version that was asked for", restart.length > 0, JSON.stringify(after.tree).slice(0, 200));
     }
   }
 
