@@ -361,6 +361,26 @@ export async function runClientSuite(harness, { pluginDir }) {
     const noGuardResult = runStorageGuard(noGuardCode);
     assert.deepEqual(noGuardResult.sessionKeys, Object.keys(guardSeed));
     assert.deepEqual(noGuardResult.localKeys, Object.keys(guardSeed));
+
+    const relayPurgeSeed = { "lr-drawings": "late", "lr-drawings:https://a.example": "late", marker: "kept", unrelated: "kept" };
+    const loadRelayWithStorage = (code) => {
+      const store = storageShim(relayPurgeSeed);
+      const windowStub = { __LR_BRIDGE_MODE__: "client", location: { href: "https://example.com/" }, localStorage: store };
+      const sandbox = vm.createContext({
+        window: windowStub,
+        fetch: async () => { throw new Error("fetch was not stubbed"); },
+        setTimeout,
+        clearTimeout,
+        console: { log() {}, warn() {}, error() {} }
+      });
+      vm.runInContext(code, sandbox, { filename: "bridge-relay.js" });
+      return { store, keys: Object.keys(store) };
+    };
+    const bridgePath = path.join(pluginDir, "lib", "bridge.js");
+    const relayPurged = loadRelayWithStorage(readFileSync(bridgePath, "utf8"));
+    harness.check("the bridge relay purges the legacy drawings keys", JSON.stringify(relayPurged.keys) === JSON.stringify(["marker", "unrelated"]), JSON.stringify(relayPurged.keys));
+    const relayUnpurged = loadRelayWithStorage("(() => { \"use strict\"; if (window.__LR_BRIDGE__) return; const MODE = window.__LR_BRIDGE_MODE__ === \"client\" ? \"client\" : \"direct\"; })();");
+    assert.deepEqual(relayUnpurged.keys, Object.keys(relayPurgeSeed));
   }
 
   harness.section("client: overlay locales");

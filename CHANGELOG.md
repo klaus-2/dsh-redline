@@ -13,12 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   longer broadcasts the saved drawings, and an inline guard that runs before
   `window.__LR__` is defined removes the legacy `lr-drawings` and
   `lr-drawings:*` keys and the off-page pin and panel keys from both
-  `sessionStorage` and `localStorage`. Drawings now live only in memory in the
-  overlay; the only repository of saved drawings is the host store behind the
-  instance secret. One upgrade caveat: a page the proxy rewrites without a
-  recognized `<head>` tag, or one it serves as non-HTML content, does not get
-  the injected guard, so on such a first load a page script could still read
-  leftover pre-1.0.24 keys once.
+  `sessionStorage` and `localStorage`. The bridge relay purges the legacy
+  drawing keys again when it loads, so a page script that re-creates them
+  after the guard does not keep them for the next page. Drawings now live
+  only in memory in the overlay; the only repository of saved drawings is the
+  host store behind the instance secret.
 
 ### Fixed
 
