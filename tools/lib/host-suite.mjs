@@ -453,6 +453,8 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.check("a malformed version is refused", badVersion.status === 400);
       const local = await (await fetch(`${base}/.lr/update/install`, { method: "POST", headers: json(), body: JSON.stringify({ version: pluginVersion }) })).json();
       harness.check("a development copy refuses the in-app install", local.ok === false && local.error === "local-development", JSON.stringify(local));
+      const running = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
+      harness.check("the running copy is not reported as a pending install", running.installed === null && running.update.installed === undefined, JSON.stringify({ installed: running.installed, updateInstalled: running.update.installed }));
     }
 
     harness.section("host: agent delivery");
