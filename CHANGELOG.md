@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.24] - 2026-11-09
+
+### Security
+
+- **The proxied page no longer receives review text.** The inline config no
+  longer broadcasts the saved drawings, and an inline guard that runs before
+  `window.__LR__` is defined removes the legacy `lr-drawings` and
+  `lr-drawings:*` keys and the off-page pin and panel keys from both
+  `sessionStorage` and `localStorage`. Drawings now live only in memory in the
+  overlay; the only repository of saved drawings is the host store behind the
+  instance secret. One upgrade caveat: a page the proxy rewrites without a
+  recognized `<head>` tag, or one it serves as non-HTML content, does not get
+  the injected guard, so on such a first load a page script could still read
+  leftover pre-1.0.24 keys once.
+
+### Fixed
+
+- **The generated overlay is rebuilt with its template, and panel positions now live in `sessionStorage`.** Unsent drawings are memory-only and do not survive a reload; pins stay tab-scoped, and legacy Web Storage keys are purged when the page loads.
+
 ## [1.0.23] - 2026-11-08
 
 ### Security

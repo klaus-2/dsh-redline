@@ -243,6 +243,7 @@ let sessionCookie = "";
   const pageHtml = await page.text();
   const config = JSON.parse(/window\.__LR__=(\{.*?\});window\.__LR_BRIDGE_MODE__/.exec(pageHtml)[1]);
   check("page: o config não carrega o segredo", !("secret" in config), Object.keys(config).join(", "));
+  check("page: o config não carrega os desenhos", !("drawings" in config), Object.keys(config).join(", "));
 
   const relaySource = await (await fetch(`${base}/.lr/bridge.js`)).text();
   const windowStub = { __LR__: config };

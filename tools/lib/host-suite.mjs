@@ -2,7 +2,9 @@ import { createServer, request as httpRequest } from "node:http";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { freePort, withIsolatedHome, withStubbedFetch } from "./harness.mjs";
+import assert from "node:assert/strict";
+import vm from "node:vm";
+import { freePort, storageShim, withIsolatedHome, withStubbedFetch } from "./harness.mjs";
 
 const enc = (value) => Buffer.from(value, "utf8").toString("base64url");
 const SHOT = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwcJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==";
@@ -314,8 +316,45 @@ export async function runHostSuite(harness, { pluginDir }) {
 
     harness.section("host: proxy and page rewriting");
     {
+      await fetch(`${base}/.lr/drawings`, { method: "POST", headers: json(), body: JSON.stringify({ items: [{ type: "stroke", points: [1, 2] }] }) });
       const response = await fetch(`${base}/p/${enc(targetUrl)}`);
       const html = await response.text();
+      const configMatch = /window\.__LR__=(\{.*?\});window\.__LR_BRIDGE_MODE__/.exec(html);
+      let pageConfig = null;
+      try { pageConfig = configMatch === null ? null : JSON.parse(configMatch[1]); } catch { pageConfig = null; }
+      harness.check("the proxied page config does not broadcast drawings", pageConfig !== null && !("drawings" in pageConfig), JSON.stringify(pageConfig === null ? null : Object.keys(pageConfig)));
+
+      const pageHref = `${base}/p/${enc(targetUrl)}`;
+      const otherHref = `${base}/p/${enc(`${targetUrl}other`)}`;
+      const guardSeed = {
+        "lr-drawings": "old",
+        "lr-drawings:https://a.example": "old",
+        [`lr:pins:${otherHref}`]: "old",
+        [`lr:pins:${pageHref}`]: "keep",
+        [`lr-panel-pos:${otherHref}`]: "old",
+        foreign: "keep"
+      };
+      const guardExpected = [`lr:pins:${pageHref}`, "foreign"];
+      const runStorageGuard = (code) => {
+        const session = storageShim(guardSeed);
+        const local = storageShim(guardSeed);
+        const context = vm.createContext({ window: { location: { href: pageHref }, sessionStorage: session, localStorage: local } });
+        vm.runInContext(code, context, { filename: "storage-guard.js" });
+        return { sessionKeys: Object.keys(session), localKeys: Object.keys(local) };
+      };
+      const guardMatch = /<script>([\s\S]*?)<\/script>/.exec(html);
+      const guardCode = guardMatch?.[1] ?? "";
+      const guardResult = runStorageGuard(guardCode);
+      harness.check("the injected storage guard removes the legacy drawings key",
+        guardCode.includes("lr-drawings") && guardCode.includes("window.location.href") &&
+        JSON.stringify(guardResult.sessionKeys) === JSON.stringify(guardExpected) &&
+        JSON.stringify(guardResult.localKeys) === JSON.stringify(guardExpected),
+        `session ${JSON.stringify(guardResult.sessionKeys)} | local ${JSON.stringify(guardResult.localKeys)}`);
+      const noGuardHtml = guardMatch === null ? html : html.replace(guardMatch[0], "<script></script>");
+      const noGuardCode = /<script>([\s\S]*?)<\/script>/.exec(noGuardHtml)?.[1] ?? "";
+      const noGuardResult = runStorageGuard(noGuardCode);
+      assert.deepEqual(noGuardResult.sessionKeys, Object.keys(guardSeed));
+      assert.deepEqual(noGuardResult.localKeys, Object.keys(guardSeed));
       const cookie = /lr_session=[a-z0-9-]+/i.exec(response.headers.get("set-cookie") ?? "")?.[0] ?? "";
       harness.check("the page answers 200", response.status === 200);
       harness.includes("the overlay is injected", html, "/.lr/overlay.js");
@@ -335,6 +374,16 @@ export async function runHostSuite(harness, { pluginDir }) {
       const fallthroughHtml = await fallthrough.text();
       harness.check("the fallthrough proxies the target", fallthrough.status === 200 && fallthroughHtml.includes("Sobre"));
       harness.includes("the fallthrough is rewritten too", fallthroughHtml, "window.__LR__=");
+
+      const headlessGuardMatch = /<script>([\s\S]*?)<\/script>/.exec(fallthroughHtml);
+      const headlessGuard = headlessGuardMatch?.[1] ?? "";
+      const headlessResult = runStorageGuard(headlessGuard);
+      harness.check("the storage guard leads a page without a head too",
+        headlessGuard === guardCode &&
+        headlessGuardMatch.index < /window\.__LR__=/.exec(fallthroughHtml)?.index &&
+        JSON.stringify(headlessResult.sessionKeys) === JSON.stringify(guardExpected) &&
+        JSON.stringify(headlessResult.localKeys) === JSON.stringify(guardExpected),
+        `order=${headlessGuardMatch.index < /window\.__LR__=/.exec(fallthroughHtml)?.index} session ${JSON.stringify(headlessResult.sessionKeys)}`);
 
       const raw = await fetch(`${base}/p/http://127.0.0.1:${targetPort}/`);
       harness.check("the raw target form works", raw.status === 200 && (await raw.text()).includes("/.lr/overlay.js"));

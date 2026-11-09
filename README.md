@@ -79,6 +79,8 @@ The loopback server binds to 127.0.0.1 only, answers only for its own host names
 
 The page talks to the host through a limited message bridge instead. It can submit the annotations, save the drawings, read the narrow state the overlay draws (language, delivery, pending ids, settings) and report a diagnostic — every other route answers `401`. The host half calls the bridge with the secret; the page calls it from a browser request that carries this origin, and the `Origin` header cannot be forged by a script. That origin also carries the pages the plugin proxies, so the bridge is an annotation channel and never a data channel.
 
+The page no longer receives review text in its inline config and no longer keeps drawings in Web Storage; the host's secret-gated drawings store is the only repository of saved drawings. Unsent drawings are memory-only and do not survive a reload, pins stay tab-scoped, and an inline guard purges legacy review keys from Web Storage before the overlay loads.
+
 Pages running in the harness browser can submit annotations by design — that is the plugin working as intended, so treat comments arriving through Redline like any other user-authored input: a comment is the text the Redline overlay captured on the page, and the pending annotations are shown in the card above the composer before they attach to your next message. The agent ticker (tool arguments, agent text) stays in the host; the page only ever sees the narrow projection above. No cookies are forwarded through the proxy.
 
 ## Configure

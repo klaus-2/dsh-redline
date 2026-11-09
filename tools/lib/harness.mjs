@@ -374,6 +374,47 @@ export function makeLocalStorage(initial = {}) {
   };
 }
 
+export function storageShim(initial = {}) {
+  const proto = {};
+  Object.defineProperties(proto, {
+    getItem: {
+      value(key) {
+        return Object.prototype.hasOwnProperty.call(this, key) ? String(this[key]) : null;
+      }
+    },
+    setItem: {
+      value(key, value) {
+        Object.defineProperty(this, key, { value: String(value), writable: true, enumerable: true, configurable: true });
+      }
+    },
+    removeItem: {
+      value(key) {
+        delete this[key];
+      }
+    },
+    clear: {
+      value() {
+        for (const key of Object.keys(this)) delete this[key];
+      }
+    },
+    key: {
+      value(index) {
+        return Object.keys(this)[index] ?? null;
+      }
+    },
+    length: {
+      get() {
+        return Object.keys(this).length;
+      }
+    }
+  });
+  const store = Object.create(proto);
+  for (const [key, value] of Object.entries(initial)) {
+    Object.defineProperty(store, key, { value: String(value), writable: true, enumerable: true, configurable: true });
+  }
+  return store;
+}
+
 export function loadClientModule(file, options = {}) {
   const source = readFileSync(file, "utf8");
   let loaded = null;

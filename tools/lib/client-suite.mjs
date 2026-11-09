@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import assert from "node:assert/strict";
 import vm from "node:vm";
-import { collectCallArguments, createReactStub, evaluateObjectLiteral, extractObjectLiteral, fakeClientCtx, findElements, flush, loadClientModule, makeLocalStorage, renderOnce, waitFor } from "./harness.mjs";
+import { collectCallArguments, createReactStub, evaluateObjectLiteral, extractObjectLiteral, fakeClientCtx, findElements, flush, loadClientModule, makeLocalStorage, renderOnce, storageShim, waitFor } from "./harness.mjs";
 
 // The bridge relay runs in the page, not in the app: it is loaded in its own
 // sandbox so the suite can drive both transports without a browser.
@@ -204,7 +205,7 @@ export async function runClientSuite(harness, { pluginDir }) {
     // The guest is a real page running the real relay: the code the client
     // injects is evaluated, so the queue, the drain and the delivery are the
     // ones the page really uses.
-    const pageWindow = { __LR__: { settings: { keys: { comment: "x" } }, drawings: [{ id: 1 }] } };
+    const pageWindow = { __LR__: { settings: { keys: { comment: "x" } }, marker: "kept" } };
     const pageSandbox = {
       window: pageWindow,
       document: {
@@ -280,7 +281,7 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("the client injects the overlay into the guest", injection !== undefined);
     harness.check("the injected code carries no secret", injection !== undefined && !injection.includes("a".repeat(64)) && !/secret\s*:/i.test(injection), (injection ?? "").slice(0, 200));
     harness.check("the guest really runs the relay", pageWindow.__LR_BRIDGE__ !== undefined && pageWindow.__LR_BRIDGE__.mode === "client");
-    harness.check("the injected code keeps the page config", pageWindow.__LR__.settings?.keys?.comment === "x" && pageWindow.__LR__.drawings?.length === 1 && pageWindow.__LR__.apiBase !== undefined && !("secret" in pageWindow.__LR__), JSON.stringify(Object.keys(pageWindow.__LR__)));
+    harness.check("the injected code keeps the page config", pageWindow.__LR__.settings?.keys?.comment === "x" && pageWindow.__LR__.marker === "kept" && pageWindow.__LR__.apiBase !== undefined && !("secret" in pageWindow.__LR__), JSON.stringify(Object.keys(pageWindow.__LR__)));
 
     // The page asks for something; the client answers; the page is happy.
     const pending = pageWindow.__LR_BRIDGE__.send("annotations.submit", { pageUrl: "https://example.com/", pins: [{ id: "p1" }] });
@@ -304,6 +305,62 @@ export async function runClientSuite(harness, { pluginDir }) {
       deliveredAnswers = [];
     }
     harness.check("the client delivers the answers as an array", Array.isArray(deliveredAnswers) && deliveredAnswers.length === 1 && deliveredAnswers[0].ok === true, JSON.stringify(deliveredAnswers).slice(0, 160));
+
+    harness.check("the overlay never writes drawings to web storage",
+      !overlay.includes('"lr-drawings"') && !template.includes('"lr-drawings"'),
+      `built ${overlay.includes('"lr-drawings"')} | template ${template.includes('"lr-drawings"')}`);
+    harness.check("the panel positions live in session storage",
+      template.includes("sessionStorage.getItem(PANEL_POS_KEY)") &&
+      template.includes("sessionStorage.setItem(PANEL_POS_KEY") &&
+      overlay.includes("sessionStorage.getItem(PANEL_POS_KEY)") &&
+      overlay.includes("sessionStorage.setItem(PANEL_POS_KEY") &&
+      !template.includes("localStorage") && !overlay.includes("localStorage"),
+      `template ${template.includes("localStorage")} | built ${overlay.includes("localStorage")}`);
+
+    const injected = executed.find((code) => code.includes("window.__LR__ = Object.assign")) ?? injection;
+    const cleanupLine = (injected ?? "").split("\n")[0];
+    const clientSeed = { "lr-drawings": "old", "lr-drawings:https://a.example": "old", marker: "kept" };
+    const clientStore = storageShim(clientSeed);
+    assert.deepEqual(Object.keys(clientStore), Object.keys(clientSeed));
+    vm.runInContext(cleanupLine, vm.createContext({ localStorage: clientStore }), { filename: "client-cleanup.js" });
+    harness.check("the client injection removes the legacy drawings keys",
+      cleanupLine.includes("lr-drawings") && cleanupLine.includes("Object.keys(localStorage)") &&
+      pageWindow.__LR__.marker === "kept" && JSON.stringify(Object.keys(clientStore)) === JSON.stringify(["marker"]),
+      JSON.stringify(Object.keys(clientStore)));
+
+    const hostSource = readFileSync(path.join(pluginDir, "lib", "index.js"), "utf8");
+    const guardScript = /const guardScript = `([^`]*)`;/.exec(hostSource)?.[1] ?? "";
+    const guardCode = /<script>([\s\S]*?)<\/script>/.exec(guardScript)?.[1] ?? "";
+    const guardHref = "https://example.com/";
+    const guardOtherHref = "https://example.com/other";
+    const guardSeed = {
+      "lr-drawings": "old",
+      "lr-drawings:https://a.example": "old",
+      [`lr:pins:${guardOtherHref}`]: "old",
+      [`lr:pins:${guardHref}`]: "keep",
+      [`lr-panel-pos:${guardOtherHref}`]: "old",
+      [`lr-panel-pos:${guardHref}`]: "keep",
+      foreign: "keep"
+    };
+    const guardExpected = [`lr:pins:${guardHref}`, `lr-panel-pos:${guardHref}`, "foreign"];
+    const runStorageGuard = (code) => {
+      const session = storageShim(guardSeed);
+      const local = storageShim(guardSeed);
+      const context = vm.createContext({ window: { location: { href: guardHref }, sessionStorage: session, localStorage: local } });
+      vm.runInContext(code, context, { filename: "storage-guard.js" });
+      return { sessionKeys: Object.keys(session), localKeys: Object.keys(local) };
+    };
+    const guardResult = runStorageGuard(guardCode);
+    harness.check("the storage guard keeps only this page's keys",
+      guardCode.includes("window.location.href") &&
+      JSON.stringify(guardResult.sessionKeys) === JSON.stringify(guardExpected) &&
+      JSON.stringify(guardResult.localKeys) === JSON.stringify(guardExpected),
+      `session ${JSON.stringify(guardResult.sessionKeys)} | local ${JSON.stringify(guardResult.localKeys)}`);
+    const noGuardScript = guardScript.replace(/<script>[\s\S]*?<\/script>/, "<script></script>");
+    const noGuardCode = /<script>([\s\S]*?)<\/script>/.exec(noGuardScript)?.[1] ?? "";
+    const noGuardResult = runStorageGuard(noGuardCode);
+    assert.deepEqual(noGuardResult.sessionKeys, Object.keys(guardSeed));
+    assert.deepEqual(noGuardResult.localKeys, Object.keys(guardSeed));
   }
 
   harness.section("client: overlay locales");
