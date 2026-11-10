@@ -1327,9 +1327,46 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
   }
 
-  harness.section("client: a host that answers without settings does not break the panel");
+  harness.section("client: a save made over a refused read does not write the defaults");
   {
+    // The settings read was refused: what the panel shows is the defaults, not the ones the host
+    // holds. Saving them would write the defaults over the host's settings, so the save is
+    // refused with a message of its own.
     const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    let posts = 0;
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url, options) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/settings") && options?.method === "POST") { posts += 1; return jsonResponse({ ok: true, settings: JSON.parse(String(options.body)) }); }
+        if (target.includes("/.lr/settings")) return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), { status: 401, headers: { "content-type": "application/json" } });
+        if (target.includes("/.lr/update")) return jsonResponse({ ok: true, version: "1.0.16", update: { latest: "v1.0.17", newer: true } });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const panel = renderOnce(stub, section.component, {});
+    const selects = findElements(panel.tree, (element) => element.props?.["aria-label"] === "Language");
+    await selects[0].props.onChange({ target: { value: "pt" } });
+    await flush(4);
+    harness.eq("the save never reached the host", posts, 0);
+    const warned = findElements(renderOnce(stub, section.component, {}).tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("could not be read"));
+    harness.check("the blocked save says why", warned.length === 1, JSON.stringify(stub.getStates()[0]));
+  }
+
+  harness.section("client: a host that answers without settings does not break the panel");
+  {    const stub = createReactStub();
     const localStorage = makeLocalStorage();
     const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
       react: stub.React,
@@ -1495,27 +1532,33 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
   }
 
-  harness.section("client: a copy that is already installed is asked for by its exact tarball");
+  harness.section("client: a copy the manager already holds is not asked for by its tarball");
   {
-    // The manager refuses name@version because the package is already there: the row asks again with the
-    // exact tarball, and the answer that comes back is the one the row must name.
+    // The manager refuses name@version because the package is already there. Asking again with the
+    // tarball would save the dependency as a tarball url, and the host refuses to update a
+    // dependency saved that way: the plugin's own route installs it with pnpm instead, which
+    // rewrites the dependency as a registry spec.
     const stub = createReactStub();
     const localStorage = makeLocalStorage();
     const calls = [];
+    const routeCalls = [];
     const pluginManager = {
       async installBundle(spec) {
         calls.push(spec);
-        if (calls.length === 1) return { ok: true, value: { application: "failed", error: { code: "already-installed" } } };
-        return { ok: true, value: { application: "restart-required", version: "1.0.24" } };
+        return { ok: true, value: { application: "failed", error: { code: "already-installed" } } };
       }
     };
     const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
       react: stub.React,
       localStorage,
       console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
-      fetch: async (url) => {
+      fetch: async (url, options) => {
         const target = String(url);
         if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/update/install")) {
+          routeCalls.push(JSON.parse(String(options?.body ?? "{}")));
+          return jsonResponse({ ok: true, installed: "1.0.24" });
+        }
         if (target.includes("/.lr/update")) {
           return jsonResponse({ ok: true, version: "1.0.23", update: { latest: "v1.0.24", newer: true } });
         }
@@ -1539,8 +1582,10 @@ export async function runClientSuite(harness, { pluginDir }) {
     if (buttons.length === 1) {
       await buttons[0].props.onClick();
       await flush(4);
-      harness.eq("the manager is asked twice", calls.length, 2);
-      harness.eq("the retry asks for the exact tarball", calls[1], "https://registry.npmjs.org/dsh-redline/-/dsh-redline-1.0.24.tgz");
+      harness.eq("the manager is asked once", calls.length, 1);
+      harness.check("the tarball is never asked for", !calls.some((spec) => String(spec).includes(".tgz")), JSON.stringify(calls));
+      harness.eq("the plugin's own route installs the version", routeCalls.length, 1);
+      harness.eq("the route is asked for the exact version", routeCalls[0]?.version, "1.0.24");
       harness.eq("the version that landed on disk is remembered", localStorage.getItem("dsh-redline.updated"), "1.0.24");
       const after = renderOnce(stub, section.component, {});
       const restart = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("1.0.24") && element.props.children.includes("installed"));
@@ -1600,16 +1645,21 @@ export async function runClientSuite(harness, { pluginDir }) {
 
   harness.section("client: a host that refuses the update does not claim it worked");
   {
-    const build = async (pluginManager) => {
+    const build = async (pluginManager, options = {}) => {
       const stub = createReactStub();
       const localStorage = makeLocalStorage();
+      const routeCalls = options.routeCalls ?? [];
       const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
         react: stub.React,
         localStorage,
         console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
-        fetch: async (url) => {
+        fetch: async (url, init) => {
           const target = String(url);
           if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+          if (target.includes("/.lr/update/install")) {
+            routeCalls.push(JSON.parse(String(init?.body ?? "{}")));
+            return jsonResponse(options.route ?? { ok: true, installed: "1.0.24" });
+          }
           if (target.includes("/.lr/update")) return jsonResponse({ ok: true, version: "1.0.23", update: { latest: "v1.0.24", newer: true } });
           if (target.includes("/.lr/settings")) return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.23" });
           if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
@@ -1634,15 +1684,17 @@ export async function runClientSuite(harness, { pluginDir }) {
       await flush(4);
     };
 
+    const refusedRouteCalls = [];
     const refused = await build({
       async updateBundle() {
         return { ok: true, value: { from: "1.0.23", to: "1.0.24", step: "check", result: { changed: false, application: "failed", stage: "install", target: "dsh-redline", error: { code: "invalid-spec", diagnostic: "dsh-redline is not installed from a registry under its own name" } } } };
       }
-    });
+    }, { routeCalls: refusedRouteCalls });
     await click(refused);
-    harness.eq("a refusal names nothing as installed", refused.stub.getStates()[0].installed, "");
-    harness.eq("a refusal is not remembered as installed", refused.localStorage.getItem("dsh-redline.updated"), null);
-    harness.check("a refusal names the host's own reason", String(refused.stub.getStates()[0].installError).includes("not installed from a registry"), String(refused.stub.getStates()[0].installError));
+    harness.eq("the plugin's own route installs the version", refusedRouteCalls.length, 1);
+    harness.eq("the route is asked for the exact version", refusedRouteCalls[0]?.version, "1.0.24");
+    harness.eq("the version that landed is named", refused.stub.getStates()[0].installed, "1.0.24");
+    harness.eq("the version that landed is remembered", refused.localStorage.getItem("dsh-redline.updated"), "1.0.24");
 
     const cancelled = await build({
       async updateBundle(name, version) {
@@ -1654,26 +1706,85 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.eq("a cancellation is not remembered as installed", cancelled.localStorage.getItem("dsh-redline.updated"), null);
     harness.check("a cancellation is reported", cancelled.stub.getStates()[0].installError !== "", String(cancelled.stub.getStates()[0].installError));
 
-    const fallbackCalls = [];
+    const managerCalls = [];
+    const recoveredRouteCalls = [];
     const recovered = await build({
       async updateBundle() {
         return { ok: true, value: { from: "1.0.23", to: "1.0.24", step: "check", result: { changed: false, application: "failed", stage: "install", target: "dsh-redline", error: { code: "invalid-spec", diagnostic: "dsh-redline is not installed from a registry under its own name" } } } };
       },
       async installBundle(spec) {
-        fallbackCalls.push(spec);
+        managerCalls.push(spec);
         return { ok: true, value: { application: "restart-required", version: "1.0.24" } };
       }
-    });
+    }, { routeCalls: recoveredRouteCalls });
     await click(recovered);
-    harness.eq("the plain spec is asked for after the refusal", fallbackCalls.length, 1);
-    harness.eq("the plain spec names the package and the version", fallbackCalls[0], "dsh-redline@1.0.24");
+    harness.eq("the manager is not asked to install a package it already holds", managerCalls.length, 0);
+    harness.eq("the plugin's own route installs the version", recoveredRouteCalls.length, 1);
+    harness.eq("the route is asked for the exact version", recoveredRouteCalls[0]?.version, "1.0.24");
     harness.eq("the copy that landed is remembered", recovered.localStorage.getItem("dsh-redline.updated"), "1.0.24");
     harness.eq("the refusal does not survive the recovery", recovered.stub.getStates()[0].installError, "");
   }
 
-  harness.section("client: a host that only has the update API is still asked");
+  harness.section("client: a profile that holds a tarball dependency is repaired");
   {
+    // The host refuses to update a dependency saved as a tarball url, and it refuses to install a
+    // package the profile already holds. The plugin's own route installs the version with pnpm,
+    // which rewrites the dependency as a registry spec and leaves the profile updatable.
     const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const managerCalls = [];
+    const routeCalls = [];
+    const pluginManager = {
+      async updateBundle(name, version) {
+        managerCalls.push({ api: "updateBundle", name, version });
+        return { ok: true, value: { from: "1.0.23", to: version, step: "check", result: { changed: false, application: "failed", stage: "install", target: name, error: { code: "invalid-spec", diagnostic: "dsh-redline is not installed from a registry under its own name" } } } };
+      },
+      async installBundle(spec) {
+        managerCalls.push({ api: "installBundle", spec });
+        return { ok: true, value: { application: "failed", error: { code: "already-installed" } } };
+      }
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url, options) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/update/install")) {
+          routeCalls.push(JSON.parse(String(options?.body ?? "{}")));
+          return jsonResponse({ ok: true, installed: "1.0.24" });
+        }
+        if (target.includes("/.lr/update")) return jsonResponse({ ok: true, version: "1.0.23", update: { latest: "v1.0.24", newer: true } });
+        if (target.includes("/.lr/settings")) return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.23" });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({ remote: { pluginManager } });
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const withButton = renderOnce(stub, section.component, {});
+    const buttons = findElements(withButton.tree, (element) => element.props?.children === "Update now");
+    harness.eq("the update button appears", buttons.length, 1);
+    if (buttons.length === 1) {
+      await buttons[0].props.onClick();
+      await flush(4);
+      harness.eq("the host's update API is asked first", managerCalls[0]?.api, "updateBundle");
+      harness.check("the tarball is never asked for", !managerCalls.some((call) => String(call.spec ?? "").includes(".tgz")), JSON.stringify(managerCalls));
+      harness.eq("the plugin's own route installs the version", routeCalls.length, 1);
+      harness.eq("the route is asked for the exact version", routeCalls[0]?.version, "1.0.24");
+      harness.eq("the version that landed is named", stub.getStates()[0].installed, "1.0.24");
+      harness.eq("the version that landed is remembered", localStorage.getItem("dsh-redline.updated"), "1.0.24");
+    }
+  }
+
+  harness.section("client: a host that only has the update API is still asked");
+  {    const stub = createReactStub();
     const localStorage = makeLocalStorage();
     const calls = [];
     const pluginManager = {

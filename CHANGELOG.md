@@ -20,9 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The update now goes through the host's own update API.** Installing a
   tarball URL as the dependency left the profile with a dependency the host
   refuses to update, which locked the plugin out of its own update path. The
-  host's update API replaces the installed copy and keeps the dependency
-  saved under its own name, and a profile that still holds the old tarball
-  dependency is repaired on the next update.
+  host's update API replaces the installed copy and keeps the dependency saved
+  under its own name. A profile that still holds the old tarball dependency is
+  repaired by the update itself, which installs the version with pnpm and
+  rewrites the dependency as a registry spec.
+
+- **A settings change made over an unreadable panel is refused.** When the
+  service could not be read, the panel showed the default settings as if they
+  were the ones in use, and saving a change wrote those defaults over the real
+  settings. The panel now refuses the save and says the settings could not be
+  read.
 
 - **The update check no longer says "no releases published" when it never
   ran.** A refused or unreachable update check left the row reading as if the
