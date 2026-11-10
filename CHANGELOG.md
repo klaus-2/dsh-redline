@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.25] - 2026-11-10
+
+### Fixed
+
+- **The update row no longer claims an update worked when it did not.** A
+  release the panel could not name as a version was refused silently, so
+  clicking "Update now" did nothing at all. A host that refuses or cancels the
+  update named nothing as installed either, and the row now says what the host
+  said instead of reporting a version that never landed. A settings change
+  that failed to reach the host no longer leaves the "Saved" banner on screen
+  over a value that was never written.
+
+- **The update now goes through the host's own update API.** Installing a
+  tarball URL as the dependency left the profile with a dependency the host
+  refuses to update, which locked the plugin out of its own update path. The
+  host's update API replaces the installed copy and keeps the dependency
+  saved under its own name, and a profile that still holds the old tarball
+  dependency is repaired on the next update.
+
+- **The update check no longer says "no releases published" when it never
+  ran.** A refused or unreachable update check left the row reading as if the
+  registry had been asked and had nothing to offer. The row now reports the
+  failed check, and the same applies to a settings read the host refused.
+
+- **The version that landed is the version the row names.** An install that
+  landed a version other than the one that was asked for was reported as a
+  failure, so a successful install looked like a broken one. The route names
+  the version that is on disk, and the row keeps saying which one was asked
+  for when pnpm holds a release back.
+
+- **An install that stops making progress says so.** An install that ran past
+  its bound was reported with a line of pnpm output that read like a network
+  problem. The row now says the install was stopped, and a second install
+  asked for while the first one runs is refused instead of writing the same
+  profile at the same time.
+
+### Changed
+
+- **The update check asks the npm registry only.** The row also asked GitHub
+  for the release notes, which no longer had a reader, and that API answers
+  403 once an unauthenticated caller spends its sixty requests an hour. The
+  release page button still carries the notes.
+
 ## [1.0.24] - 2026-11-09
 
 ### Security
