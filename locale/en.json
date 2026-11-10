@@ -149,5 +149,10 @@
   "statusTitle": "Live Review active",
   "pendingTitle": "Annotations waiting for your next prompt in the chat",
   "pendingCount": "{n} pending",
-  "restoredPins": "Redline: {n} pin(s) restored"
+  "restoredPins": "Redline: {n} pin(s) restored",
+  "hotkeyComment": "Comment mode key",
+  "hotkeyAdjust": "Adjust mode key",
+  "hotkeyDraw": "Draw mode key",
+  "capture": "Click here and press a key",
+  "duplicateKey": "That shortcut is already used by another mode. Pick a different one."
 }

@@ -1,12 +1,12 @@
 import { createServer, request as httpRequest } from "node:http";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import { freePort, storageShim, withIsolatedHome, withStubbedFetch } from "./harness.mjs";
+import { extractFunction, freePort, storageShim, withIsolatedHome, withStubbedFetch } from "./harness.mjs";
 
 const enc = (value) => Buffer.from(value, "utf8").toString("base64url");
 const SHOT = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwcJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==";
@@ -268,22 +268,10 @@ export async function runHostSuite(harness, { pluginDir }) {
       // script inside a third-party page and cannot import the host's module. They must agree, or
       // the settings panel would accept a shortcut the overlay refuses to fire.
       const overlaySource = readFileSync(path.join(pluginDir, "lib", "overlay.js"), "utf8");
-      const anchor = overlaySource.indexOf("function parseHotkey(");
-      let depth = 0;
-      let quote = "";
-      let end = anchor;
-      for (let index = overlaySource.indexOf("{", anchor); index < overlaySource.length; index += 1) {
-        const char = overlaySource[index];
-        if (quote !== "") {
-          if (char === "\\") { index += 1; continue; }
-          if (char === quote) quote = "";
-          continue;
-        }
-        if (char === '"' || char === "'" || char === "`") { quote = char; continue; }
-        if (char === "{") depth += 1;
-        else if (char === "}") { depth -= 1; if (depth === 0) { end = index + 1; break; } }
-      }
-      const overlayParse = vm.runInNewContext(`(${overlaySource.slice(anchor, end).replace("function parseHotkey", "function")})`, {}, { filename: "overlay-parse-hotkey" });
+      const overlayParseSource = extractFunction(overlaySource, "parseHotkey");
+      const overlayParse = overlayParseSource === undefined
+        ? undefined
+        : vm.runInNewContext(`(${overlayParseSource.replace("function parseHotkey", "function")})`, {}, { filename: "overlay-parse-hotkey" });
       // The overlay's parser answers with the key and its modifiers; the host's answers with the
       // canonical string. They must accept and refuse exactly the same texts.
       const shared = ["c", "C", "5", "ctrl+shift+a", "shift+ctrl+a", "Ctrl+Shift+A", "meta+alt+d", "Ctrl+", "+", "Ctrl+shift", "Ctrl+Ctrl+a", "ctrl++a", "Ctrl + a", "ctrl+a+b", "", "ab", "Hyper+a", "ctrl+alt+shift+meta+z"];
@@ -301,6 +289,16 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.check("the overlay's parser is there", typeof overlayParse === "function");
       harness.check("the host and the overlay read the same shortcuts", diverged.length === 0, JSON.stringify(diverged));
 
+      // The modifiers are shown with the same spelling everywhere: the host stores them, the
+      // overlay shows them and the settings panel shows them.
+      const overlayLabels = /const labels = \{([^}]*)\}/.exec(overlaySource)?.[1] ?? "";
+      const hostLabels = /const HOTKEY_MODIFIER_LABELS = (\{[^}]*\});/.exec(readFileSync(path.join(pluginDir, "lib", "index.js"), "utf8"))?.[1] ?? "";
+      const clientLabels = /const HOTKEY_MODIFIER_LABELS = (\{[^}]*\});/.exec(readFileSync(path.join(pluginDir, "lib", "client.js"), "utf8"))?.[1] ?? "";
+      const normalize = (text) => JSON.stringify(Object.fromEntries([...text.matchAll(/(\w+):\s*"([^"]*)"/g)].map((match) => [match[1], match[2]])));
+      harness.check("the three sides spell the modifiers the same way",
+        overlayLabels !== "" && normalize(overlayLabels) === normalize(hostLabels) && normalize(hostLabels) === normalize(clientLabels),
+        `overlay=${normalize(overlayLabels)} host=${normalize(hostLabels)} client=${normalize(clientLabels)}`);
+
       const composite = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "shift+ctrl+a", adjust: "v" } }) })).json();
       harness.eq("a composite hotkey is stored canonically", composite.settings.keys.comment, "Ctrl+Shift+a");
       const order = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "meta+alt+d", adjust: "v" } }) })).json();
@@ -314,10 +312,25 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.eq("the refusal names the colliding pair", duplicateBody.keys, ["comment", "adjust"]);
       const afterDuplicate = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
       harness.eq("the refused change was not stored", afterDuplicate.settings.keys.adjust, "v");
+      // Carrying only one side of the pair is enough to create the collision.
+      const commentBefore = afterDuplicate.settings.keys.comment;
+      const oneSided = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "v" } }) });
+      harness.eq("a hotkey that would collide is refused", oneSided.status, 400);
+      const oneSidedBody = await oneSided.json();
+      harness.eq("the one-sided refusal names the pair", oneSidedBody.keys, ["comment", "adjust"]);
+      const afterOneSided = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
+      harness.eq("the one-sided refusal was not stored", afterOneSided.settings.keys.comment, commentBefore);
       const drawKey = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "q", adjust: "w", draw: "e" } }) })).json();
       harness.eq("the draw key is configurable", drawKey.settings.keys.draw, "e");
       const restored = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "c", adjust: "v", draw: "d" } }) })).json();
       harness.eq("the defaults can be restored", restored.settings.keys, { comment: "c", adjust: "v", draw: "d" });
+
+      // A settings file that already holds a collision (the host used to allow it) must not lock
+      // every later change. The panel always sends the three keys, so the request body carries
+      // them all — that is the shape that must keep working. The legacy state is written to disk
+      // below, where the host is started against it.
+      const legacyKeys = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "c", adjust: "v", draw: "d" } }) })).json();
+      harness.eq("the defaults can be restored after a refusal", legacyKeys.settings.keys, { comment: "c", adjust: "v", draw: "d" });
     }
 
     harness.section("host: drawings");
@@ -650,5 +663,49 @@ export async function runHostSuite(harness, { pluginDir }) {
 
       limitedServer.close();
     }
+  });
+
+  // The canvas key joined the settings later, and the host used to allow two modes to share a
+  // key. Neither may leave the panel refusing every change.
+  await withIsolatedHome(async (home) => {
+    const settingsDir = path.join(home, ".dsh", "redline");
+    mkdirSync(settingsDir, { recursive: true });
+    const moduleUrl = pathToFileURL(path.join(pluginDir, "lib", "index.js")).href;
+    const source = readFileSync(path.join(pluginDir, "lib", "index.js"), "utf8");
+    const secretHeader = /SECRET_HEADER = "([^"]+)"/.exec(source)?.[1] ?? "";
+    const json = () => ({ "content-type": "application/json", ...auth });
+    let auth = {};
+
+    const start = async (tag) => {
+      const { startServer } = await import(`${moduleUrl}?${tag}`);
+      const server = await startServer({ port: await freePort() });
+      const secret = readFileSync(path.join(home, ".dsh", "profiles", "desktop", "dsh-redline", "instance.secret"), "utf8").trim();
+      auth = { [secretHeader]: secret };
+      return { server, base: `http://127.0.0.1:${server.port ?? server.address().port}` };
+    };
+
+    // A file that named "d" for another mode: the canvas key would land on it.
+    writeFileSync(path.join(settingsDir, "settings.json"), JSON.stringify({ lang: "en", keys: { comment: "d", adjust: "v" }, screenshot: true, cropPad: 72 }));
+    const first = await start("legacy-draw");
+    const loaded = await (await fetch(`${first.base}/.lr/settings`, { headers: auth })).json();
+    harness.check("a legacy file does not leave two modes on the same key", loaded.settings.keys.comment !== loaded.settings.keys.draw, JSON.stringify(loaded.settings.keys));
+    const panelBody = { lang: "en", keys: loaded.settings.keys, screenshot: false, cropPad: 72 };
+    const posted = await fetch(`${first.base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify(panelBody) });
+    harness.eq("the panel can change another setting after the upgrade", posted.status, 200);
+    const postedBody = await posted.json();
+    harness.eq("the change was applied", postedBody.settings.screenshot, false);
+    first.server.close();
+
+    // A file that already held a collision: the panel must still be able to change things.
+    writeFileSync(path.join(settingsDir, "settings.json"), JSON.stringify({ lang: "en", keys: { comment: "v", adjust: "v", draw: "d" }, screenshot: true, cropPad: 72 }));
+    const second = await start("legacy-collision");
+    const stored = await (await fetch(`${second.base}/.lr/settings`, { headers: auth })).json();
+    const other = await fetch(`${second.base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "pt", keys: stored.settings.keys, screenshot: false, cropPad: 72 }) });
+    harness.eq("a stored collision does not refuse an unrelated change", other.status, 200);
+    const otherBody = await other.json();
+    harness.eq("the unrelated change was applied", otherBody.settings.screenshot, false);
+    const fixed = await fetch(`${second.base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "c", adjust: "v", draw: "d" } }) });
+    harness.eq("the stored collision can be fixed", fixed.status, 200);
+    second.server.close();
   });
 }

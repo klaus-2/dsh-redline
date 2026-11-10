@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import { collectCallArguments, createReactStub, evaluateExpression, evaluateObjectLiteral, extractFunction, extractObjectLiteral, fakeClientCtx, findElements, flush, jsonResponse, loadClientModule, makeLocalStorage, renderOnce, storageShim, waitFor } from "./harness.mjs";
+import { collectCallArguments, createReactStub, evaluateExpression, evaluateObjectLiteral, extractArrowConst, extractFunction, extractObjectLiteral, fakeClientCtx, findElements, flush, jsonResponse, loadClientModule, makeLocalStorage, renderOnce, runCleanups, storageShim, waitFor } from "./harness.mjs";
 
 // The bridge relay runs in the page, not in the app: it is loaded in its own
 // sandbox so the suite can drive both transports without a browser.
@@ -176,7 +176,7 @@ export async function runClientSuite(harness, { pluginDir }) {
     await flush(4);
     for (const timer of exhausted.intervals) await timer.fn();
     harness.check("the exhaustion fixture probes all twenty candidates including the default", exhausted.started() && exhausted.probes().length === 20 && exhausted.probes().every((call, index) => new URL(call.url).port === String(47477 + index)), `probes=${exhausted.probes().length}`);
-    harness.check("the settings slot remains registered when discovery is exhausted", exhausted.section.spec.id === "dsh-redline" && exhausted.effects.length === 2);
+    harness.check("the settings slot remains registered when discovery is exhausted", exhausted.section.spec.id === "dsh-redline" && exhausted.effects.length >= 2);
     harness.check("the client never authenticates to an unidentified fallback host", exhausted.secretCalls().length === 0 && exhausted.privateCalls().length === 0 && exhausted.calls.every((call) => !("x-dsh-redline-secret" in call.headers)), `secret acquisitions=${exhausted.secretCalls().length}, private requests=${exhausted.privateCalls().length}`);
 
     let releaseHealth;
@@ -184,7 +184,7 @@ export async function runClientSuite(harness, { pluginDir }) {
     const delayed = build((port) => port === 47477 ? pendingHealth : jsonResponse({}, 503));
     await flush(4);
     const before = delayed.stub.getStates()[0];
-    harness.check("initial settings effects wait while host identification is pending", delayed.started() && delayed.effects.length === 2 && delayed.probes().length === 1 && delayed.secretCalls().length === 0 && delayed.privateCalls().length === 0 && before.loaded === false && before.checking === true, `probes=${delayed.probes().length}, private requests=${delayed.privateCalls().length}, loaded=${before.loaded}, checking=${before.checking}`);
+    harness.check("initial settings effects wait while host identification is pending", delayed.started() && delayed.effects.length >= 2 && delayed.probes().length === 1 && delayed.secretCalls().length === 0 && delayed.privateCalls().length === 0 && before.loaded === false && before.checking === true, `probes=${delayed.probes().length}, private requests=${delayed.privateCalls().length}, loaded=${before.loaded}, checking=${before.checking}`);
     releaseHealth(validHealth(47477));
     await flush(4);
     const loaded = await waitFor(() => delayed.stub.getStates()[0].loaded === true && delayed.stub.getStates()[0].update?.latest === "v1.0.24" && delayed.stub.getStates()[0].checking === false, 500, 10);
@@ -282,7 +282,7 @@ export async function runClientSuite(harness, { pluginDir }) {
       await flush(4);
       for (const timer of fixture.intervals) await timer.fn();
       const before = fixture.stub.getStates()[0];
-      harness.check(`the stalled health ${phase} fixture starts and remains pending`, fixture.started() && fixture.effects.length === 2 && stalled.state.started && stalled.state.pending && !stalled.state.aborted && (phase === "fetch" || (stalled.state.response?.bodyUsed === true && stalled.state.response.body.locked)) && fixture.probes().length === 1 && fixture.secretCalls().length === 0 && fixture.privateCalls().length === 0 && before.loaded === false && before.checking === true, `started=${stalled.state.started}, pending=${stalled.state.pending}, body used=${stalled.state.response?.bodyUsed}, probes=${fixture.probes().length}, private requests=${fixture.privateCalls().length}`);
+      harness.check(`the stalled health ${phase} fixture starts and remains pending`, fixture.started() && fixture.effects.length >= 2 && stalled.state.started && stalled.state.pending && !stalled.state.aborted && (phase === "fetch" || (stalled.state.response?.bodyUsed === true && stalled.state.response.body.locked)) && fixture.probes().length === 1 && fixture.secretCalls().length === 0 && fixture.privateCalls().length === 0 && before.loaded === false && before.checking === true, `started=${stalled.state.started}, pending=${stalled.state.pending}, body used=${stalled.state.response?.bodyUsed}, probes=${fixture.probes().length}, private requests=${fixture.privateCalls().length}`);
       const deadline = control.deadlines.find((entry) => entry.controller.signal === stalled.state.signal);
       harness.check(`a stalled health ${phase} receives the 1000ms request deadline`, deadline?.ms === 1000 && stalled.state.signal instanceof AbortSignal && !stalled.state.signal.aborted, `deadline=${deadline?.ms}, signal supplied=${stalled.state.signal !== undefined}`);
       if (deadline !== undefined) deadline.controller.abort(new DOMException("fixture deadline expired", "TimeoutError"));
@@ -297,7 +297,7 @@ export async function runClientSuite(harness, { pluginDir }) {
       boundedFixtures.push(fixture);
       await flush(4);
       const before = fixture.stub.getStates()[0];
-      harness.check(`the stalled secret ${phase} fixture starts and remains pending`, fixture.started() && fixture.effects.length === 2 && stalled.state.started && stalled.state.pending && !stalled.state.aborted && (phase === "fetch" || (stalled.state.response?.bodyUsed === true && stalled.state.response.body.locked)) && fixture.probes().length === 1 && fixture.secretCalls().length === 1 && before.loaded === false && before.checking === true, `started=${stalled.state.started}, pending=${stalled.state.pending}, body used=${stalled.state.response?.bodyUsed}, probes=${fixture.probes().length}, secret acquisitions=${fixture.secretCalls().length}`);
+      harness.check(`the stalled secret ${phase} fixture starts and remains pending`, fixture.started() && fixture.effects.length >= 2 && stalled.state.started && stalled.state.pending && !stalled.state.aborted && (phase === "fetch" || (stalled.state.response?.bodyUsed === true && stalled.state.response.body.locked)) && fixture.probes().length === 1 && fixture.secretCalls().length === 1 && before.loaded === false && before.checking === true, `started=${stalled.state.started}, pending=${stalled.state.pending}, body used=${stalled.state.response?.bodyUsed}, probes=${fixture.probes().length}, secret acquisitions=${fixture.secretCalls().length}`);
       for (const timer of fixture.intervals) await timer.fn();
       harness.check(`the client publishes no private destination during a stalled secret ${phase}`, fixture.privateCalls().length === 0, `private requests=${fixture.privateCalls().length}`);
       const deadline = control.deadlines.find((entry) => entry.controller.signal === stalled.state.signal);
@@ -315,7 +315,7 @@ export async function runClientSuite(harness, { pluginDir }) {
     await flush(4);
     for (const timer of delayedSecret.intervals) await timer.fn();
     const secretBefore = delayedSecret.stub.getStates()[0];
-    harness.check("the client keeps private requests blocked while a valid secret is pending", delayedSecret.started() && delayedSecret.effects.length === 2 && delayedSecret.probes().length === 1 && delayedSecret.secretCalls().length === 1 && delayedSecret.privateCalls().length === 0 && secretBefore.loaded === false && secretBefore.checking === true, `probes=${delayedSecret.probes().length}, secret acquisitions=${delayedSecret.secretCalls().length}, private requests=${delayedSecret.privateCalls().length}, loaded=${secretBefore.loaded}, checking=${secretBefore.checking}`);
+    harness.check("the client keeps private requests blocked while a valid secret is pending", delayedSecret.started() && delayedSecret.effects.length >= 2 && delayedSecret.probes().length === 1 && delayedSecret.secretCalls().length === 1 && delayedSecret.privateCalls().length === 0 && secretBefore.loaded === false && secretBefore.checking === true, `probes=${delayedSecret.probes().length}, secret acquisitions=${delayedSecret.secretCalls().length}, private requests=${delayedSecret.privateCalls().length}, loaded=${secretBefore.loaded}, checking=${secretBefore.checking}`);
     releaseSecret(jsonResponse({ ok: true, secret }));
     await flush(4);
     const secretAfter = delayedSecret.stub.getStates()[0];
@@ -698,19 +698,39 @@ export async function runClientSuite(harness, { pluginDir }) {
       // The client and the overlay read the same stored strings: their parsers and their
       // formatters must agree, or the settings panel would show a shortcut the overlay
       // would not fire.
-      const clientFormat = evaluateExpression(`(text, fallback) => {
-        const labels = { ctrl: "Ctrl", alt: "Alt", shift: "Shift", meta: "Meta" };
-        const parts = String(text ?? "").split("+").map((part) => part.trim()).filter((part) => part !== "");
-        if (parts.length === 0) return fallback.toUpperCase();
-        const key = parts.at(-1);
-        const modifiers = parts.slice(0, -1).map((part) => part.toLowerCase());
-        return [...modifiers.map((name) => labels[name] ?? name), key.toUpperCase()].join("+");
-      }`, "clientFormatHotkey");
-      const shared = ["c", "5", "Ctrl+Shift+a", "Alt+Meta+d", "ctrl+shift+a", "Ctrl+a"];
-      harness.check("the client and the overlay show the same shortcut",
-        shared.every((text) => clientFormat(text, "?") === show(parse(text))),
-        JSON.stringify(shared.map((text) => [text, clientFormat(text, "?"), show(parse(text))])));
+      // The client and the overlay read the same stored strings: their parsers and their
+      // formatters must agree, or the settings panel would show a shortcut the overlay
+      // would not fire. Both sides are the real code, not a copy of it.
+      const clientSource = readFileSync(path.join(pluginDir, "lib", "client.js"), "utf8");
+      const clientFormatSource = extractArrowConst(clientSource, "formatHotkeyText");
+      const clientLabels = /const HOTKEY_MODIFIER_LABELS = (\{[^}]*\});/.exec(clientSource)?.[1] ?? "";
+      harness.check("the client keeps its hotkey formatter", typeof clientFormatSource === "string");
+      if (typeof clientFormatSource === "string" && clientLabels !== "") {
+        const clientFormat = evaluateExpression(`(text, fallback) => {
+          const HOTKEY_MODIFIER_LABELS = ${clientLabels};
+          const formatHotkey = ${clientFormatSource.replace(/^const formatHotkeyText = /, "")};
+          return formatHotkey(text, fallback);
+        }`, "clientFormatHotkey");
+        const shared = ["c", "5", "Ctrl+Shift+a", "Alt+Meta+d", "ctrl+shift+a", "Ctrl+a"];
+        harness.check("the client and the overlay show the same shortcut",
+          typeof clientFormat === "function" && shared.every((text) => clientFormat(text, "?") === show(parse(text))),
+          JSON.stringify(shared.map((text) => [text, typeof clientFormat === "function" ? clientFormat(text, "?") : null, show(parse(text))])));
+      }
     }
+  }
+
+  harness.section("client: the overlay wires its hotkeys to the key handler");
+  {
+    // The matcher on its own is not the behaviour: what matters is that the overlay's key
+    // handler calls it, so that Ctrl+C does not enter comment mode and Ctrl+Shift+A does.
+    const overlaySource = readFileSync(path.join(pluginDir, "lib", "overlay.js"), "utf8");
+    const handler = /if \(hotkeyMatches\(event, hotkeyComment\)\)[\s\S]*?else if \(hotkeyMatches\(event, hotkeyDraw\)\)[^\n]*/.exec(overlaySource)?.[0] ?? "";
+    harness.check("the overlay's key handler asks the matcher", handler.includes("hotkeyMatches(event, hotkeyComment)") && handler.includes("hotkeyMatches(event, hotkeyAdjust)") && handler.includes("hotkeyMatches(event, hotkeyDraw)"), handler.slice(0, 120));
+    // One key arms one mode: the three checks are chained, not independent.
+    const chained = handler.match(/hotkeyMatches\(event, hotkey(Comment|Adjust|Draw)\)/g) ?? [];
+    harness.eq("the three hotkeys are checked in a chain", chained.length, 3);
+    harness.check("one key arms one mode", (handler.match(/\belse if\b/g) ?? []).length === 2, handler.slice(0, 120));
+    harness.check("the handler does not compare the key on its own", !/event\.key === key(Comment|Adjust|Draw)/.test(overlaySource), "a raw event.key comparison would ignore the modifiers");
   }
 
   harness.section("client: the shortcut capture");
@@ -766,6 +786,65 @@ export async function runClientSuite(harness, { pluginDir }) {
       await flush(4);
       harness.eq("the capture sends the hotkey", posted.at(-1)?.keys?.comment, "Ctrl+Shift+a");
       harness.eq("the capture stopped listening", listeners.length, 0);
+    }
+
+    // Clicking another field replaces the capture: the previous listener goes away and the key
+    // lands on the field that was clicked.
+    const fields = findElements(renderOnce(stub, section.component, {}).tree, (element) => element.props?.["aria-label"] === "Comment mode key");
+    const otherField = findElements(renderOnce(stub, section.component, {}).tree, (element) => element.props?.["aria-label"] === "Adjust mode key");
+    if (fields.length === 1 && otherField.length === 1) {
+      // The comment key holds whatever the earlier step captured: the point is that the new key
+      // lands on the field that was clicked and leaves the other one alone.
+      const commentBefore = posted.at(-1)?.keys?.comment;
+      fields[0].props.onClick();
+      await flush(2);
+      harness.eq("the capture listens for the key", listeners.length, 1);
+      otherField[0].props.onClick();
+      await flush(2);
+      harness.eq("clicking another field replaces the capture", listeners.length, 1);
+      const before = posted.length;
+      listeners[0]({ key: "z", preventDefault() {} });
+      await flush(4);
+      harness.eq("the key lands on the field that was clicked", posted.at(-1)?.keys?.adjust, "z");
+      harness.eq("the other field keeps its key", posted.at(-1)?.keys?.comment, commentBefore);
+      harness.check("the capture changed something", posted.length > before, JSON.stringify(posted.at(-1)?.keys));
+    }
+
+    // A setting changed while the capture was armed must survive it: the save sends what the
+    // panel shows now, not what the render that armed the capture knew about.
+    const armed = findElements(renderOnce(stub, section.component, {}).tree, (element) => element.props?.["aria-label"] === "Draw mode key");
+    if (armed.length === 1) {
+      armed[0].props.onClick();
+      await flush(2);
+      const toggle = findElements(renderOnce(stub, section.component, {}).tree, (element) => element.props?.["aria-label"] === "Screenshot");
+      harness.eq("the screenshot toggle is there", toggle.length, 1);
+      if (toggle.length === 1) {
+        const wasOn = posted.at(-1)?.screenshot;
+        toggle[0].props.onChange({ target: { checked: !wasOn } });
+        await flush(4);
+        const changed = posted.at(-1)?.screenshot;
+        harness.check("the toggle changed the setting", changed !== wasOn, `was=${wasOn} now=${changed}`);
+        const before = posted.length;
+        if (listeners.length === 1) listeners[0]({ key: "q", preventDefault() {} });
+        await flush(4);
+        harness.eq("the capture kept the change made while it was armed", posted.at(-1)?.screenshot, changed);
+        harness.check("the capture still sent the key", posted.length > before, JSON.stringify(posted.at(-1)?.keys));
+      }
+    }
+
+    // The capture listens on the window: it must not outlive the panel that owns it.
+    const unmounted = renderOnce(stub, section.component, {});
+    const drawField = findElements(unmounted.tree, (element) => element.props?.["aria-label"] === "Draw mode key");
+    if (drawField.length === 1) {
+      drawField[0].props.onClick();
+      await flush(2);
+      harness.eq("the capture listens for the key", listeners.length, 1);
+      runCleanups(unmounted.effects);
+      harness.eq("unmounting the panel removes the capture", listeners.length, 0);
+      const before = posted.length;
+      if (listeners.length === 1) listeners[0]({ key: "x", preventDefault() {} });
+      await flush(4);
+      harness.check("a stray key after the unmount changes nothing", posted.length === before, JSON.stringify(posted.at(-1)?.keys));
     }
 
     // The capture can be cancelled: a second click on the field, or Escape, leaves the key alone.

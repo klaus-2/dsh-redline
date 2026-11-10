@@ -516,6 +516,18 @@ export function evaluateExpression(text, filename = "expression") {
 export function extractFunction(source, name) {
   const anchor = source.indexOf(`function ${name}(`);
   if (anchor === -1) return undefined;
+  return extractBlock(source, anchor);
+}
+
+/** The source of a module-level `const name = ... => {...}`, so a test can call it on its own. */
+export function extractArrowConst(source, name) {
+  const anchor = source.indexOf(`const ${name} = `);
+  if (anchor === -1) return undefined;
+  return extractBlock(source, anchor);
+}
+
+/** The source from an anchor to the end of the block it opens. */
+function extractBlock(source, anchor) {
   const start = source.indexOf("{", anchor);
   if (start === -1) return undefined;
   let depth = 0;
@@ -535,6 +547,16 @@ export function extractFunction(source, name) {
     }
   }
   return undefined;
+}
+
+/** The cleanups the effects of a render registered: what unmounting the component does. */
+export function runCleanups(effects = []) {
+  for (const effect of effects) {
+    if (typeof effect === "function") {
+      const cleanup = effect();
+      if (typeof cleanup === "function") cleanup();
+    }
+  }
 }
 
 export function collectCallArguments(source, callee) {

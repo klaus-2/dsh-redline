@@ -149,5 +149,10 @@
   "statusTitle": "Live Review 运行中",
   "pendingTitle": "标注将随你的下一条消息发送",
   "pendingCount": "{n} 条待发送",
-  "restoredPins": "Redline: 已恢复 {n} 个图钉"
+  "restoredPins": "Redline: 已恢复 {n} 个图钉",
+  "hotkeyComment": "评论模式键",
+  "hotkeyAdjust": "调整模式键",
+  "hotkeyDraw": "绘制模式键",
+  "capture": "点击后按下按键",
+  "duplicateKey": "该快捷键已被其他模式使用。请选择另一个。"
 }

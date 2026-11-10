@@ -149,5 +149,10 @@
   "statusTitle": "Live Review ativo",
   "pendingTitle": "Anotações aguardando seu próximo prompt no chat",
   "pendingCount": "{n} pendente(s)",
-  "restoredPins": "Redline: {n} pin(s) restaurado(s)"
+  "restoredPins": "Redline: {n} pin(s) restaurado(s)",
+  "hotkeyComment": "Tecla do modo comentário",
+  "hotkeyAdjust": "Tecla do modo ajuste",
+  "hotkeyDraw": "Tecla do modo desenho",
+  "capture": "Clique aqui e pressione uma tecla",
+  "duplicateKey": "Esse atalho já é usado por outro modo. Escolha outro."
 }

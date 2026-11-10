@@ -1543,9 +1543,11 @@
         else if (event.key.length === 1) { drawTyping.text += event.key; redrawDrawings(); }
         return;
       }
+      // One key arms one mode: the first match wins, so a settings file that names the same key
+      // for two modes cannot arm both at once.
       if (hotkeyMatches(event, hotkeyComment)) { if (drawMode) toggleDraw(false); setMode(mode === "picking" ? null : "picking"); }
-      if (hotkeyMatches(event, hotkeyAdjust)) { if (drawMode) toggleDraw(false); setMode(mode === "adjust" ? null : "adjust"); }
-      if (hotkeyMatches(event, hotkeyDraw)) toggleDraw();
+      else if (hotkeyMatches(event, hotkeyAdjust)) { if (drawMode) toggleDraw(false); setMode(mode === "adjust" ? null : "adjust"); }
+      else if (hotkeyMatches(event, hotkeyDraw)) toggleDraw();
       if (event.key === "Escape") {
         if (drawMode) { toggleDraw(false); return; }
         if (adjustPanel !== null) {
