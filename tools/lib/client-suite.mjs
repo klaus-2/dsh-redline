@@ -833,10 +833,10 @@ export async function runClientSuite(harness, { pluginDir }) {
       await flush(4);
       harness.eq("the version that landed on disk is remembered", localStorage.getItem("dsh-redline.updated"), "1.0.23");
       const after = renderOnce(stub, section.component, {});
-      const restart = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("1.0.23") && element.props.children.includes("installed"));
-      harness.check("the row names the version that landed", restart.length > 0, JSON.stringify(after.tree).slice(0, 200));
-      harness.eq("the row carries the message once", restart.length, 1);
-      const asked = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("1.0.24 was installed"));
+      const restart = findElements(after.tree, (element) => typeof element?.props?.children === "string" && element.props.children.includes("1.0.23") && element.props.children.includes("installed"));
+      harness.eq("the row names the version that landed, and says which one was asked for", restart.length, 1);
+      harness.eq("the row says exactly what landed and what was asked for", restart[0]?.props.children, "Version 1.0.23 was installed instead of 1.0.24 — pnpm holds back a release that is too recent.");
+      const asked = findElements(after.tree, (element) => typeof element?.props?.children === "string" && element.props.children.includes("1.0.24 was installed"));
       harness.eq("the row does not claim the version that was only asked for", asked.length, 0);
       const stillThere = findElements(after.tree, (element) => element.props?.children === "Update now");
       harness.eq("the update button stays so the release can be tried again", stillThere.length, 1);
