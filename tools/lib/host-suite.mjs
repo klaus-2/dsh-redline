@@ -729,6 +729,16 @@ export async function runHostSuite(harness, { pluginDir }) {
     harness.eq("the unrelated change was applied", otherBody.settings.screenshot, false);
     const fixed = await fetch(`${second.base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "c", adjust: "v", draw: "d" } }) });
     harness.eq("the stored collision can be fixed", fixed.status, 200);
-    second.server.close();
+
+    // A collision the stored state did not hold: the request creates it and must be refused.
+    writeFileSync(path.join(settingsDir, "settings.json"), JSON.stringify({ lang: "en", keys: { comment: "v", adjust: "v", draw: "d" }, screenshot: true, cropPad: 72 }));
+    const third = await start("legacy-new-collision");
+    const created = await fetch(`${third.base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "x", adjust: "x", draw: "d" } }) });
+    harness.eq("a collision the stored state did not hold is refused", created.status, 400);
+    const createdBody = await created.json();
+    harness.eq("the new collision names the pair", createdBody.keys, ["comment", "adjust"]);
+    const afterCreated = await (await fetch(`${third.base}/.lr/settings`, { headers: auth })).json();
+    harness.eq("the new collision was not stored", afterCreated.settings.keys.comment, "v");
+    third.server.close();
   });
 }

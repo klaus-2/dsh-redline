@@ -994,6 +994,110 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
   }
 
+  harness.section("client: an older answer does not overwrite a newer change");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    // The host answers the first save slowly and the second quickly: the first answer is older
+    // and must not win.
+    const pending = [];
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      window: { addEventListener() {}, removeEventListener() {} },
+      fetch: async (url, options) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/settings") && options?.method === "POST") {
+          const body = JSON.parse(options.body);
+          if (body.screenshot === false) {
+            // The slow answer: it comes back with a value the user has already changed since.
+            return new Promise((resolve) => { pending.push(() => resolve(jsonResponse({ ok: true, settings: { ...body, screenshot: false } }))); });
+          }
+          return jsonResponse({ ok: true, settings: body });
+        }
+        if (target.includes("/.lr/settings")) return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v", draw: "d" }, screenshot: true, cropPad: 72 }, version: "1.0.24" });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const before = renderOnce(stub, section.component, {});
+    const toggle = findElements(before.tree, (element) => element.props?.["aria-label"] === "Screenshot");
+    harness.eq("the screenshot toggle is there", toggle.length, 1);
+    if (toggle.length === 1) {
+      toggle[0].props.onChange({ target: { checked: false } });
+      await flush(2);
+      toggle[0].props.onChange({ target: { checked: true } });
+      await flush(4);
+      // The slow answer arrives now.
+      for (const resolve of pending) resolve();
+      await flush(4);
+      const after = renderOnce(stub, section.component, {});
+      harness.eq("the older answer did not overwrite the newer change", after.states?.[0]?.settings?.screenshot, true);
+    }
+  }
+
+  harness.section("client: the first read does not overwrite the first change");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    // The first read of the settings is slow: the user changes something before it answers, and
+    // the answer must not undo the change.
+    let releaseRead;
+    const readPending = new Promise((resolve) => { releaseRead = resolve; });
+    let reads = 0;
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      window: { addEventListener() {}, removeEventListener() {} },
+      fetch: async (url, options) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/settings") && options?.method === "POST") {
+          const body = JSON.parse(options.body);
+          return jsonResponse({ ok: true, settings: body });
+        }
+        if (target.includes("/.lr/settings")) {
+          reads += 1;
+          if (reads === 1) {
+            await readPending;
+            return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v", draw: "d" }, screenshot: true, cropPad: 72 }, version: "1.0.24" });
+          }
+          return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v", draw: "d" }, screenshot: true, cropPad: 72 }, version: "1.0.24" });
+        }
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(2);
+    const before = renderOnce(stub, section.component, {});
+    const toggle = findElements(before.tree, (element) => element.props?.["aria-label"] === "Screenshot");
+    harness.eq("the screenshot toggle is there", toggle.length, 1);
+    if (toggle.length === 1) {
+      toggle[0].props.onChange({ target: { checked: false } });
+      await flush(4);
+      releaseRead();
+      await flush(4);
+      const after = renderOnce(stub, section.component, {});
+      harness.eq("the slow first read did not undo the change", after.states?.[0]?.settings?.screenshot, false);
+    }
+  }
+
   harness.section("client: plugin manager metadata");
   {
     for (const code of ["en", "pt-BR", "zh-CN"]) {
