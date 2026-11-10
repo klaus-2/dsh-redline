@@ -519,8 +519,12 @@ export async function runHostSuite(harness, { pluginDir }) {
       const REQUIRED = ["function loadPins", "function savePins", "function renderPins", "function mountShadow", "function setHint", "function postSnapshot", "function openAdjustPanel", "const EDITABLE_PROPS", "const PROP_META", "const t = (key) =>"];
       const missing = REQUIRED.filter((symbol) => !overlaySource.includes(symbol));
       harness.check("the overlay keeps its core symbols", missing.length === 0, missing.join(", "));
-      const selfRef = overlaySource.slice(overlaySource.indexOf("const UI_LOCALES"), overlaySource.indexOf("const t = (key)")).match(/: t\("/g);
-      harness.check("the locales do not reference themselves", selfRef === null, String(selfRef ? selfRef.length : 0));
+      const localeStart = overlaySource.indexOf("const UI_LOCALES");
+      const localeEnd = overlaySource.indexOf("const t = (key)");
+      harness.check("the overlay locale markers are present", localeStart !== -1 && localeEnd !== -1 && localeEnd > localeStart, `start=${localeStart} end=${localeEnd}`);
+      const localeSpan = localeStart !== -1 && localeEnd > localeStart ? overlaySource.slice(localeStart, localeEnd) : "";
+      const selfRef = localeSpan.match(/: t\("/g);
+      harness.check("the locales do not reference themselves", localeSpan !== "" && selfRef === null, String(selfRef ? selfRef.length : 0));
     }
 
     harness.section("host: version and update");

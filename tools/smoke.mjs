@@ -122,8 +122,12 @@ await withIsolatedHome(async (home) => {
       ];
       const missing = REQUIRED_SYMBOLS.filter((sym) => !overlaySource.includes(sym));
       check("overlay: símbolos do núcleo presentes", overlaySource.startsWith("// SPDX-License-Identifier: MIT") && missing.length === 0, missing.join(", "));
-      const selfRef = overlaySource.slice(overlaySource.indexOf("const UI_LOCALES"), overlaySource.indexOf("const t = (key)")).match(/: t\("/g);
-      check("overlay: locales sem autorreferência", selfRef === null, String(selfRef ? selfRef.length : 0));
+      const localeStart = overlaySource.indexOf("const UI_LOCALES");
+      const localeEnd = overlaySource.indexOf("const t = (key)");
+      check("overlay: marcadores de locale presentes", localeStart !== -1 && localeEnd !== -1 && localeEnd > localeStart, `start=${localeStart} end=${localeEnd}`);
+      const localeSpan = localeStart !== -1 && localeEnd > localeStart ? overlaySource.slice(localeStart, localeEnd) : "";
+      const selfRef = localeSpan.match(/: t\("/g);
+      check("overlay: locales sem autorreferência", localeSpan !== "" && selfRef === null, String(selfRef ? selfRef.length : 0));
     }
 
     {
