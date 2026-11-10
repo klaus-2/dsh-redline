@@ -731,6 +731,21 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.eq("the three hotkeys are checked in a chain", chained.length, 3);
     harness.check("one key arms one mode", (handler.match(/\belse if\b/g) ?? []).length === 2, handler.slice(0, 120));
     harness.check("the handler does not compare the key on its own", !/event\.key === key(Comment|Adjust|Draw)/.test(overlaySource), "a raw event.key comparison would ignore the modifiers");
+
+    // The toolbar shows the key that is configured: the kbd of each button carries it.
+    const kbdOf = (tool) => {
+      const line = overlaySource.split("\n").find((text) => text.includes(`${tool} = el("button"`)) ?? "";
+      return /el\("kbd", \{\}, (.+)\)\);/.exec(line)?.[1] ?? "";
+    };
+    harness.check("the comment button shows its key", kbdOf("commentBtn").includes("formatHotkey(hotkeyComment)"), kbdOf("commentBtn"));
+    harness.check("the adjust button shows its key", kbdOf("adjustBtn").includes("formatHotkey(hotkeyAdjust)"), kbdOf("adjustBtn"));
+    harness.check("the canvas button shows its key", kbdOf("drawBtn").includes("formatHotkey(hotkeyDraw)"), kbdOf("drawBtn"));
+
+    // The keys the host answers with reach the overlay: applySettings applies all three.
+    const applySettings = /function applySettings\(next\) \{[\s\S]*?\n  \}/.exec(overlaySource)?.[0] ?? "";
+    harness.check("applySettings applies the comment key", applySettings.includes("hotkeyComment = comment"), applySettings.slice(0, 200));
+    harness.check("applySettings applies the adjust key", applySettings.includes("hotkeyAdjust = adjust"), applySettings.slice(0, 200));
+    harness.check("applySettings applies the canvas key", applySettings.includes("hotkeyDraw = draw"), applySettings.slice(0, 200));
   }
 
   harness.section("client: the shortcut capture");
@@ -860,10 +875,68 @@ export async function runClientSuite(harness, { pluginDir }) {
       const afterCancel = posted.length;
       cancellable[0].props.onClick();
       await flush(2);
-      if (listeners.length === 1) listeners[0]({ key: "Escape", preventDefault() {} });
+      const beforeEscape = posted.length;
+      let escapePrevented = false;
+      if (listeners.length === 1) listeners[0]({ key: "Escape", preventDefault() { escapePrevented = true; } });
       await flush(2);
       harness.eq("escape cancels the capture", listeners.length, 0);
-      harness.eq("a cancelled capture changes nothing", posted.length, afterCancel);
+      harness.check("escape is swallowed", escapePrevented === true);
+      harness.eq("a cancelled capture changes nothing", posted.length, beforeEscape);
+      // The key after the escape is not captured: the capture is really over.
+      const afterEscape = posted.length;
+      const keysBefore = { ...(posted.at(-1)?.keys ?? {}) };
+      if (listeners.length === 1) listeners[0]({ key: "z", preventDefault() {} });
+      await flush(4);
+      harness.check("the key after the escape is not captured", posted.length === afterEscape, JSON.stringify(posted.at(-1)?.keys));
+      harness.eq("the keys are the ones the host kept", posted.at(-1)?.keys, keysBefore);
+    }
+  }
+
+  harness.section("client: the panel takes the settings the host answered with");
+  {
+    const posted = [];
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    // The host answers with settings that differ from the ones the panel sent: the panel must
+    // show what the host kept, not what it asked for.
+    const hostSettings = { lang: "auto", keys: { comment: "c", adjust: "v", draw: "q" }, screenshot: false, cropPad: 40 };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      window: { addEventListener() {}, removeEventListener() {} },
+      fetch: async (url, options) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/settings") && options?.method === "POST") {
+          posted.push(JSON.parse(options.body));
+          return jsonResponse({ ok: true, settings: hostSettings });
+        }
+        if (target.includes("/.lr/settings")) return jsonResponse({ ok: true, settings: hostSettings, version: "1.0.24" });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const before = renderOnce(stub, section.component, {});
+    const toggle = findElements(before.tree, (element) => element.props?.["aria-label"] === "Screenshot");
+    harness.eq("the screenshot toggle is there", toggle.length, 1);
+    if (toggle.length === 1) {
+      toggle[0].props.onChange({ target: { checked: true } });
+      await flush(4);
+      const after = renderOnce(stub, section.component, {});
+      const settings = after.states?.[0]?.settings;
+      harness.eq("the panel took the settings the host answered with", settings?.keys, hostSettings.keys);
+      harness.eq("the panel took the screenshot flag too", settings?.screenshot, hostSettings.screenshot);
+      harness.eq("the panel took the crop padding too", settings?.cropPad, hostSettings.cropPad);
+      const draw = findElements(after.tree, (element) => element.props?.["aria-label"] === "Draw mode key");
+      harness.eq("the row shows the key the host kept", draw[0]?.props?.value, "Q");
     }
   }
 

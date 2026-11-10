@@ -312,6 +312,12 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.eq("the refusal names the colliding pair", duplicateBody.keys, ["comment", "adjust"]);
       const afterDuplicate = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
       harness.eq("the refused change was not stored", afterDuplicate.settings.keys.adjust, "v");
+      // The refusal must leave the whole settings alone: the keys, and everything else.
+      const keysBefore = { ...afterDuplicate.settings.keys };
+      const afterDuplicateBody = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
+      harness.eq("the refusal left every key alone", afterDuplicateBody.settings.keys, keysBefore);
+      const afterRefusal = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ screenshot: false }) });
+      harness.eq("a change after the refusal is accepted", afterRefusal.status, 200);
       // Carrying only one side of the pair is enough to create the collision.
       const commentBefore = afterDuplicate.settings.keys.comment;
       const oneSided = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "v" } }) });
@@ -320,6 +326,18 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.eq("the one-sided refusal names the pair", oneSidedBody.keys, ["comment", "adjust"]);
       const afterOneSided = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
       harness.eq("the one-sided refusal was not stored", afterOneSided.settings.keys.comment, commentBefore);
+
+      // All three pairs are checked: the canvas shares its key with the other two.
+      const drawCollision = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "d", adjust: "v", draw: "d" } }) });
+      const drawCollisionBody = await drawCollision.json();
+      harness.eq("the canvas colliding with the comment is refused", drawCollision.status, 400);
+      harness.eq("the canvas refusal names the pair", drawCollisionBody.keys, ["comment", "draw"]);
+      const adjustCollision = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "c", adjust: "d", draw: "d" } }) });
+      const adjustCollisionBody = await adjustCollision.json();
+      harness.eq("the canvas colliding with the adjust is refused", adjustCollision.status, 400);
+      harness.eq("the second canvas refusal names the pair", adjustCollisionBody.keys, ["adjust", "draw"]);
+      const afterCollisions = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
+      harness.eq("the canvas collisions were not stored", afterCollisions.settings.keys, keysBefore);
       const drawKey = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "q", adjust: "w", draw: "e" } }) })).json();
       harness.eq("the draw key is configurable", drawKey.settings.keys.draw, "e");
       const restored = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "c", adjust: "v", draw: "d" } }) })).json();
