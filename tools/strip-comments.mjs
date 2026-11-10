@@ -2,6 +2,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 const KEYWORDS = new Set(["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]);
 
+const LEGAL = /SPDX-License-Identifier|Copyright|\(c\)\s*\d{4}|Apache-2.0|MIT License/i;
+function isLegal(commentText) {
+  return LEGAL.test(commentText);
+}
+
 function stripJs(source) {
   let out = "";
   let i = 0;
@@ -15,13 +20,19 @@ function stripJs(source) {
     const next = i + 1 < n ? source[i + 1] : "";
     if (state === "code") {
       if (ch === "/" && next === "/") {
-        while (i < n && source[i] !== "\n") i += 1;
+        let end = i;
+        while (end < n && source[end] !== "\n") end += 1;
+        const lineText = source.slice(i, end);
+        if (isLegal(lineText)) out += lineText;
+        i = end;
         continue;
       }
       if (ch === "/" && next === "*") {
         const end = source.indexOf("*/", i + 2);
         const span = end < 0 ? n : end + 2;
-        if (source.slice(i, span).includes("\n")) out += "\n";
+        const comment = source.slice(i, span);
+        if (isLegal(comment) || comment.startsWith("/*!")) out += comment;
+        else if (comment.includes("\n")) out += "\n";
         else out += " ";
         i = span;
         continue;
@@ -151,7 +162,7 @@ function collapseBlank(source) {
 function stripCss(source) {
   return collapseBlank(
     source
-      .replace(/\/\*[\s\S]*?\*\//g, (m) => (m.includes("\n") ? "\n" : " "))
+      .replace(/\/\*[\s\S]*?\*\//g, (m) => (isLegal(m) || m.startsWith("/*!") ? m : m.includes("\n") ? "\n" : " "))
       .replace(/\n{3,}/g, "\n\n")
       .replace(/[ \t]+$/gm, "")
   );
@@ -173,6 +184,6 @@ for (const path of args) {
   else if (path.endsWith(".yml")) body = stripYaml(body);
   else body = stripJs(body);
   body = collapseBlank(body);
-  writeFileSync(path, (path.endsWith(".js") ? "// SPDX-License-Identifier: MIT\n" : "") + body.trimStart() + (body.endsWith("\n") ? "" : "\n"));
+  writeFileSync(path, isSpdx + body.trimStart() + (body.endsWith("\n") ? "" : "\n"));
   console.log(path.split("/").pop(), "->", body.length, "chars");
 }
