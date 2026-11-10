@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { packedFiles } from "./harness.mjs";
@@ -117,5 +118,21 @@ export async function runPackageSuite(harness, { pluginDir, packageName }) {
     const text = readFileSync(file, "utf8");
     const leaked = /npm_[A-Za-z0-9]{20,}|_authToken\s*=|NPM_TOKEN\s*=\s*["'][^"']+/.test(text);
     harness.check(`${relative} carries no token`, !leaked);
+  }
+
+  harness.section("package: syntax");
+  const scripts = ["lib/index.js", "lib/client.js", "lib/overlay.js", "lib/bridge.js", "overlay.template.js", "build-overlay.mjs", "tools/smoke.mjs", "tools/regression.mjs", "tools/strip-comments.mjs", "tools/lib/harness.mjs", "tools/lib/host-suite.mjs", "tools/lib/client-suite.mjs", "tools/lib/package-suite.mjs", "tools/lib/release-suite.mjs"];
+  for (const relative of scripts) {
+    try {
+      await new Promise((resolve, reject) => {
+        execFile("node", ["--check", path.join(pluginDir, relative)], { timeout: 120000, windowsHide: true }, (error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+      harness.check(`${relative} parses`, true);
+    } catch (error) {
+      harness.check(`${relative} parses`, false, String(error?.stderr || error?.message || error).slice(0, 300));
+    }
   }
 }

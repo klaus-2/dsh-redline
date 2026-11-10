@@ -504,6 +504,15 @@ export async function runClientSuite(harness, { pluginDir }) {
     await waitFor(() => executed.some((code) => code.includes("window.__LR__ = Object.assign")), 4000);
 
     const injection = executed.find((code) => code.includes("window.__LR__"));
+    let parsed = true;
+    let parseError = "";
+    try {
+      new vm.Script(injection);
+    } catch (error) {
+      parsed = false;
+      parseError = String(error?.message ?? error).slice(0, 200);
+    }
+    harness.check("the injected overlay bundle parses", injection !== undefined && parsed, parseError);
     harness.check("the client injects the overlay into the guest", injection !== undefined);
     harness.check("the injected code carries no secret", injection !== undefined && !injection.includes("a".repeat(64)) && !/secret\s*:/i.test(injection), (injection ?? "").slice(0, 200));
     harness.check("the guest really runs the relay", pageWindow.__LR_BRIDGE__ !== undefined && pageWindow.__LR_BRIDGE__.mode === "client");

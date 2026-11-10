@@ -45,7 +45,8 @@
     "test": "node tools/smoke.mjs && node tools/regression.mjs",
     "smoke": "node tools/smoke.mjs",
     "regression": "node tools/regression.mjs",
-    "strip-comments": "node tools/strip-comments.mjs"
+    "strip-comments": "node tools/strip-comments.mjs",
+    "syntax": "node --check lib/index.js && node --check lib/client.js && node --check lib/overlay.js && node --check lib/bridge.js && node --check overlay.template.js && node --check build-overlay.mjs"
   },
   "dsh": {
     "bundle": {
