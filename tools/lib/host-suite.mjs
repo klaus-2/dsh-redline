@@ -6,6 +6,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import assert from "node:assert/strict";
 import vm from "node:vm";
+import { connect } from "node:net";
 import { extractFunction, flush, freePort, storageShim, withIsolatedHome, withStubbedFetch } from "./harness.mjs";
 
 const enc = (value) => Buffer.from(value, "utf8").toString("base64url");
@@ -474,6 +475,68 @@ export async function runHostSuite(harness, { pluginDir }) {
       assert.deepEqual(noGuardResult.sessionKeys, Object.keys(guardSeed));
       assert.deepEqual(noGuardResult.localKeys, Object.keys(guardSeed));
       const cookie = /lr_session=[a-z0-9-]+/i.exec(response.headers.get("set-cookie") ?? "")?.[0] ?? "";
+      // Session-relative escape probe: an "internal" service the suite controls,
+      // reached through a raw request-target that the host's first parse normalizes
+      // into a protocol-relative reference. fetch normalizes dot-segments client-side,
+      // so these rows go over a node:net socket.
+      const internalRequests = [];
+      const internalPort = await freePort();
+      const internal = createServer((req, res) => {
+        internalRequests.push({ url: req.url, host: req.headers.host });
+        res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+        res.end("INTERNAL-SECRET-DATA");
+      });
+      await new Promise((resolve) => internal.listen(internalPort, "127.0.0.1", resolve));
+      const rawSocketRequest = (requestTarget) =>
+        new Promise((resolve, reject) => {
+          const socket = connect({ host: "127.0.0.1", port }, () => {
+            socket.write(`GET ${requestTarget} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nCookie: ${cookie}\r\nConnection: close\r\n\r\n`);
+          });
+          let data = "";
+          socket.on("data", (chunk) => { data += chunk.toString("utf8"); });
+          socket.on("end", () => resolve(data));
+          socket.on("error", reject);
+        });
+      const statusOf = (rawResponse) => /^HTTP\/1\.[01] (\d{3})/.exec(rawResponse)?.[1] ?? "";
+      // Reject rows: every request-target below resolves off the session target's
+      // origin after the host's two parses, so the guard must answer exactly 404
+      // before any fetch happens. The per-row internalDelta is what proves the
+      // request never reached the internal service (a 404 from the target alone
+      // would not discriminate the guard).
+      const rejectRows = [
+        ["a session-relative path cannot leave the target origin", `/..//127.0.0.1:${internalPort}/secret`],
+        ["a session-relative path cannot leave the target origin deeper in the path", `/a/..//127.0.0.1:${internalPort}/secret`],
+        ["a session-relative path cannot leave the target origin with a query string", `/..//127.0.0.1:${internalPort}/secret?x=1`],
+        ["a session-relative path cannot leave the target origin when the path carries a backslash", `/..\\//127.0.0.1:${internalPort}/secret`],
+        ["a session-relative path cannot leave the target origin when the path carries an absolute URL", `/..//http://127.0.0.1:${internalPort}/secret`]
+      ];
+      for (const [name, requestTarget] of rejectRows) {
+        const before = internalRequests.length;
+        const rawResponse = await rawSocketRequest(requestTarget);
+        const status = statusOf(rawResponse);
+        harness.check(name, status === "404" && internalRequests.length === before,
+          `target=${requestTarget} status=${status} internalDelta=${internalRequests.length - before}`);
+      }
+      // Accept rows: ordinary relative paths on the target's origin must keep
+      // proxying, each answered by the fake target (Sobre for /about, the 2-byte
+      // PNG fallthrough for /a/b/c). The last accept row uses the raw socket because fetch
+      // normalizes the dot-segments client-side and would send /about instead.
+      const aboutPlain = await fetch(`${base}/about`, { headers: { cookie } });
+      harness.check("a session-relative path on the target origin still proxies",
+        aboutPlain.status === 200 && (await aboutPlain.text()).includes("Sobre"));
+      const aboutQuery = await fetch(`${base}/about?x=1`, { headers: { cookie } });
+      harness.check("a session-relative path on the target origin still proxies with a query string",
+        aboutQuery.status === 200 && (await aboutQuery.text()).includes("Sobre"));
+      const nested = await fetch(`${base}/a/b/c`, { headers: { cookie } });
+      const nestedBody = Buffer.from(await nested.arrayBuffer());
+      harness.check("a session-relative path on the target origin still proxies for a nested path",
+        nested.status === 200 && (nested.headers.get("content-type") ?? "").includes("image/png") && nestedBody.equals(Buffer.from([0x89, 0x50])),
+        `status=${nested.status} contentType=${nested.headers.get("content-type")} bytes=${nestedBody.length}`);
+      const dotSegments = await rawSocketRequest("/a/../about");
+      harness.check("a session-relative path on the target origin still proxies when the path contains dot-segments",
+        statusOf(dotSegments) === "200" && dotSegments.includes("Sobre"),
+        `status=${statusOf(dotSegments)}`);
+      internal.close();
       harness.check("the page answers 200", response.status === 200);
       harness.includes("the overlay is injected", html, "/.lr/overlay.js");
       harness.includes("the config is injected", html, "window.__LR__=");
