@@ -703,10 +703,15 @@ export async function runHostSuite(harness, { pluginDir }) {
     };
 
     // A file that named "d" for another mode: the canvas key would land on it.
-    writeFileSync(path.join(settingsDir, "settings.json"), JSON.stringify({ lang: "en", keys: { comment: "d", adjust: "v" }, screenshot: true, cropPad: 72 }));
+    const settingsFile = path.join(settingsDir, "settings.json");
+    writeFileSync(settingsFile, JSON.stringify({ lang: "en", keys: { comment: "d", adjust: "v" }, screenshot: true, cropPad: 72 }));
     const first = await start("legacy-draw");
     const loaded = await (await fetch(`${first.base}/.lr/settings`, { headers: auth })).json();
     harness.check("a legacy file does not leave two modes on the same key", loaded.settings.keys.comment !== loaded.settings.keys.draw, JSON.stringify(loaded.settings.keys));
+    // The repair is written, so the next start does not have to make it again.
+    const repaired = JSON.parse(readFileSync(settingsFile, "utf8"));
+    harness.check("the repair is written to the file", repaired.keys?.draw !== undefined && repaired.keys.draw !== repaired.keys.comment, JSON.stringify(repaired.keys));
+    harness.check("the file keeps the key the user chose", repaired.keys?.comment === "d", JSON.stringify(repaired.keys));
     const panelBody = { lang: "en", keys: loaded.settings.keys, screenshot: false, cropPad: 72 };
     const posted = await fetch(`${first.base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify(panelBody) });
     harness.eq("the panel can change another setting after the upgrade", posted.status, 200);
