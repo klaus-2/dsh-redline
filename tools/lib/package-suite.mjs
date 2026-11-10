@@ -1,6 +1,9 @@
 import { execFile } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { packedFiles } from "./harness.mjs";
 import { listPublishedReleases, readPublishedReleases } from "./release-suite.mjs";
 
@@ -133,6 +136,48 @@ export async function runPackageSuite(harness, { pluginDir, packageName }) {
       harness.check(`${relative} parses`, true);
     } catch (error) {
       harness.check(`${relative} parses`, false, String(error?.stderr || error?.message || error).slice(0, 300));
+    }
+  }
+
+  harness.section("package: legal notices survive stripping");
+  {
+    const stripper = path.resolve(fileURLToPath(import.meta.url), "..", "..", "strip-comments.mjs");
+    const strip = async (file) => {
+      await new Promise((resolve, reject) => {
+        execFile(process.execPath, [stripper, "--write", file], { timeout: 120000, windowsHide: true, maxBuffer: 8 * 1024 * 1024 }, (error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+      return readFileSync(file, "utf8");
+    };
+    const dir = await mkdtemp(path.join(tmpdir(), "dsh-strip-"));
+    try {
+      const cssFixture = path.join(dir, "fixture.css");
+      const templateFixture = path.join(dir, "fixture.js");
+      const syntheticFixture = path.join(dir, "synthetic.js");
+      await writeFile(cssFixture, readFileSync(path.join(pluginDir, "tencil-overlay.css"), "utf8"));
+      await writeFile(templateFixture, readFileSync(path.join(pluginDir, "overlay.template.js"), "utf8"));
+      await writeFile(syntheticFixture, "// SPDX-License-Identifier: Apache-2.0\nconst answer = 42;\n");
+      const strippedCss = await strip(cssFixture);
+      const strippedTemplate = await strip(templateFixture);
+      const strippedSynthetic = await strip(syntheticFixture);
+      harness.check("the css keeps its Apache-2.0 identifier", strippedCss.includes("SPDX-License-Identifier: Apache-2.0"));
+      harness.check("the css keeps its copyright notice", strippedCss.includes("Copyright 2026 Pixel Perfect Agency"));
+      harness.check("the template keeps its attribution line", strippedTemplate.includes("(c) 2026 Pixel Perfect Agency"));
+      harness.check("the template keeps its own SPDX line", strippedTemplate.startsWith("// SPDX-License-Identifier: MIT"));
+      harness.check("a non-MIT SPDX line survives verbatim", strippedSynthetic.startsWith("// SPDX-License-Identifier: Apache-2.0"));
+      const proseFixture = path.join(dir, "prose.js");
+      await writeFile(proseFixture, "// SPDX-License-Identifier: Apache-2.0\n// derived from the tencil design system (c) 2026 Pixel Perfect Agency\n// TODO: refactor this later\n// Copyright note: reviewed by the operator\n/* planned cleanup of the old canvas keys */\nconst answer = 42;\n");
+      const strippedProse = await strip(proseFixture);
+      harness.check("the stripper still removes prose comments", !strippedProse.includes("refactor this later"));
+      harness.check("the stripper keeps legal keywords inside prose comments", strippedProse.includes("Copyright note: reviewed by the operator"));
+      harness.check("the stripper removes non-legal block comments", !strippedProse.includes("planned cleanup of the old canvas keys"));
+      const stripperSource = readFileSync(stripper, "utf8");
+      const defaultTargets = /const DEFAULT_TARGETS = \[([\s\S]*?)\];/.exec(stripperSource);
+      harness.check("the comment stripper never targets the generated overlay", defaultTargets !== null && !defaultTargets[1].includes("lib/overlay.js"));
+    } finally {
+      await rm(dir, { recursive: true, force: true });
     }
   }
 }

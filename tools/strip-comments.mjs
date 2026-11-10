@@ -1,6 +1,13 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import { isAbsolute, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const KEYWORDS = new Set(["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]);
+
+const LEGAL = /SPDX-License-Identifier|Copyright|\(c\)\s*\d{4}|Apache-2.0|MIT License/i;
+function isLegal(commentText) {
+  return LEGAL.test(commentText);
+}
 
 function stripJs(source) {
   let out = "";
@@ -15,13 +22,19 @@ function stripJs(source) {
     const next = i + 1 < n ? source[i + 1] : "";
     if (state === "code") {
       if (ch === "/" && next === "/") {
-        while (i < n && source[i] !== "\n") i += 1;
+        let end = i;
+        while (end < n && source[end] !== "\n") end += 1;
+        const lineText = source.slice(i, end);
+        if (isLegal(lineText)) out += lineText;
+        i = end;
         continue;
       }
       if (ch === "/" && next === "*") {
         const end = source.indexOf("*/", i + 2);
         const span = end < 0 ? n : end + 2;
-        if (source.slice(i, span).includes("\n")) out += "\n";
+        const comment = source.slice(i, span);
+        if (isLegal(comment) || comment.startsWith("/*!")) out += comment;
+        else if (comment.includes("\n")) out += "\n";
         else out += " ";
         i = span;
         continue;
@@ -151,7 +164,7 @@ function collapseBlank(source) {
 function stripCss(source) {
   return collapseBlank(
     source
-      .replace(/\/\*[\s\S]*?\*\//g, (m) => (m.includes("\n") ? "\n" : " "))
+      .replace(/\/\*[\s\S]*?\*\//g, (m) => (isLegal(m) || m.startsWith("/*!") ? m : m.includes("\n") ? "\n" : " "))
       .replace(/\n{3,}/g, "\n\n")
       .replace(/[ \t]+$/gm, "")
   );
@@ -164,15 +177,41 @@ function stripYaml(source) {
     .join("\n");
 }
 
-const args = process.argv.slice(2);
-for (const path of args) {
-  let source = readFileSync(path, "utf8");
+const DEFAULT_TARGETS = [
+  "lib/index.js",
+  "lib/client.js",
+  "lib/bridge.js",
+  "overlay.template.js",
+  "tencil-overlay.css",
+  "cordis.patch.yml"
+];
+
+const argv = process.argv.slice(2);
+const write = argv.includes("--write");
+const unknown = argv.filter((arg) => (arg.startsWith("-") && arg !== "--write") || arg === "");
+if (unknown.length > 0) {
+  console.error(`unknown option: ${unknown.join(", ")} (use --write to modify files)`);
+  process.exit(1);
+}
+const positional = argv.filter((arg) => !arg.startsWith("-") && arg !== "");
+const targets = positional.length > 0 ? positional : DEFAULT_TARGETS;
+const rootDir = fileURLToPath(new URL("..", import.meta.url));
+
+for (const target of targets) {
+  const targetPath = isAbsolute(target) ? target : resolve(rootDir, target);
+  const source = readFileSync(targetPath, "utf8");
   const isSpdx = source.startsWith("// SPDX-License-Identifier:") ? source.split("\n")[0] + "\n" : "";
   let body = isSpdx ? source.slice(isSpdx.length) : source;
-  if (path.endsWith(".css")) body = stripCss(body);
-  else if (path.endsWith(".yml")) body = stripYaml(body);
+  if (targetPath.endsWith(".css")) body = stripCss(body);
+  else if (targetPath.endsWith(".yml")) body = stripYaml(body);
   else body = stripJs(body);
   body = collapseBlank(body);
-  writeFileSync(path, (path.endsWith(".js") ? "// SPDX-License-Identifier: MIT\n" : "") + body.trimStart() + (body.endsWith("\n") ? "" : "\n"));
-  console.log(path.split("/").pop(), "->", body.length, "chars");
+  const next = isSpdx + body.trimStart() + (body.endsWith("\n") ? "" : "\n");
+  const changed = next !== source;
+  if (write) {
+    writeFileSync(targetPath, next);
+    console.log(`${target} -> ${body.length} chars${changed ? " (rewritten)" : " (unchanged)"}`);
+  } else {
+    console.log(`${target} -> ${changed ? `would change (${source.length} -> ${next.length} chars)` : "clean"}`);
+  }
 }
