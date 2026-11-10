@@ -61,8 +61,10 @@ export async function withIsolatedHome(run) {
   const dir = await mkdtemp(path.join(tmpdir(), "dsh-regression-"));
   const previousProfile = process.env.USERPROFILE;
   const previousHome = process.env.HOME;
+  const previousProfileDir = process.env.DSH_PROFILE_DIR;
   process.env.USERPROFILE = dir;
   process.env.HOME = dir;
+  process.env.DSH_PROFILE_DIR = path.join(dir, ".dsh", "profiles", "desktop");
   try {
     return await run(dir);
   } finally {
@@ -70,6 +72,8 @@ export async function withIsolatedHome(run) {
     else process.env.USERPROFILE = previousProfile;
     if (previousHome === undefined) delete process.env.HOME;
     else process.env.HOME = previousHome;
+    if (previousProfileDir === undefined) delete process.env.DSH_PROFILE_DIR;
+    else process.env.DSH_PROFILE_DIR = previousProfileDir;
     await rm(dir, { recursive: true, force: true });
   }
 }

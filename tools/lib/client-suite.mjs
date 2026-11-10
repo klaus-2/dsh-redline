@@ -1222,6 +1222,172 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
   }
 
+  harness.section("client: the update paths that fail");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const managerCalls = [];
+    const pluginManager = {
+      async installBundle(spec) {
+        managerCalls.push(spec);
+        return { ok: true, value: { application: "applied", version: "1.0.25-rc.1" } };
+      }
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/update")) return jsonResponse({ ok: true, version: "1.0.16", update: { latest: "v1.0.25-rc.1", newer: true } });
+        if (target.includes("/.lr/settings")) return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.16" });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({ remote: { pluginManager } });
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const withButton = renderOnce(stub, section.component, {});
+    const buttons = findElements(withButton.tree, (element) => element.props?.children === "Update now");
+    harness.eq("the update button appears for a release that is not a plain version", buttons.length, 1);
+    if (buttons.length === 1) {
+      await buttons[0].props.onClick();
+      await flush(4);
+      const after = renderOnce(stub, section.component, {});
+      harness.eq("the refused release is never handed to the manager", managerCalls.length, 0);
+      const refusal = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("not a version this plugin can install"));
+      harness.check("the refusal is said out loud", refusal.length === 1, JSON.stringify(after.tree).slice(0, 160));
+      const stuck = findElements(after.tree, (element) => element.props?.children === "Installing 1.0.25-rc.1...");
+      harness.eq("the row does not stay busy", stuck.length, 0);
+    }
+  }
+
+  harness.section("client: a save that fails does not claim it worked");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    let saveFails = false;
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url, options) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/update")) return jsonResponse({ ok: true, version: "1.0.16", update: { latest: "v1.0.17", newer: true } });
+        if (target.includes("/.lr/settings") && options?.method === "POST") {
+          if (saveFails) throw new Error("the host is gone");
+          return jsonResponse({ ok: true, settings: { lang: "en", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 } });
+        }
+        if (target.includes("/.lr/settings")) return jsonResponse({ ok: true, settings: { lang: "en", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.16" });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const selects = findElements(renderOnce(stub, section.component, {}).tree, (element) => element.props?.["aria-label"] === "Language");
+    harness.eq("the language select is there", selects.length, 1);
+    if (selects.length === 1) {
+      await selects[0].props.onChange({ target: { value: "pt" } });
+      await flush(4);
+      const afterSave = renderOnce(stub, section.component, {});
+      const banner = findElements(afterSave.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("Saved"));
+      harness.check("a saved change is acknowledged", banner.length === 1, JSON.stringify(afterSave.tree).slice(0, 160));
+      saveFails = true;
+      const selectsAgain = findElements(afterSave.tree, (element) => element.props?.["aria-label"] === "Language");
+      await selectsAgain[0].props.onChange({ target: { value: "zh" } });
+      await flush(4);
+      const afterFail = renderOnce(stub, section.component, {});
+      const bannerAfter = findElements(afterFail.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("Saved"));
+      harness.eq("a failed save does not leave the saved banner", bannerAfter.length, 0);
+      const reported = findElements(afterFail.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("the host is gone"));
+      harness.check("the failed save is reported", reported.length === 1, JSON.stringify(afterFail.tree).slice(0, 200));
+      const kept = findElements(afterFail.tree, (element) => element.props?.["aria-label"] === "Language");
+      harness.eq("the panel shows the setting the host still holds", kept[0]?.props?.value, "en");
+    }
+  }
+
+  harness.section("client: a host that answers without settings does not break the panel");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/update")) return jsonResponse({ ok: true, version: "1.0.16", update: { latest: "v1.0.17", newer: true } });
+        if (target.includes("/.lr/settings")) return jsonResponse({ ok: true, version: "1.0.16" });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    let survived = true;
+    let tree = undefined;
+    try {
+      tree = renderOnce(stub, section.component, {}).tree;
+    } catch {
+      survived = false;
+    }
+    harness.check("the panel renders an answer that carries no settings", survived, "the panel threw while rendering");
+    if (survived) {
+      const current = findElements(tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("Current version"));
+      harness.check("the row still names the running version", current.length === 1, JSON.stringify(tree).slice(0, 160));
+    }
+  }
+
+  harness.section("client: an update check that fails is not an answer that says there is nothing");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/update")) throw new Error("the registry is unreachable");
+        if (target.includes("/.lr/settings")) return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.16" });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const after = renderOnce(stub, section.component, {});
+    const nothing = findElements(after.tree, (element) => element.props?.children === "No releases published yet");
+    harness.eq("a failed check does not claim there are no releases", nothing.length, 0);
+    const failed = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("Update check failed"));
+    harness.check("the failed check is reported", failed.length === 1, JSON.stringify(after.tree).slice(0, 200));
+  }
+
   harness.section("client: the update survives the plugin going away");
   {
     const stub = createReactStub();
@@ -1372,6 +1538,233 @@ export async function runClientSuite(harness, { pluginDir }) {
       const restart = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("1.0.24") && element.props.children.includes("installed"));
       harness.check("the row names the version that landed", restart.length > 0, JSON.stringify(after.tree).slice(0, 200));
     }
+  }
+
+  harness.section("client: the host's own update API is preferred over a tarball");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const calls = [];
+    const pluginManager = {
+      async updateBundle(name, version, options) {
+        calls.push({ api: "updateBundle", name, version, options });
+        return { ok: true, value: { from: "1.0.23", to: version, step: "install", result: { changed: true, application: "restart-required", stage: "install", target: name, version } } };
+      },
+      async installBundle(spec) {
+        calls.push({ api: "installBundle", spec });
+        return { ok: true, value: { application: "failed", error: { code: "already-installed" } } };
+      }
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/update")) return jsonResponse({ ok: true, version: "1.0.23", update: { latest: "v1.0.24", newer: true } });
+        if (target.includes("/.lr/settings")) return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.23" });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({ remote: { pluginManager } });
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const withButton = renderOnce(stub, section.component, {});
+    const buttons = findElements(withButton.tree, (element) => element.props?.children === "Update now");
+    harness.eq("the update button appears", buttons.length, 1);
+    if (buttons.length === 1) {
+      await buttons[0].props.onClick();
+      await flush(4);
+      harness.eq("the host's update API is the only call", calls.length, 1);
+      harness.eq("the host's update API is the one that was used", calls[0]?.api, "updateBundle");
+      harness.eq("the host's update API names the package", calls[0]?.name, "dsh-redline");
+      harness.eq("the host's update API names the version", calls[0]?.version, "1.0.24");
+      harness.check("the host's update API receives a request id", typeof calls[0]?.options?.requestId === "string", JSON.stringify(calls[0]?.options));
+      harness.eq("the version that landed on disk is remembered", localStorage.getItem("dsh-redline.updated"), "1.0.24");
+    }
+  }
+
+  harness.section("client: a host that refuses the update does not claim it worked");
+  {
+    const build = async (pluginManager) => {
+      const stub = createReactStub();
+      const localStorage = makeLocalStorage();
+      const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+        react: stub.React,
+        localStorage,
+        console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+        fetch: async (url) => {
+          const target = String(url);
+          if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+          if (target.includes("/.lr/update")) return jsonResponse({ ok: true, version: "1.0.23", update: { latest: "v1.0.24", newer: true } });
+          if (target.includes("/.lr/settings")) return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.23" });
+          if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+          return jsonResponse({});
+        }
+      });
+      const client = fakeClientCtx({ remote: { pluginManager } });
+      module.apply(client.ctx);
+      client.resolve();
+      const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+      const rendered = renderOnce(stub, section.component, {});
+      for (const effect of rendered.effects) effect();
+      await flush(4);
+      return { stub, section, localStorage };
+    };
+    const click = async (built) => {
+      const withButton = renderOnce(built.stub, built.section.component, {});
+      const buttons = findElements(withButton.tree, (element) => element.props?.children === "Update now");
+      harness.eq("the update button appears", buttons.length, 1);
+      if (buttons.length !== 1) return;
+      await buttons[0].props.onClick();
+      await flush(4);
+    };
+
+    const refused = await build({
+      async updateBundle() {
+        return { ok: true, value: { from: "1.0.23", to: "1.0.24", step: "check", result: { changed: false, application: "failed", stage: "install", target: "dsh-redline", error: { code: "invalid-spec", diagnostic: "dsh-redline is not installed from a registry under its own name" } } } };
+      }
+    });
+    await click(refused);
+    harness.eq("a refusal names nothing as installed", refused.stub.getStates()[0].installed, "");
+    harness.eq("a refusal is not remembered as installed", refused.localStorage.getItem("dsh-redline.updated"), null);
+    harness.check("a refusal names the host's own reason", String(refused.stub.getStates()[0].installError).includes("not installed from a registry"), String(refused.stub.getStates()[0].installError));
+
+    const cancelled = await build({
+      async updateBundle(name, version) {
+        return { ok: true, value: { from: "1.0.23", to: version, step: "install", result: { changed: false, application: "cancelled", stage: "install", target: name } } };
+      }
+    });
+    await click(cancelled);
+    harness.eq("a cancellation names nothing as installed", cancelled.stub.getStates()[0].installed, "");
+    harness.eq("a cancellation is not remembered as installed", cancelled.localStorage.getItem("dsh-redline.updated"), null);
+    harness.check("a cancellation is reported", cancelled.stub.getStates()[0].installError !== "", String(cancelled.stub.getStates()[0].installError));
+
+    const fallbackCalls = [];
+    const recovered = await build({
+      async updateBundle() {
+        return { ok: true, value: { from: "1.0.23", to: "1.0.24", step: "check", result: { changed: false, application: "failed", stage: "install", target: "dsh-redline", error: { code: "invalid-spec", diagnostic: "dsh-redline is not installed from a registry under its own name" } } } };
+      },
+      async installBundle(spec) {
+        fallbackCalls.push(spec);
+        return { ok: true, value: { application: "restart-required", version: "1.0.24" } };
+      }
+    });
+    await click(recovered);
+    harness.eq("the plain spec is asked for after the refusal", fallbackCalls.length, 1);
+    harness.eq("the plain spec names the package and the version", fallbackCalls[0], "dsh-redline@1.0.24");
+    harness.eq("the copy that landed is remembered", recovered.localStorage.getItem("dsh-redline.updated"), "1.0.24");
+    harness.eq("the refusal does not survive the recovery", recovered.stub.getStates()[0].installError, "");
+  }
+
+  harness.section("client: a host that only has the update API is still asked");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const calls = [];
+    const pluginManager = {
+      async updateBundle(name, version) {
+        calls.push({ api: "updateBundle", name, version });
+        return { ok: true, value: { from: "1.0.23", to: version, step: "install", result: { changed: true, application: "restart-required", stage: "install", target: name, version } } };
+      }
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/update")) return jsonResponse({ ok: true, version: "1.0.23", update: { latest: "v1.0.24", newer: true } });
+        if (target.includes("/.lr/settings")) return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.23" });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({ remote: { pluginManager } });
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const withButton = renderOnce(stub, section.component, {});
+    const buttons = findElements(withButton.tree, (element) => element.props?.children === "Update now");
+    harness.eq("the update button appears", buttons.length, 1);
+    if (buttons.length === 1) {
+      await buttons[0].props.onClick();
+      await flush(4);
+      harness.eq("the host's update API is the only call", calls.length, 1);
+      harness.eq("the host's update API is the one that was used", calls[0]?.api, "updateBundle");
+      harness.eq("the version that landed on disk is remembered", localStorage.getItem("dsh-redline.updated"), "1.0.24");
+    }
+  }
+
+  harness.section("client: a refused update check is not an answer that says there is nothing");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/update")) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "content-type": "application/json" } });
+        if (target.includes("/.lr/settings")) return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.23" });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const after = renderOnce(stub, section.component, {});
+    const nothing = findElements(after.tree, (element) => element.props?.children === "No releases published yet");
+    harness.eq("a refused check does not claim there are no releases", nothing.length, 0);
+    const failed = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("Update check failed"));
+    harness.check("the refused check is reported", failed.length === 1, JSON.stringify(after.tree).slice(0, 200));
+  }
+
+  harness.section("client: a refused settings read is reported instead of leaving the panel blank");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/update")) return jsonResponse({ ok: true, version: "1.0.23", update: { latest: "v1.0.24", newer: true } });
+        if (target.includes("/.lr/settings")) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "content-type": "application/json" } });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const after = renderOnce(stub, section.component, {});
+    const unreachable = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("unreachable"));
+    harness.check("the refused read is reported", unreachable.length === 1, JSON.stringify(after.tree).slice(0, 200));
+    harness.eq("the panel does not wait for an answer that never came", stub.getStates()[0].loaded, false);
   }
 
   harness.section("client: a manager that names no version falls back to the one that was asked for");

@@ -6,7 +6,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import { extractFunction, freePort, storageShim, withIsolatedHome, withStubbedFetch } from "./harness.mjs";
+import { extractFunction, flush, freePort, storageShim, withIsolatedHome, withStubbedFetch } from "./harness.mjs";
 
 const enc = (value) => Buffer.from(value, "utf8").toString("base64url");
 const SHOT = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwcJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==";
@@ -526,7 +526,6 @@ export async function runHostSuite(harness, { pluginDir }) {
     harness.section("host: version and update");
     {
       await withStubbedFetch([
-        { match: "api.github.com", reply: async () => new Response(JSON.stringify({ body: "notes" }), { status: 200, headers: { "content-type": "application/json" } }) },
         { match: "registry.npmjs.org/dsh-redline", reply: async () => new Response(JSON.stringify({ version: "99.0.0" }), { status: 200, headers: { "content-type": "application/json" } }) }
       ], async () => {
         const update = await (await fetch(`${base}/.lr/update`, { headers: auth })).json();
@@ -535,11 +534,11 @@ export async function runHostSuite(harness, { pluginDir }) {
         harness.check("the settings carry the update information", settings.update !== null && settings.update.latest === "v99.0.0");
       });
       await withStubbedFetch([
-        { match: "api.github.com", reply: async () => new Response("{}", { status: 403 }) },
+        { match: "api.github.com", reply: async () => { throw new Error("the GitHub API must not be asked for the version"); } },
         { match: "registry.npmjs.org/dsh-redline", reply: async () => new Response(JSON.stringify({ version: "99.0.0" }), { status: 200, headers: { "content-type": "application/json" } }) }
       ], async () => {
         const withoutNotes = await (await fetch(`${base}/.lr/update`, { headers: auth })).json();
-        harness.check("a blocked notes request does not break the update check", withoutNotes.error === undefined && withoutNotes.update.latest === "v99.0.0", JSON.stringify(withoutNotes).slice(0, 140));
+        harness.check("the version comes from the registry alone", withoutNotes.error === undefined && withoutNotes.update.latest === "v99.0.0", JSON.stringify(withoutNotes).slice(0, 140));
         harness.check("the release is still offered without the notes", withoutNotes.update.newer === true, JSON.stringify(withoutNotes.update).slice(0, 140));
       });
       await withStubbedFetch([
@@ -550,11 +549,95 @@ export async function runHostSuite(harness, { pluginDir }) {
       });
       const badVersion = await fetch(`${base}/.lr/update/install`, { method: "POST", headers: json(), body: JSON.stringify({ version: "abc" }) });
       harness.check("a malformed version is refused", badVersion.status === 400);
+      const overlong = await fetch(`${base}/.lr/update/install`, { method: "POST", headers: json(), body: JSON.stringify({ version: "9999999.0.0" }) });
+      harness.check("a version the panel cannot name is not installable", overlong.status === 400, `status=${overlong.status}`);
       const local = await (await fetch(`${base}/.lr/update/install`, { method: "POST", headers: json(), body: JSON.stringify({ version: pluginVersion }) })).json();
       harness.check("a development copy refuses the in-app install", local.ok === false && local.error === "local-development", JSON.stringify(local));
       const running = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
       harness.check("the running copy is not reported as a pending install", running.update.installed === undefined, JSON.stringify({ installed: running.installed, updateInstalled: running.update.installed }));
       harness.check("the top level still names the version on disk", running.installed === pluginVersion, JSON.stringify({ installed: running.installed, pluginVersion }));
+    }
+
+    harness.section("host: the install route answers what landed");
+    {
+      const staged = await mkdtemp(path.join(tmpdir(), "dsh-regression-install-"));
+      try {
+        const stub = path.join(staged, "pnpm.cjs");
+        await writeFile(stub, [
+          "const fs = require('node:fs');",
+          "const path = require('node:path');",
+          "const spec = process.argv[process.argv.indexOf('add') + 1] ?? '';",
+          "const version = spec.slice(spec.lastIndexOf('@') + 1);",
+          "const land = process.env.DSH_TEST_LAND ?? version;",
+          "if (process.env.DSH_TEST_HANG === '1') {",
+          "  console.log('Progress: resolved 1, reused 0, downloaded 0, added 0');",
+          "  setTimeout(() => {}, 600000);",
+          "} else {",
+          "  const pkg = path.join(process.env.DSH_TEST_PKG_DIR, 'package.json');",
+          "  fs.writeFileSync(pkg, JSON.stringify({ name: 'dsh-redline', version: land }));",
+          "  console.log('Done in 1s');",
+          "}"
+        ].join("\n"));
+        await mkdir(path.join(staged, "lib"), { recursive: true });
+        await writeFile(path.join(staged, "package.json"), JSON.stringify({ name: "dsh-redline", version: pluginVersion }));
+        await copyFile(path.join(pluginDir, "lib", "index.js"), path.join(staged, "lib", "index.js"));
+        await copyFile(path.join(pluginDir, "lib", "overlay.js"), path.join(staged, "lib", "overlay.js"));
+        await copyFile(path.join(pluginDir, "lib", "bridge.js"), path.join(staged, "lib", "bridge.js"));
+        const previousRuntime = process.env.DSH_RUNTIME_PNPM;
+        const previousPkgDir = process.env.DSH_TEST_PKG_DIR;
+        process.env.DSH_RUNTIME_PNPM = stub;
+        process.env.DSH_TEST_PKG_DIR = staged;
+        try {
+          const installModule = await import(pathToFileURL(path.join(staged, "lib", "index.js")).href);
+          const installServer = await installModule.startServer({ port: await freePort() });
+          const installPort = installServer.port ?? installServer.address().port;
+          const installBase = `http://127.0.0.1:${installPort}`;
+          try {
+            const exact = await (await fetch(`${installBase}/.lr/update/install`, { method: "POST", headers: { [secretHeader]: secret, "content-type": "application/json" }, body: JSON.stringify({ version: "9.9.9" }) })).json();
+            harness.check("the route names the version that landed", exact.ok === true && exact.installed === "9.9.9", JSON.stringify(exact));
+            process.env.DSH_TEST_LAND = "9.9.8";
+            const held = await (await fetch(`${installBase}/.lr/update/install`, { method: "POST", headers: { [secretHeader]: secret, "content-type": "application/json" }, body: JSON.stringify({ version: "9.9.9" }) })).json();
+            harness.check("a version other than the one asked for is a success that names what landed", held.ok === true && held.installed === "9.9.8", JSON.stringify(held));
+            delete process.env.DSH_TEST_LAND;
+            process.env.DSH_TEST_HANG = "1";
+            const previousTimeout = process.env.DSH_PNPM_TIMEOUT_MS;
+            process.env.DSH_PNPM_TIMEOUT_MS = "700";
+            try {
+              const hung = await (await fetch(`${installBase}/.lr/update/install`, { method: "POST", headers: { [secretHeader]: secret, "content-type": "application/json" }, body: JSON.stringify({ version: "9.9.9" }) })).json();
+              harness.check("a stopped run is not reported as a success", hung.ok === false, JSON.stringify(hung));
+              harness.check("the reason names the stop, not a line of pnpm output", typeof hung.error === "string" && hung.error.includes("stopped") && !hung.error.includes("Progress"), JSON.stringify(hung));
+            } finally {
+              delete process.env.DSH_TEST_HANG;
+              if (previousTimeout === undefined) delete process.env.DSH_PNPM_TIMEOUT_MS;
+              else process.env.DSH_PNPM_TIMEOUT_MS = previousTimeout;
+            }
+            process.env.DSH_TEST_HANG = "1";
+            process.env.DSH_PNPM_TIMEOUT_MS = "3000";
+            try {
+              const first = fetch(`${installBase}/.lr/update/install`, { method: "POST", headers: { [secretHeader]: secret, "content-type": "application/json" }, body: JSON.stringify({ version: "9.9.9" }) });
+              await flush(2);
+              const second = await fetch(`${installBase}/.lr/update/install`, { method: "POST", headers: { [secretHeader]: secret, "content-type": "application/json" }, body: JSON.stringify({ version: "9.9.9" }) });
+              harness.check("a second install is refused while the first runs", second.status === 409, `status=${second.status}`);
+              const refused = await second.json();
+              harness.check("the refused install says why", refused.ok === false && refused.error === "install-in-progress", JSON.stringify(refused));
+              await first;
+            } finally {
+              delete process.env.DSH_TEST_HANG;
+              if (previousTimeout === undefined) delete process.env.DSH_PNPM_TIMEOUT_MS;
+              else process.env.DSH_PNPM_TIMEOUT_MS = previousTimeout;
+            }
+          } finally {
+            await installServer.close?.();
+          }
+        } finally {
+          if (previousRuntime === undefined) delete process.env.DSH_RUNTIME_PNPM;
+          else process.env.DSH_RUNTIME_PNPM = previousRuntime;
+          if (previousPkgDir === undefined) delete process.env.DSH_TEST_PKG_DIR;
+          else process.env.DSH_TEST_PKG_DIR = previousPkgDir;
+        }
+      } finally {
+        await rm(staged, { recursive: true, force: true });
+      }
     }
 
     harness.section("host: a newer copy on disk waits for the next start");
