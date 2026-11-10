@@ -24,9 +24,10 @@ A green suite is required for every change to `lib/`.
 - No comments in shipped files except the `SPDX-License-Identifier` line.
   Code and tests explain themselves; when a decision needs prose, move it into
   the README or a doc under `docs/`.
-- `npm run strip-comments` re-strips comment noise from the JS/CSS sources
-  (it is a real lexer: strings, template literals and regex literals are
-  preserved).
+- `npm run strip-comments` reports comment drift in the shipped JS/CSS sources;
+  `npm run strip-comments -- --write` applies it (it is a real lexer: strings,
+  template literals and regex literals are preserved, and license notices survive
+  in the JS/CSS sources).
 - User-facing strings go through the locale tables in
   `overlay.template.js` / `lib/client.js`. The JSON files in `locale/` are
   translation mirrors for contributors, not runtime inputs; update the inline

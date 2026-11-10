@@ -128,7 +128,7 @@ export async function runPackageSuite(harness, { pluginDir, packageName }) {
     const stripper = path.resolve(fileURLToPath(import.meta.url), "..", "..", "strip-comments.mjs");
     const strip = async (file) => {
       await new Promise((resolve, reject) => {
-        execFile(process.execPath, [stripper, file], { timeout: 120000, windowsHide: true, maxBuffer: 8 * 1024 * 1024 }, (error) => {
+        execFile(process.execPath, [stripper, "--write", file], { timeout: 120000, windowsHide: true, maxBuffer: 8 * 1024 * 1024 }, (error) => {
           if (error) reject(error);
           else resolve();
         });
@@ -152,10 +152,14 @@ export async function runPackageSuite(harness, { pluginDir, packageName }) {
       harness.check("the template keeps its own SPDX line", strippedTemplate.startsWith("// SPDX-License-Identifier: MIT"));
       harness.check("a non-MIT SPDX line survives verbatim", strippedSynthetic.startsWith("// SPDX-License-Identifier: Apache-2.0"));
       const proseFixture = path.join(dir, "prose.js");
-      await writeFile(proseFixture, "// SPDX-License-Identifier: Apache-2.0\n// derived from the tencil design system (c) 2026 Pixel Perfect Agency\n// TODO: refactor this later\n// Copyright note: reviewed by the operator\nconst answer = 42;\n");
+      await writeFile(proseFixture, "// SPDX-License-Identifier: Apache-2.0\n// derived from the tencil design system (c) 2026 Pixel Perfect Agency\n// TODO: refactor this later\n// Copyright note: reviewed by the operator\n/* planned cleanup of the old canvas keys */\nconst answer = 42;\n");
       const strippedProse = await strip(proseFixture);
       harness.check("the stripper still removes prose comments", !strippedProse.includes("refactor this later"));
       harness.check("the stripper keeps legal keywords inside prose comments", strippedProse.includes("Copyright note: reviewed by the operator"));
+      harness.check("the stripper removes non-legal block comments", !strippedProse.includes("planned cleanup of the old canvas keys"));
+      const stripperSource = readFileSync(stripper, "utf8");
+      const defaultTargets = /const DEFAULT_TARGETS = \[([\s\S]*?)\];/.exec(stripperSource);
+      harness.check("the comment stripper never targets the generated overlay", defaultTargets !== null && !defaultTargets[1].includes("lib/overlay.js"));
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

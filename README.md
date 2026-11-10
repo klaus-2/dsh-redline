@@ -113,7 +113,7 @@ npm test
 npm run strip-comments
 ```
 
-`overlay.template.js` + `tencil-overlay.css` are the sources; `lib/overlay.js` is generated — never edit it directly. `tools/smoke.mjs` runs 33 checks (proxy, rewrite, intake, screenshots, context format, overlay integrity) against an isolated port.
+`overlay.template.js` + `tencil-overlay.css` are the sources; `lib/overlay.js` is generated — never edit it directly. `npm run strip-comments` reports what the comment stripper would change in the shipped sources; add `-- --write` to apply it. License and copyright notices are preserved in the JS and CSS sources. `tools/smoke.mjs` runs 33 checks (proxy, rewrite, intake, screenshots, context format, overlay integrity) against an isolated port.
 
 ## Scope
 
