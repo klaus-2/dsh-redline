@@ -71,7 +71,7 @@ export async function runClientSuite(harness, { pluginDir }) {
   const overlayPath = path.join(pluginDir, "lib", "overlay.js");
   const templatePath = path.join(pluginDir, "overlay.template.js");
   const client = readFileSync(clientPath, "utf8");
-  const overlay = readFileSync(overlayPath, "utf8");
+  const overlay = readFileSync(overlayPath, "utf8").split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
   const template = readFileSync(templatePath, "utf8");
 
   harness.section("client: bundle contract");
