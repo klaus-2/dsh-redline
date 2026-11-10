@@ -38,7 +38,7 @@
   "linkOff": "关联数值",
   "rawHint": "原始值（CSS 语法）",
   "adjustSaved": "调整已保存 — 将附加到你的下一个提示",
-  "deliveredToast": "✅ 标注已随你的消息发送给智能体",
+  "deliveredToast": "标注已随消息发送给智能体",
   "secText": "文本",
   "secFill": "填充",
   "secTypography": "排版",
@@ -154,5 +154,6 @@
   "hotkeyAdjust": "调整模式键",
   "hotkeyDraw": "绘制模式键",
   "capture": "点击后按下按键",
-  "duplicateKey": "该快捷键已被其他模式使用。请选择另一个。"
+  "duplicateKey": "该快捷键已被其他模式使用。请选择另一个。",
+  "panelDrag": "拖动移动 · 双击恢复默认位置"
 }

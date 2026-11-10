@@ -11,7 +11,14 @@
     } catch {}
     return null;
   })();
-  const API_BASE = (window.__LR__ && window.__LR__.apiBase) || scriptOrigin || window.location.origin;
+  // The page can rewrite window.__LR__ before this script runs, so the host it names is not
+  // trusted: the overlay is served from the same loopback as the host it talks to, and that
+  // origin is the one that counts. A page that points elsewhere gets nothing loaded from it.
+  const API_BASE = (() => {
+    if (scriptOrigin !== null) return scriptOrigin;
+    const named = window.__LR__ && typeof window.__LR__.apiBase === "string" ? window.__LR__.apiBase : "";
+    return named || window.location.origin;
+  })();
   // The page never holds the instance secret. Every privileged call goes
   // through the bridge, which the host answers from its own context.
   const BRIDGE = (() => { try { return window.__LR_BRIDGE__ ?? null; } catch { return null; } })();
@@ -509,7 +516,9 @@
    * the text is not a hotkey. */
   function parseHotkey(text) {
     const names = ["ctrl", "alt", "shift", "meta"];
-    if (typeof text !== "string") return undefined;
+    // The longest shortcut is "Ctrl+Alt+Shift+Meta+a": 22 characters. The limit is read before
+    // the text is split, so a page-sized string costs nothing to refuse.
+    if (typeof text !== "string" || text.length > 32) return undefined;
     const parts = text.split("+").map((part) => part.trim()).filter((part) => part !== "");
     if (parts.length === 0) return undefined;
     const key = parts.at(-1);
@@ -521,17 +530,26 @@
   }
 
   /** True when the event is exactly that hotkey: the same key and the same set of modifiers.
-   * The key is matched on event.key, the character the layout produces, not on event.code: a
-   * shortcut names the key the user reads, not its place on a QWERTY board. */
+   * The key is matched on the character the layout produces when no modifier is held, and on the
+   * physical key when one is: a shortcut names the key the user reads. Shift+1 produces "!",
+   * which is not what anyone means by "1". */
   function hotkeyMatches(event, hotkey) {
     if (hotkey === undefined) return false;
-    if (String(event.key ?? "").toLowerCase() !== hotkey.key) return false;
     const held = [];
     if (event.ctrlKey) held.push("ctrl");
     if (event.altKey) held.push("alt");
     if (event.shiftKey) held.push("shift");
     if (event.metaKey) held.push("meta");
-    return held.length === hotkey.modifiers.length && hotkey.modifiers.every((name) => held.includes(name));
+    if (held.length !== hotkey.modifiers.length || !hotkey.modifiers.every((name) => held.includes(name))) return false;
+    let key = String(event.key ?? "").toLowerCase();
+    if (held.length > 0) {
+      const code = String(event.code ?? "");
+      const letter = /^Key([A-Za-z])$/.exec(code);
+      const digit = /^(?:Digit|Numpad)(\d)$/.exec(code);
+      if (letter !== null) key = letter[1].toLowerCase();
+      else if (digit !== null) key = digit[1];
+    }
+    return key === hotkey.key;
   }
 
   /** The hotkey as it is shown: the key uppercased, the modifiers in their canonical spelling. */

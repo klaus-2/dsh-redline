@@ -38,7 +38,7 @@
   "linkOff": "Vincular valores",
   "rawHint": "valor bruto (sintaxe CSS)",
   "adjustSaved": "Ajustes guardados — anexam ao seu próximo prompt",
-  "deliveredToast": "✅ Anotações entregues ao agente com sua mensagem",
+  "deliveredToast": "Anotações entregues ao agente com sua mensagem",
   "secText": "Texto",
   "secFill": "Preenchimento",
   "secTypography": "Tipografia",
@@ -154,5 +154,6 @@
   "hotkeyAdjust": "Tecla do modo ajuste",
   "hotkeyDraw": "Tecla do modo desenho",
   "capture": "Clique aqui e pressione uma tecla",
-  "duplicateKey": "Esse atalho já é usado por outro modo. Escolha outro."
+  "duplicateKey": "Esse atalho já é usado por outro modo. Escolha outro.",
+  "panelDrag": "Arraste para mover · duplo clique para voltar ao padrão"
 }

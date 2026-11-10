@@ -34,6 +34,16 @@ const REQUIRED_OVERLAY_SYMBOLS = [
   "const t = (key) =>"
 ];
 
+// The mirrors carry the strings of the settings panel as well as the overlay's. These are the
+// panel's, and they live in the client's table, not in the overlay's.
+const MIRROR_ONLY_KEYS = new Set([
+  "hotkeyComment",
+  "hotkeyAdjust",
+  "hotkeyDraw",
+  "capture",
+  "duplicateKey"
+]);
+
 function localeKeys(source) {
   const literal = extractObjectLiteral(source, "const UI_LOCALES");
   const locales = evaluateObjectLiteral(literal, "UI_LOCALES");
@@ -639,6 +649,23 @@ export async function runClientSuite(harness, { pluginDir }) {
       }
     }
     harness.check("every property of the inspector is labelled in every language", metaMissing.length === 0, metaMissing.slice(0, 8).join(", "));
+
+    // The mirrors in locale/ are what a translator reads. A mirror that drifts from the inline
+    // table sends the translator to the wrong text.
+    const mirrorOf = { en: "en.json", pt: "pt-BR.json", zh: "zh-CN.json" };
+    const drifted = [];
+    for (const [code, file] of Object.entries(mirrorOf)) {
+      const mirror = JSON.parse(readFileSync(path.join(pluginDir, "locale", file), "utf8"));
+      const dictionary = dictionaries[code] ?? {};
+      for (const [key, value] of Object.entries(dictionary)) {
+        if (mirror[key] !== value) drifted.push(`${code}:${key}`);
+      }
+      for (const key of Object.keys(mirror)) {
+        if (key === "meta") continue;
+        if (dictionary[key] === undefined && !MIRROR_ONLY_KEYS.has(key)) drifted.push(`${code}:${key} (only in the mirror)`);
+      }
+    }
+    harness.check("the translation mirrors match the inline tables", drifted.length === 0, drifted.slice(0, 8).join(", "));
   }
 
   harness.section("client: overlay build");
@@ -684,6 +711,14 @@ export async function runClientSuite(harness, { pluginDir }) {
       harness.check("the key fires whatever the case", matches({ key: "C" }, plain) === true);
       harness.check("a modified key does not fire the plain hotkey", matches({ key: "c", ctrlKey: true }, plain) === false);
       harness.check("a shifted key does not fire the plain hotkey", matches({ key: "c", shiftKey: true }, plain) === false);
+
+      // A shortcut names the key the user reads: with a modifier held, the character the layout
+      // produces is not that key.
+      const shiftOne = parse("Shift+1");
+      harness.check("a shortcut with a digit fires on the digit the layout shifted", matches({ key: "!", code: "Digit1", shiftKey: true }, shiftOne) === true, JSON.stringify(shiftOne));
+      const altA = parse("Alt+a");
+      harness.check("a shortcut with a letter fires on the letter the layout changed", matches({ key: "å", code: "KeyA", altKey: true }, altA) === true, JSON.stringify(altA));
+      harness.check("the physical key alone does not fire a shortcut", matches({ key: "a", code: "KeyA" }, altA) === false);
       const combo = parse("Ctrl+Shift+a");
       harness.check("the composite fires with exactly its modifiers", matches({ key: "a", ctrlKey: true, shiftKey: true }, combo) === true);
       harness.check("the composite does not fire without them", matches({ key: "a", ctrlKey: true }, combo) === false);
@@ -695,9 +730,6 @@ export async function runClientSuite(harness, { pluginDir }) {
       harness.eq("a composite is shown with the modifiers in their spelling", show(parse("Ctrl+Shift+a")), "Ctrl+Shift+A");
       harness.eq("every modifier is shown", show(parse("Alt+Meta+d")), "Alt+Meta+D");
 
-      // The client and the overlay read the same stored strings: their parsers and their
-      // formatters must agree, or the settings panel would show a shortcut the overlay
-      // would not fire.
       // The client and the overlay read the same stored strings: their parsers and their
       // formatters must agree, or the settings panel would show a shortcut the overlay
       // would not fire. Both sides are the real code, not a copy of it.
@@ -724,6 +756,10 @@ export async function runClientSuite(harness, { pluginDir }) {
     // The matcher on its own is not the behaviour: what matters is that the overlay's key
     // handler calls it, so that Ctrl+C does not enter comment mode and Ctrl+Shift+A does.
     const overlaySource = readFileSync(path.join(pluginDir, "lib", "overlay.js"), "utf8");
+    // The page can rewrite window.__LR__ before the overlay runs, so the host it names is not
+    // trusted: the overlay only talks to the origin it was served from.
+    const apiBase = /const API_BASE = \(\(\) => \{([\s\S]*?)\}\)\(\);/.exec(overlaySource)?.[1] ?? "";
+    harness.check("the overlay does not take the host the page names", apiBase.includes("if (scriptOrigin !== null) return scriptOrigin;"), apiBase.slice(0, 160));
     const handler = /if \(hotkeyMatches\(event, hotkeyComment\)\)[\s\S]*?else if \(hotkeyMatches\(event, hotkeyDraw\)\)[^\n]*/.exec(overlaySource)?.[0] ?? "";
     harness.check("the overlay's key handler asks the matcher", handler.includes("hotkeyMatches(event, hotkeyComment)") && handler.includes("hotkeyMatches(event, hotkeyAdjust)") && handler.includes("hotkeyMatches(event, hotkeyDraw)"), handler.slice(0, 120));
     // One key arms one mode: the three checks are chained, not independent.
@@ -880,7 +916,7 @@ export async function runClientSuite(harness, { pluginDir }) {
       if (listeners.length === 1) listeners[0]({ key: "Escape", preventDefault() { escapePrevented = true; } });
       await flush(2);
       harness.eq("escape cancels the capture", listeners.length, 0);
-      harness.check("escape is swallowed", escapePrevented === true);
+      harness.check("escape is not swallowed", escapePrevented === false, `preventDefault=${escapePrevented}`);
       harness.eq("a cancelled capture changes nothing", posted.length, beforeEscape);
       // The key after the escape is not captured: the capture is really over.
       const afterEscape = posted.length;

@@ -289,6 +289,14 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.check("the overlay's parser is there", typeof overlayParse === "function");
       harness.check("the host and the overlay read the same shortcuts", diverged.length === 0, JSON.stringify(diverged));
 
+      // A shortcut is at most "Ctrl+Alt+Shift+Meta+a": 22 characters. Anything longer is refused
+      // before the text is split, so a body-sized string costs nothing.
+      const longest = "Ctrl+Alt+Shift+Meta+a";
+      harness.eq("the longest shortcut is accepted", hostParse(longest), longest);
+      harness.eq("a text longer than a shortcut is refused", hostParse(longest + "+x"), undefined);
+      harness.eq("a long text is refused before it is split", hostParse("ctrl+".repeat(100000) + "a"), undefined);
+      harness.eq("the overlay refuses it too", overlayParse("ctrl+".repeat(100000) + "a"), undefined);
+
       // The modifiers are shown with the same spelling everywhere: the host stores them, the
       // overlay shows them and the settings panel shows them.
       const overlayLabels = /const labels = \{([^}]*)\}/.exec(overlaySource)?.[1] ?? "";
@@ -683,6 +691,7 @@ export async function runHostSuite(harness, { pluginDir }) {
     }
   });
 
+  harness.section("host: the legacy settings file");
   // The canvas key joined the settings later, and the host used to allow two modes to share a
   // key. Neither may leave the panel refusing every change.
   await withIsolatedHome(async (home) => {

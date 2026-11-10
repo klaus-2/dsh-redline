@@ -38,7 +38,7 @@
   "linkOff": "Link values",
   "rawHint": "raw value (CSS syntax)",
   "adjustSaved": "Adjustments saved — they attach to your next prompt",
-  "deliveredToast": "✅ Annotations delivered to the agent with your message",
+  "deliveredToast": "Annotations delivered to the agent with your message",
   "secText": "Text",
   "secFill": "Fill",
   "secTypography": "Typography",
@@ -154,5 +154,6 @@
   "hotkeyAdjust": "Adjust mode key",
   "hotkeyDraw": "Draw mode key",
   "capture": "Click here and press a key",
-  "duplicateKey": "That shortcut is already used by another mode. Pick a different one."
+  "duplicateKey": "That shortcut is already used by another mode. Pick a different one.",
+  "panelDrag": "Drag to move · double-click to reset"
 }
