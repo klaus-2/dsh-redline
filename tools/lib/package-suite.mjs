@@ -110,7 +110,7 @@ export async function runPackageSuite(harness, { pluginDir, packageName }) {
   }
 
   harness.section("package: secrets");
-  const tracked = ["lib/index.js", "lib/client.js", "lib/overlay.js", "lib/bridge.js", "overlay.template.js", "build-overlay.mjs", "tools/smoke.mjs", "package.json"];
+  const tracked = ["lib/index.js", "lib/client.js", "lib/overlay.js", "lib/bridge.js", "overlay.template.js", "build-overlay.mjs", "tools/smoke.mjs", "tools/test.mjs", "package.json"];
   for (const relative of tracked) {
     const file = path.join(pluginDir, relative);
     if (!existsSync(file)) continue;
