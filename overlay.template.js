@@ -520,7 +520,9 @@
     return { key: key.toLowerCase(), modifiers: names.filter((name) => modifiers.includes(name)) };
   }
 
-  /** True when the event is exactly that hotkey: the same key and the same set of modifiers. */
+  /** True when the event is exactly that hotkey: the same key and the same set of modifiers.
+   * The key is matched on event.key, the character the layout produces, not on event.code: a
+   * shortcut names the key the user reads, not its place on a QWERTY board. */
   function hotkeyMatches(event, hotkey) {
     if (hotkey === undefined) return false;
     if (String(event.key ?? "").toLowerCase() !== hotkey.key) return false;
@@ -1440,12 +1442,6 @@
     if (adjust !== undefined && formatHotkey(adjust) !== formatHotkey(hotkeyAdjust)) { hotkeyAdjust = adjust; changed = true; }
     if (draw !== undefined && formatHotkey(draw) !== formatHotkey(hotkeyDraw)) { hotkeyDraw = draw; changed = true; }
     if (!changed) return;
-    SETTINGS.keys = {
-      ...(SETTINGS.keys ?? {}),
-      ...(comment !== undefined ? { comment: formatHotkey(comment) } : {}),
-      ...(adjust !== undefined ? { adjust: formatHotkey(adjust) } : {}),
-      ...(draw !== undefined ? { draw: formatHotkey(draw) } : {})
-    };
     applyOverlayLanguage();
   }
 
