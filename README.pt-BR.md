@@ -30,6 +30,10 @@ modificadores: `Ctrl+Shift+A` também é um atalho. Os modificadores precisam ba
 dispara enquanto um modificador estiver pressionado. Dois modos não podem usar o mesmo atalho:
 as configurações recusam o segundo.
 
+Como os modificadores precisam bater exatamente, `Shift+C` não entra mais no modo comentário:
+`Shift` é um modificador como qualquer outro, então o atalho que dispara com o Shift pressionado
+é `Shift+C`.
+
 ## Funcionalidades
 
 - Picking de elementos com highlight de hover em qualquer página

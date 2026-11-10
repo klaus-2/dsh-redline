@@ -77,6 +77,9 @@ modifiers: `Ctrl+Shift+A` is a shortcut too. The modifiers must match exactly �
 not fire a shortcut set to `Ctrl+Shift+A`, and a plain key does not fire while a modifier is
 held. Two modes cannot share the same shortcut; the settings refuse the second one.
 
+Because the modifiers must match exactly, `Shift+C` no longer enters comment mode: `Shift` is a
+modifier like any other, so the shortcut that fires with Shift held is `Shift+C`.
+
 Pins collect in the card above the composer. **Send** dispatches them with your next message; the ✕ discards them, and the page overlay updates itself.
 
 ## Security notes
@@ -91,7 +94,11 @@ Pages running in the harness browser can submit annotations by design — that i
 
 ## Configure
 
-Nothing to configure by default. The plugin starts a loopback server (`127.0.0.1:47477`, falling back to the next 20 ports) that serves the overlay, the screenshot attachments and the annotation intake.
+The plugin starts a loopback server (`127.0.0.1:47477`, falling back to the next 20 ports) that serves the overlay, the screenshot attachments and the annotation intake.
+
+The three mode keys are the only setting: open the plugin settings and change the comment, adjust or
+canvas key. A shortcut can carry modifiers (`Ctrl+Shift+A`), the modifiers must match exactly, and
+two modes cannot share one shortcut.
 
 ## How it works
 
