@@ -1982,6 +1982,44 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
   }
 
+  harness.section("client: a route that answers a version that is not a version names the one asked for");
+  {
+    // The install route answered with something that is not a version: the row names the version
+    // that was asked for, and the record keeps a version and nothing else.
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url, options) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/update/install")) return jsonResponse({ ok: true, installed: "not-a-version" });
+        if (target.includes("/.lr/update")) return jsonResponse({ ok: true, version: "1.0.23", update: { latest: "v1.0.24", newer: true } });
+        if (target.includes("/.lr/settings")) return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v" }, screenshot: true, cropPad: 72 }, version: "1.0.23" });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const withButton = renderOnce(stub, section.component, {});
+    const buttons = findElements(withButton.tree, (element) => element.props?.children === "Update now");
+    harness.eq("the update button appears", buttons.length, 1);
+    if (buttons.length === 1) {
+      await buttons[0].props.onClick();
+      await flush(4);
+      harness.eq("the version that was asked for is named", stub.getStates()[0].installed, "1.0.24");
+      harness.eq("the record keeps a version and nothing else", localStorage.getItem("dsh-redline.updated"), "1.0.24");
+    }
+  }
+
   harness.section("client: a version that is not a version names nothing");
   {
     // The host reports an on-disk version it could not parse: the row must not show it and must not break.
