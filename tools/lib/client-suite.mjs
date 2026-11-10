@@ -621,60 +621,59 @@ export async function runClientSuite(harness, { pluginDir }) {
   harness.section("client: overlay locales");
   {
     const locales = localeKeys(overlay);
-    if (!harness.check("the overlay carries the locale dictionaries", locales !== undefined)) {
-      return;
-    }
-    const codes = Object.keys(locales);
-    harness.eq("the overlay ships three languages", codes.sort(), ["en", "pt", "zh"]);
-    const reference = locales[codes[0]].slice().sort();
-    for (const code of codes) {
-      harness.eq(`the ${code} dictionary has the same keys`, locales[code].slice().sort(), reference);
-    }
-    const dictionaries = evaluateObjectLiteral(extractObjectLiteral(overlay, "const UI_LOCALES"), "UI_LOCALES");
-    const missing = [];
-    for (const key of translationKeys(overlay)) {
-      if (key.endsWith(".*")) continue;
+    if (harness.check("the overlay carries the locale dictionaries", locales !== undefined)) {
+      const codes = Object.keys(locales);
+      harness.eq("the overlay ships three languages", codes.sort(), ["en", "pt", "zh"]);
+      const reference = locales[codes[0]].slice().sort();
       for (const code of codes) {
-        if (dictionaries[code][key] === undefined) missing.push(`${code}:${key}`);
+        harness.eq(`the ${code} dictionary has the same keys`, locales[code].slice().sort(), reference);
       }
-    }
-    harness.check("every translated key exists in every language", missing.length === 0, missing.slice(0, 8).join(", "));
+      const dictionaries = evaluateObjectLiteral(extractObjectLiteral(overlay, "const UI_LOCALES"), "UI_LOCALES");
+      const missing = [];
+      for (const key of translationKeys(overlay)) {
+        if (key.endsWith(".*")) continue;
+        for (const code of codes) {
+          if (dictionaries[code][key] === undefined) missing.push(`${code}:${key}`);
+        }
+      }
+      harness.check("every translated key exists in every language", missing.length === 0, missing.slice(0, 8).join(", "));
 
-    const props = editableProps(overlay);
-    const propMissing = [];
-    for (const prop of props) {
-      for (const code of codes) {
-        if (dictionaries[code][`prop.${prop}`] === undefined) propMissing.push(`${code}:prop.${prop}`);
+      const props = editableProps(overlay);
+      const propMissing = [];
+      for (const prop of props) {
+        for (const code of codes) {
+          if (dictionaries[code][`prop.${prop}`] === undefined) propMissing.push(`${code}:prop.${prop}`);
+        }
       }
-    }
-    harness.check("every editable property is labelled in every language", propMissing.length === 0, propMissing.slice(0, 8).join(", "));
-    harness.check("the editable property list is not empty", props.length > 0, String(props.length));
+      harness.check("every editable property is labelled in every language", propMissing.length === 0, propMissing.slice(0, 8).join(", "));
+      harness.check("the editable property list is not empty", props.length > 0, String(props.length));
 
-    const propMeta = evaluateObjectLiteral(extractObjectLiteral(overlay, "const PROP_META"), "PROP_META");
-    const metaMissing = [];
-    for (const prop of Object.keys(propMeta ?? {})) {
-      for (const code of codes) {
-        if (dictionaries[code][`prop.${prop}`] === undefined) metaMissing.push(`${code}:prop.${prop}`);
+      const propMeta = evaluateObjectLiteral(extractObjectLiteral(overlay, "const PROP_META"), "PROP_META");
+      const metaMissing = [];
+      for (const prop of Object.keys(propMeta ?? {})) {
+        for (const code of codes) {
+          if (dictionaries[code][`prop.${prop}`] === undefined) metaMissing.push(`${code}:prop.${prop}`);
+        }
       }
-    }
-    harness.check("every property of the inspector is labelled in every language", metaMissing.length === 0, metaMissing.slice(0, 8).join(", "));
+      harness.check("every property of the inspector is labelled in every language", metaMissing.length === 0, metaMissing.slice(0, 8).join(", "));
 
-    // The mirrors in locale/ are what a translator reads. A mirror that drifts from the inline
-    // table sends the translator to the wrong text.
-    const mirrorOf = { en: "en.json", pt: "pt-BR.json", zh: "zh-CN.json" };
-    const drifted = [];
-    for (const [code, file] of Object.entries(mirrorOf)) {
-      const mirror = JSON.parse(readFileSync(path.join(pluginDir, "locale", file), "utf8"));
-      const dictionary = dictionaries[code] ?? {};
-      for (const [key, value] of Object.entries(dictionary)) {
-        if (mirror[key] !== value) drifted.push(`${code}:${key}`);
+      // The mirrors in locale/ are what a translator reads. A mirror that drifts from the inline
+      // table sends the translator to the wrong text.
+      const mirrorOf = { en: "en.json", pt: "pt-BR.json", zh: "zh-CN.json" };
+      const drifted = [];
+      for (const [code, file] of Object.entries(mirrorOf)) {
+        const mirror = JSON.parse(readFileSync(path.join(pluginDir, "locale", file), "utf8"));
+        const dictionary = dictionaries[code] ?? {};
+        for (const [key, value] of Object.entries(dictionary)) {
+          if (mirror[key] !== value) drifted.push(`${code}:${key}`);
+        }
+        for (const key of Object.keys(mirror)) {
+          if (key === "meta") continue;
+          if (dictionary[key] === undefined && !MIRROR_ONLY_KEYS.has(key)) drifted.push(`${code}:${key} (only in the mirror)`);
+        }
       }
-      for (const key of Object.keys(mirror)) {
-        if (key === "meta") continue;
-        if (dictionary[key] === undefined && !MIRROR_ONLY_KEYS.has(key)) drifted.push(`${code}:${key} (only in the mirror)`);
-      }
+      harness.check("the translation mirrors match the inline tables", drifted.length === 0, drifted.slice(0, 8).join(", "));
     }
-    harness.check("the translation mirrors match the inline tables", drifted.length === 0, drifted.slice(0, 8).join(", "));
   }
 
   harness.section("client: overlay build");

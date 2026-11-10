@@ -42,7 +42,7 @@
   },
   "scripts": {
     "build": "node build-overlay.mjs",
-    "test": "node tools/smoke.mjs && node tools/regression.mjs",
+    "test": "node tools/test.mjs",
     "smoke": "node tools/smoke.mjs",
     "regression": "node tools/regression.mjs",
     "strip-comments": "node tools/strip-comments.mjs",
