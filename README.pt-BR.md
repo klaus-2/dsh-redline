@@ -24,6 +24,12 @@ Descrever um problema de UI em palavras perde o ponteiro. "O botão do meio pare
 4. Confirme. O card acima do composer coleta seus pins. Envie e as anotações chegam ao agente como snapshot junto da sua mensagem — renderizadas nativamente no chat.
 5. Pressione **D** para o canvas livre de anotações: pincel, linhas, setas, retângulos, elipses, passos numerados e texto — envie a página inteira ao chat com os desenhos compostos na captura.
 
+As três teclas podem ser trocadas nas configurações do plugin, e um atalho pode ter
+modificadores: `Ctrl+Shift+A` também é um atalho. Os modificadores precisam bater exatamente —
+`Ctrl+A` não dispara um atalho configurado como `Ctrl+Shift+A`, e uma tecla simples não
+dispara enquanto um modificador estiver pressionado. Dois modos não podem usar o mesmo atalho:
+as configurações recusam o segundo.
+
 ## Funcionalidades
 
 - Picking de elementos com highlight de hover em qualquer página

@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import { collectCallArguments, createReactStub, evaluateObjectLiteral, extractObjectLiteral, fakeClientCtx, findElements, flush, jsonResponse, loadClientModule, makeLocalStorage, renderOnce, storageShim, waitFor } from "./harness.mjs";
+import { collectCallArguments, createReactStub, evaluateExpression, evaluateObjectLiteral, extractFunction, extractObjectLiteral, fakeClientCtx, findElements, flush, jsonResponse, loadClientModule, makeLocalStorage, renderOnce, storageShim, waitFor } from "./harness.mjs";
 
 // The bridge relay runs in the page, not in the app: it is loaded in its own
 // sandbox so the suite can drive both transports without a browser.
@@ -654,6 +654,192 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("the popover drag handle is wired on every panel", ["composerNode, \"composer\"", "panel, \"pin\"", "panel, \"adjust\""].every((call) => template.includes(`wirePanelDrag(${call}`)), template.includes("function wirePanelDrag") ? "call missing" : "function missing");
     harness.check("the drag handle keeps the page scrollable from the panel body", css.includes(".popover .composer-target { cursor: grab; touch-action: none;") && css.includes(".composer-target button { cursor: pointer; touch-action: auto; }"), css.includes(".popover .composer-target { cursor: grab;") ? "body rule missing" : "handle rule missing");
     harness.check("the draft pin carries the tencil rim shimmer", css.includes(".pin-draft .pin-body") && css.includes("rim-travel 2.4s linear infinite"), css.includes("rim-travel") ? "draft rule missing" : "rim animation missing");
+  }
+
+  harness.section("client: overlay hotkeys");
+  {
+    const parseHotkey = evaluateExpression(extractFunction(overlay, "parseHotkey"), "parseHotkey");
+    const hotkeyMatches = evaluateExpression(extractFunction(overlay, "hotkeyMatches"), "hotkeyMatches");
+    const formatHotkey = evaluateExpression(extractFunction(overlay, "formatHotkey"), "formatHotkey");
+    harness.check("the overlay keeps its hotkey helpers", parseHotkey !== undefined && hotkeyMatches !== undefined && formatHotkey !== undefined);
+    // Every check below runs whatever the helpers answered, so a helper that is gone or broken
+    // fails here instead of taking the whole section with it.
+    const parse = (text) => (parseHotkey === undefined ? undefined : parseHotkey(text));
+    const matches = (event, hotkey) => (hotkeyMatches === undefined ? false : hotkeyMatches(event, hotkey));
+    const show = (hotkey) => (formatHotkey === undefined ? "" : formatHotkey(hotkey));
+    {
+      const single = parse("c");
+      harness.check("a single key parses to the key alone", single !== undefined && single.key === "c" && single.modifiers.length === 0, JSON.stringify(single));
+      const composite = parse("Ctrl+Shift+a");
+      harness.check("a composite parses to the key and its modifiers", composite !== undefined && composite.key === "a" && JSON.stringify(composite.modifiers) === JSON.stringify(["ctrl", "shift"]), JSON.stringify(composite));
+      const unordered = parse("shift+ctrl+a");
+      harness.check("the order the modifiers arrive in does not matter", unordered !== undefined && JSON.stringify(unordered.modifiers) === JSON.stringify(["ctrl", "shift"]), JSON.stringify(unordered));
+      const altMeta = parse("Alt+Meta+d");
+      harness.check("every modifier is parsed", altMeta !== undefined && JSON.stringify(altMeta.modifiers) === JSON.stringify(["alt", "meta"]), JSON.stringify(altMeta));
+      const broken = ["Ctrl+", "+", "Ctrl+shift", "Ctrl+Ctrl+a", "ab", "Hyper+a", ""].every((text) => parse(text) === undefined);
+      harness.check("a text that is not a hotkey names nothing", broken, JSON.stringify(["Ctrl+", "+", "Ctrl+shift", "Ctrl+Ctrl+a", "ab", "Hyper+a", ""].map((text) => parse(text))));
+
+      const plain = parse("c");
+      harness.check("the key alone fires", matches({ key: "c" }, plain) === true);
+      harness.check("the key fires whatever the case", matches({ key: "C" }, plain) === true);
+      harness.check("a modified key does not fire the plain hotkey", matches({ key: "c", ctrlKey: true }, plain) === false);
+      harness.check("a shifted key does not fire the plain hotkey", matches({ key: "c", shiftKey: true }, plain) === false);
+      const combo = parse("Ctrl+Shift+a");
+      harness.check("the composite fires with exactly its modifiers", matches({ key: "a", ctrlKey: true, shiftKey: true }, combo) === true);
+      harness.check("the composite does not fire without them", matches({ key: "a", ctrlKey: true }, combo) === false);
+      harness.check("the composite does not fire with one more modifier", matches({ key: "a", ctrlKey: true, shiftKey: true, altKey: true }, combo) === false);
+      harness.check("the meta composite fires with meta", matches({ key: "a", metaKey: true, shiftKey: true }, parse("Meta+Shift+a")) === true);
+      harness.check("an unknown hotkey never fires", matches({ key: "a" }, undefined) === false);
+
+      harness.eq("a single key is shown uppercased", show(parse("c")), "C");
+      harness.eq("a composite is shown with the modifiers in their spelling", show(parse("Ctrl+Shift+a")), "Ctrl+Shift+A");
+      harness.eq("every modifier is shown", show(parse("Alt+Meta+d")), "Alt+Meta+D");
+
+      // The client and the overlay read the same stored strings: their parsers and their
+      // formatters must agree, or the settings panel would show a shortcut the overlay
+      // would not fire.
+      const clientFormat = evaluateExpression(`(text, fallback) => {
+        const labels = { ctrl: "Ctrl", alt: "Alt", shift: "Shift", meta: "Meta" };
+        const parts = String(text ?? "").split("+").map((part) => part.trim()).filter((part) => part !== "");
+        if (parts.length === 0) return fallback.toUpperCase();
+        const key = parts.at(-1);
+        const modifiers = parts.slice(0, -1).map((part) => part.toLowerCase());
+        return [...modifiers.map((name) => labels[name] ?? name), key.toUpperCase()].join("+");
+      }`, "clientFormatHotkey");
+      const shared = ["c", "5", "Ctrl+Shift+a", "Alt+Meta+d", "ctrl+shift+a", "Ctrl+a"];
+      harness.check("the client and the overlay show the same shortcut",
+        shared.every((text) => clientFormat(text, "?") === show(parse(text))),
+        JSON.stringify(shared.map((text) => [text, clientFormat(text, "?"), show(parse(text))])));
+    }
+  }
+
+  harness.section("client: the shortcut capture");
+  {
+    const posted = [];
+    const listeners = [];
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      window: {
+        addEventListener: (type, handler) => { if (type === "keydown") listeners.push(handler); },
+        removeEventListener: (type, handler) => { const at = listeners.indexOf(handler); if (at >= 0) listeners.splice(at, 1); }
+      },
+      fetch: async (url, options) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/settings") && options?.method === "POST") {
+          posted.push(JSON.parse(options.body));
+          return jsonResponse({ ok: true, settings: { ...posted.at(-1), keys: { ...posted.at(-1).keys, comment: "Ctrl+Shift+a" } } });
+        }
+        if (target.includes("/.lr/settings")) {
+          return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v", draw: "d" }, screenshot: true, cropPad: 72 }, version: "1.0.24" });
+        }
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const before = renderOnce(stub, section.component, {});
+    const inputs = findElements(before.tree, (element) => typeof element.props?.["aria-label"] === "string" && element.props["aria-label"].startsWith("Comment mode key"));
+    harness.eq("the comment key input is there", inputs.length, 1);
+    const drawInput = findElements(before.tree, (element) => element.props?.["aria-label"] === "Draw mode key");
+    harness.eq("the draw key input is there", drawInput.length, 1);
+    if (inputs.length === 1) {
+      inputs[0].props.onClick();
+      await flush(2);
+      harness.eq("the capture listens for the key", listeners.length, 1);
+      // A bare modifier is not a key: the capture keeps listening and shows what is held.
+      if (listeners.length === 1) listeners[0]({ key: "Control", ctrlKey: true, preventDefault() {} });
+      await flush(2);
+      harness.eq("a bare modifier press keeps the capture armed", listeners.length, 1);
+      // The key with its modifiers is the hotkey.
+      if (listeners.length === 1) listeners[0]({ key: "A", ctrlKey: true, shiftKey: true, preventDefault() {} });
+      await flush(4);
+      harness.eq("the capture sends the hotkey", posted.at(-1)?.keys?.comment, "Ctrl+Shift+a");
+      harness.eq("the capture stopped listening", listeners.length, 0);
+    }
+
+    // The capture can be cancelled: a second click on the field, or Escape, leaves the key alone.
+    const cancellable = findElements(renderOnce(stub, section.component, {}).tree, (element) => element.props?.["aria-label"] === "Adjust mode key");
+    harness.eq("the adjust key input is there", cancellable.length, 1);
+    if (cancellable.length === 1) {
+      cancellable[0].props.onClick();
+      await flush(2);
+      harness.eq("the capture listens for the key", listeners.length, 1);
+      cancellable[0].props.onClick();
+      await flush(2);
+      harness.eq("a second click cancels the capture", listeners.length, 0);
+      const afterCancel = posted.length;
+      cancellable[0].props.onClick();
+      await flush(2);
+      if (listeners.length === 1) listeners[0]({ key: "Escape", preventDefault() {} });
+      await flush(2);
+      harness.eq("escape cancels the capture", listeners.length, 0);
+      harness.eq("a cancelled capture changes nothing", posted.length, afterCancel);
+    }
+  }
+
+  harness.section("client: the shortcut save takes the host's answer");
+  {
+    const listeners = [];
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      window: {
+        addEventListener: (type, handler) => { if (type === "keydown") listeners.push(handler); },
+        removeEventListener: (type, handler) => { const at = listeners.indexOf(handler); if (at >= 0) listeners.splice(at, 1); }
+      },
+      fetch: async (url, options) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/settings") && options?.method === "POST") {
+          // The host refuses the duplicate and answers with the settings it kept.
+          return new Response(JSON.stringify({ ok: false, error: "duplicate-key", keys: ["comment", "adjust"] }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+        if (target.includes("/.lr/settings")) {
+          return jsonResponse({ ok: true, settings: { lang: "auto", keys: { comment: "c", adjust: "v", draw: "d" }, screenshot: true, cropPad: 72 }, version: "1.0.24" });
+        }
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const before = renderOnce(stub, section.component, {});
+    const inputs = findElements(before.tree, (element) => element.props?.["aria-label"] === "Comment mode key");
+    harness.eq("the comment key input is there", inputs.length, 1);
+    if (inputs.length === 1) {
+      inputs[0].props.onClick();
+      await flush(2);
+      listeners[0]({ key: "v", preventDefault() {} });
+      await flush(4);
+      const after = renderOnce(stub, section.component, {});
+      // The state, not the tree: the tree was rendered before the answer came back.
+      const settings = after.states?.[0]?.settings;
+      harness.eq("the row keeps the key the host kept", settings?.keys?.comment, "c");
+      const value = findElements(after.tree, (element) => element.props?.["aria-label"] === "Comment mode key");
+      harness.eq("the row shows the key the host kept", value[0]?.props?.value, "C");
+      const refused = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("already used"));
+      harness.check("the row says the shortcut was refused", refused.length > 0, JSON.stringify(after.tree).slice(0, 160));
+      harness.eq("the state carries the refusal", after.states?.[0]?.keyError, "duplicate-key");
+    }
   }
 
   harness.section("client: plugin manager metadata");

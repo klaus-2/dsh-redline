@@ -234,19 +234,19 @@ export async function runHostSuite(harness, { pluginDir }) {
     {
       const response = await fetch(`${base}/.lr/settings`, { headers: auth });
       const body = await response.json();
-      harness.check("the defaults come back", body.ok === true && body.settings.lang === "auto" && body.settings.keys.comment === "c" && body.settings.keys.adjust === "v" && body.settings.screenshot === true && body.settings.cropPad === 72, JSON.stringify(body.settings));
+      harness.check("the defaults come back", body.ok === true && body.settings.lang === "auto" && body.settings.keys.comment === "c" && body.settings.keys.adjust === "v" && body.settings.keys.draw === "d" && body.settings.screenshot === true && body.settings.cropPad === 72, JSON.stringify(body.settings));
       harness.check("the settings expose the version and the repo", body.version === pluginVersion && body.current === pluginVersion && body.repo === "https://github.com/klaus-2/dsh-redline");
     }
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "pt", keys: { comment: "x", adjust: "z" }, screenshot: false, cropPad: 96 }) });
       const body = await response.json();
-      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z" }, screenshot: false, cropPad: 96 });
+      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d" }, screenshot: false, cropPad: 96 });
     }
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "klingon", keys: { comment: "xx", adjust: "!" }, screenshot: "yes", cropPad: 5 }) });
       const body = await response.json();
       harness.eq("an invalid language is ignored", body.settings.lang, "pt");
-      harness.eq("an invalid shortcut is ignored", body.settings.keys, { comment: "x", adjust: "z" });
+      harness.eq("an invalid shortcut is ignored", body.settings.keys, { comment: "x", adjust: "z", draw: "d" });
       harness.eq("a non-boolean screenshot is ignored", body.settings.screenshot, false);
       harness.eq("the crop padding is clamped", body.settings.cropPad, 16);
       const high = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ cropPad: 9999 }) })).json();
@@ -258,8 +258,66 @@ export async function runHostSuite(harness, { pluginDir }) {
       const port2 = server2.port ?? server2.address().port;
       const response = await fetch(`http://127.0.0.1:${port2}/.lr/settings`, { headers: { [secretHeader]: secret } });
       const body = await response.json();
-      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z" }, screenshot: false, cropPad: 200 });
+      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d" }, screenshot: false, cropPad: 200 });
       server2.close();
+    }
+
+    harness.section("host: hotkeys");
+    {
+      // The host and the overlay carry their own copy of the parser: the overlay runs as a plain
+      // script inside a third-party page and cannot import the host's module. They must agree, or
+      // the settings panel would accept a shortcut the overlay refuses to fire.
+      const overlaySource = readFileSync(path.join(pluginDir, "lib", "overlay.js"), "utf8");
+      const anchor = overlaySource.indexOf("function parseHotkey(");
+      let depth = 0;
+      let quote = "";
+      let end = anchor;
+      for (let index = overlaySource.indexOf("{", anchor); index < overlaySource.length; index += 1) {
+        const char = overlaySource[index];
+        if (quote !== "") {
+          if (char === "\\") { index += 1; continue; }
+          if (char === quote) quote = "";
+          continue;
+        }
+        if (char === '"' || char === "'" || char === "`") { quote = char; continue; }
+        if (char === "{") depth += 1;
+        else if (char === "}") { depth -= 1; if (depth === 0) { end = index + 1; break; } }
+      }
+      const overlayParse = vm.runInNewContext(`(${overlaySource.slice(anchor, end).replace("function parseHotkey", "function")})`, {}, { filename: "overlay-parse-hotkey" });
+      // The overlay's parser answers with the key and its modifiers; the host's answers with the
+      // canonical string. They must accept and refuse exactly the same texts.
+      const shared = ["c", "C", "5", "ctrl+shift+a", "shift+ctrl+a", "Ctrl+Shift+A", "meta+alt+d", "Ctrl+", "+", "Ctrl+shift", "Ctrl+Ctrl+a", "ctrl++a", "Ctrl + a", "ctrl+a+b", "", "ab", "Hyper+a", "ctrl+alt+shift+meta+z"];
+      const hostParse = (await import(moduleUrl)).parseHotkey;
+      const diverged = shared.filter((text) => {
+        const overlay = overlayParse(text);
+        const host = hostParse(text);
+        if (overlay === undefined || host === undefined) return overlay !== host;
+        // The host answers with the canonical string; the overlay with the key and its modifiers.
+        const parts = host.split("+");
+        const hostKey = parts.at(-1);
+        const hostModifiers = parts.slice(0, -1).map((name) => name.toLowerCase());
+        return overlay.key !== hostKey || JSON.stringify(overlay.modifiers) !== JSON.stringify(hostModifiers);
+      });
+      harness.check("the overlay's parser is there", typeof overlayParse === "function");
+      harness.check("the host and the overlay read the same shortcuts", diverged.length === 0, JSON.stringify(diverged));
+
+      const composite = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "shift+ctrl+a", adjust: "v" } }) })).json();
+      harness.eq("a composite hotkey is stored canonically", composite.settings.keys.comment, "Ctrl+Shift+a");
+      const order = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "meta+alt+d", adjust: "v" } }) })).json();
+      harness.eq("the modifiers are stored in the canonical order", order.settings.keys.comment, "Alt+Meta+d");
+      const broken = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "Ctrl+" } }) })).json();
+      harness.eq("a hotkey that is not one keeps the stored value", broken.settings.keys.comment, "Alt+Meta+d");
+      const duplicate = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "v", adjust: "v" } }) });
+      const duplicateBody = await duplicate.json();
+      harness.eq("a duplicate hotkey is refused", duplicate.status, 400);
+      harness.eq("the refusal names the error", duplicateBody.error, "duplicate-key");
+      harness.eq("the refusal names the colliding pair", duplicateBody.keys, ["comment", "adjust"]);
+      const afterDuplicate = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
+      harness.eq("the refused change was not stored", afterDuplicate.settings.keys.adjust, "v");
+      const drawKey = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "q", adjust: "w", draw: "e" } }) })).json();
+      harness.eq("the draw key is configurable", drawKey.settings.keys.draw, "e");
+      const restored = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "c", adjust: "v", draw: "d" } }) })).json();
+      harness.eq("the defaults can be restored", restored.settings.keys, { comment: "c", adjust: "v", draw: "d" });
     }
 
     harness.section("host: drawings");

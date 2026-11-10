@@ -512,6 +512,31 @@ export function evaluateExpression(text, filename = "expression") {
   return vm.runInNewContext(`(${text})`, { t: (key) => key }, { filename });
 }
 
+/** The source of a module-level function declaration, so a test can call it on its own. */
+export function extractFunction(source, name) {
+  const anchor = source.indexOf(`function ${name}(`);
+  if (anchor === -1) return undefined;
+  const start = source.indexOf("{", anchor);
+  if (start === -1) return undefined;
+  let depth = 0;
+  let quote = "";
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index];
+    if (quote !== "") {
+      if (char === "\\") { index += 1; continue; }
+      if (char === quote) quote = "";
+      continue;
+    }
+    if (char === '"' || char === "'" || char === "`") { quote = char; continue; }
+    if (char === "{") depth += 1;
+    else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return source.slice(anchor, index + 1);
+    }
+  }
+  return undefined;
+}
+
 export function collectCallArguments(source, callee) {
   const calls = [];
   const needle = `${callee}(`;

@@ -26,6 +26,11 @@ Describing a UI problem in words loses the pointer. "The button in the middle se
 4. Confirm. The card above the composer collects your pins. Send, and the annotations reach the agent as a snapshot alongside your message — rendered natively in the chat.
 5. Press **D** for the free annotation canvas: brush, lines, arrows, rectangles, ellipses, numbered step markers and text — send the full page to the chat with every drawing composited into the screenshot.
 
+Every one of the three keys can be changed in the plugin settings, and a shortcut can carry
+modifiers: `Ctrl+Shift+A` is a shortcut too. The modifiers must match exactly — `Ctrl+A` does
+not fire a shortcut set to `Ctrl+Shift+A`, and a plain key does not fire while a modifier is
+held. Two modes cannot share the same shortcut; the settings refuse the second one.
+
 ## What the agent receives
 
 For each pin, one block in a single snapshot:
