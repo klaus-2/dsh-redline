@@ -1672,7 +1672,18 @@
       const point = anchorPoint(pin);
       if (point) entry.node.style.transform = `translate(${point.x}px, ${point.y}px)`;
     }
-    if (draft !== null) renderDraft();
+    repositionDraft();
+  }
+  function repositionDraft() {
+    if (draft === null || draftNode === null || composerNode === null) return;
+    const point = draftPoint();
+    if (point === null) return;
+    draftNode.style.transform = `translate(${point.x}px, ${point.y}px)`;
+    if (panelPositions.composer === null) {
+      if (placeComposerDefault !== null) placeComposerDefault();
+    } else {
+      applyPanelPosition(composerNode, "composer");
+    }
   }
   window.addEventListener("scroll", repositionPins, { passive: true });
   window.addEventListener("resize", repositionPins);
@@ -1865,12 +1876,14 @@
 
   let draftNode = null;
   let composerNode = null;
+  let placeComposerDefault = null;
 
   function renderDraft() {
     draftNode?.remove();
     composerNode?.remove();
     draftNode = null;
     composerNode = null;
+    placeComposerDefault = null;
     if (draft === null) return;
     mountShadow();
     const point = draftPoint();
@@ -1882,7 +1895,7 @@
     const WIDTH = 320;
     const placeComposerDefaultLeft = Math.min(Math.max(8, point.x + 16), window.innerWidth - WIDTH - 8);
     const placeComposerDefaultTop = Math.min(Math.max(8, point.y - 46), window.innerHeight - 240);
-    const placeComposerDefault = () => {
+    placeComposerDefault = () => {
       const point = draftPoint();
       composerNode.style.left = `${Math.min(Math.max(8, point.x + 16), window.innerWidth - WIDTH - 8)}px`;
       composerNode.style.top = `${Math.min(Math.max(8, point.y - 46), window.innerHeight - 240)}px`;

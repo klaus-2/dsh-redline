@@ -695,6 +695,11 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("the pin anchor uses viewport coordinates", anchor !== undefined && !anchor.includes("scrollX") && !anchor.includes("scrollY"), anchor === undefined ? "anchorPoint missing" : "anchorPoint still adds scroll offsets");
     const capture = extractFunction(overlay, "captureCropFor");
     harness.check("the screenshot capture still passes scroll offsets to html2canvas", capture !== undefined && capture.includes("scrollX: window.scrollX") && capture.includes("scrollY: window.scrollY"), capture === undefined ? "captureCropFor missing" : "captureCropFor lost its scroll offsets");
+    const reposition = extractFunction(overlay, "repositionPins");
+    harness.check("repositioning the page does not rebuild the comment draft", reposition !== undefined && !reposition.includes("renderDraft("), reposition === undefined ? "repositionPins missing" : "repositionPins still calls renderDraft");
+    const renderer = extractFunction(overlay, "renderDraft");
+    const opener = extractFunction(overlay, "openDraft");
+    harness.check("opening a draft still renders it", renderer !== undefined && opener !== undefined && opener.includes("renderDraft("), renderer === undefined ? "renderDraft missing" : opener === undefined ? "openDraft missing" : "openDraft no longer calls renderDraft");
   }
 
   harness.section("client: overlay hotkeys");
