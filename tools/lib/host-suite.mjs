@@ -840,6 +840,22 @@ export async function runHostSuite(harness, { pluginDir }) {
         const unrelated = await (await bridgePost({})).json();
         harness.check("an unrelated prompt does not acknowledge another page's pins", !unrelated.deliveredIds.includes("ack-b1") && unrelated.pendingIds.includes("ack-b1"), JSON.stringify({ deliveredIds: unrelated.deliveredIds, pendingIds: unrelated.pendingIds }));
       }
+
+      harness.section("host: capture-session race");
+      {
+        await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: json(), body: JSON.stringify({ kind: "view", sessionId: "session-race-a" }) });
+        const submitting = fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "race-pin", tag: "h1", selector: "#t", comment: "captura em curso", shot: SHOT }] }) }).then((response) => response.json());
+        await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: json(), body: JSON.stringify({ kind: "view", sessionId: "session-race-b" }) });
+        const raced = await submitting;
+        const storedA = pendingBySession.get("session-race-a")?.snapshotId ?? null;
+        const storedB = pendingBySession.get("session-race-b")?.snapshotId ?? null;
+        harness.check("a session switch during capture does not move the snapshot",
+          raced.kind === "pending" && raced.sessionId === "session-race-a" && storedA === raced.snapshotId && storedB === null && globalPending.snapshotId === null,
+          JSON.stringify({ response: raced, storedA, storedB, global: globalPending.snapshotId }));
+        const fnSource = extractFunction(source, "storeAnnotations");
+        const capturedAt = typeof fnSource === "string" ? fnSource.indexOf("const sessionId = lastViewedSessionId") : -1;
+        harness.check("the submit captures the viewed session before awaiting", capturedAt !== -1 && capturedAt < fnSource.indexOf("await"), `capturedAt=${capturedAt}`);
+      }
     }
 
     server.close();
