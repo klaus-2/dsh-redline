@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import assert from "node:assert/strict";
 import vm from "node:vm";
 import { connect } from "node:net";
-import { extractFunction, flush, freePort, storageShim, withIsolatedHome, withStubbedFetch } from "./harness.mjs";
+import { evaluateExpression, extractFunction, flush, freePort, storageShim, withIsolatedHome, withStubbedFetch } from "./harness.mjs";
 
 const enc = (value) => Buffer.from(value, "utf8").toString("base64url");
 const SHOT = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwcJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==";
@@ -431,6 +431,38 @@ export async function runHostSuite(harness, { pluginDir }) {
       const flattenedPath = screenshotPath.replace("\n", " ");
       const { text } = formatContext({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "formatter-path", tag: "h1", selector: "#t", screenshotPath }], screenshotPath: null });
       harness.check("the context formatter flattens a screenshot path", text.includes(flattenedPath) && !text.includes(injected), JSON.stringify({ screenshotPath, flattenedPath }));
+    }
+
+    harness.section("host: the context budget");
+    {
+      const MAX_CONTEXT_CHARS = 61440;
+      const bigPins = Array.from({ length: 40 }, (_, index) => ({
+        id: `big-${index}`,
+        tag: "h1",
+        selector: "s".repeat(2000),
+        text: "Alvo",
+        comment: "c".repeat(4000),
+        changes: [],
+        textChange: { before: "a", after: "b" }
+      }));
+      const { text, blocks } = formatContext({ pageUrl: "http://127.0.0.1:1/", pageTitle: "Alvo", pins: bigPins, screenshotPath: null });
+      const blockChars = blocks.reduce((sum, block) => sum + block.join("\n").length, 0);
+      const shown = blocks.filter((block) => block[0] !== "## Truncated").length;
+      harness.check("the context text stays inside the budget", text.length <= MAX_CONTEXT_CHARS, String(text.length));
+      harness.check("the context blocks stay inside the budget", blockChars <= MAX_CONTEXT_CHARS && blocks.length < bigPins.length, JSON.stringify({ blockChars, blocks: blocks.length, pins: bigPins.length }));
+      harness.includes("a truncated snapshot says how many comments were omitted", text, `${bigPins.length - shown} comment(s) omitted`);
+      const buildSections = evaluateExpression(extractFunction(source, "buildSections"), "buildSections");
+      const sections = buildSections(blocks);
+      harness.check("the context sections stay inside the budget", sections.reduce((sum, s) => sum + s.text.length, 0) <= MAX_CONTEXT_CHARS && sections[sections.length - 1].name === "Truncated", JSON.stringify({ sections: sections.length, names: sections.map((s) => s.name).slice(-2), total: sections.reduce((sum, s) => sum + s.text.length, 0) }));
+      {
+        const oversizedChanges = Array.from({ length: 200 }, (_, index) => ({ prop: `p${index}`, before: "x".repeat(200), after: "y".repeat(200) }));
+        const oversized = formatContext({ pageUrl: "http://127.0.0.1:1/", pageTitle: "Alvo", pins: [{ id: "only", tag: "h1", selector: "body h1", comment: "the only comment", changes: oversizedChanges }], screenshotPath: null });
+        harness.check("an oversized single comment is dropped and reported", !oversized.text.includes("the only comment") && oversized.text.includes("1 comment(s) omitted") && oversized.text.length <= MAX_CONTEXT_CHARS && oversized.blocks.length === 1, JSON.stringify({ textLength: oversized.text.length, blocks: oversized.blocks.length }));
+      }
+    }
+    {
+      const { text, blocks } = formatContext({ pageUrl: "http://127.0.0.1:1/", pageTitle: "Alvo", pins: [{ id: "1", tag: "h1", selector: "body h1", text: "Alvo", comment: "mude o titulo", changes: [{ prop: "color", before: "#000", after: "red" }], textChange: { before: "a", after: "b" } }], screenshotPath: null });
+      harness.check("a snapshot inside the budget is not marked as truncated", !text.includes("## Truncated") && blocks.length === 1, JSON.stringify({ blocks: blocks.length }));
     }
 
     harness.section("host: proxy and page rewriting");
