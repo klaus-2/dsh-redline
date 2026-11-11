@@ -142,8 +142,8 @@ export async function runHostSuite(harness, { pluginDir }) {
       const own = await post("state.get", {}, { origin: base });
       harness.check("the bridge answers a page the host served", own.status === 200);
       const state = await own.json();
-      harness.check("the bridge state is the narrow projection", state.ok === true && typeof state.lang === "string" && Array.isArray(state.pendingIds) && state.settings !== undefined && state.events === undefined && state.diag === undefined, JSON.stringify(state).slice(0, 160));
-      harness.eq("the bridge state carries exactly the narrow keys", Object.keys(state).sort(), ["active", "deliveredAt", "lang", "ok", "pendingIds", "settings"]);
+      harness.check("the bridge state is the narrow projection", state.ok === true && typeof state.lang === "string" && Array.isArray(state.pendingIds) && Array.isArray(state.deliveredIds) && state.settings !== undefined && state.events === undefined && state.diag === undefined, JSON.stringify(state).slice(0, 160));
+      harness.eq("the bridge state carries exactly the narrow keys", Object.keys(state).sort(), ["active", "deliveredIds", "lang", "ok", "pendingIds", "settings"]);
       const unsupported = await post("settings.update", {}, { ...auth });
       harness.check("the bridge refuses a message outside the allowlist", unsupported.status === 400);
       const withSecret = await post("state.get", {}, { ...auth });
@@ -806,6 +806,40 @@ export async function runHostSuite(harness, { pluginDir }) {
       const cropped = await host.commands.get("redline-send").handler({ agent: { id: "session-1", followup: (message) => cropFollowups.push(message) }, rawInput: "" });
       const image = (cropFollowups[0]?.content ?? []).find((part) => part.type === "image");
       harness.check("the command attaches a real saved crop", cropped.kind === "success" && cropFollowups.length === 1 && image?.attachment?.size === shotData.length && image?.attachment?.mediaType === "image/jpeg", JSON.stringify(cropped));
+
+      harness.section("host: delivered ids");
+      {
+        const sessionEvent = host.listeners.get("session/event");
+        harness.check("the session/event handler is registered", typeof sessionEvent === "function");
+        await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: json(), body: JSON.stringify({ kind: "view", sessionId: "session-ack-a" }) });
+        await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "ack-a1", tag: "h1", selector: "#t", comment: "primeira pagina" }], screenshot: null }) });
+        await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: json(), body: JSON.stringify({ kind: "view", sessionId: "session-ack-b" }) });
+        await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "ack-b1", tag: "h1", selector: "#t", comment: "segunda pagina" }], screenshot: null }) });
+        const ackSnapshotId = pendingBySession.get("session-ack-a")?.snapshotId;
+        harness.check("the first snapshot is pending", typeof ackSnapshotId === "string" && ackSnapshotId !== "");
+        const bridgePost = (payload) => fetch(`${base}/.lr/bridge`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ type: "state.get", payload }) });
+        const before = await (await bridgePost({})).json();
+        harness.check("both pins are pending before the ack", before.pendingIds.includes("ack-a1") && before.pendingIds.includes("ack-b1"), JSON.stringify(before.pendingIds));
+        sessionEvent({ id: "session-ack-a" }, { type: "user/message", data: { source: { snapshotId: ackSnapshotId } } });
+        const afterSession = await (await bridgePost({})).json();
+        const globalSnapshotId = "suite-global";
+        globalPending.snapshotId = globalSnapshotId;
+        globalPending.context = "ctx";
+        globalPending.sections = [];
+        globalPending.snapshot = { pageUrl: targetUrl, pageTitle: "Global", pins: [{ id: "ack-g1" }] };
+        sessionEvent({ id: "" }, { type: "user/message", data: { source: { snapshotId: globalSnapshotId } } });
+        const after = await (await bridgePost({})).json();
+        harness.check("the bridge reports the ids it delivered",
+          Array.isArray(afterSession.deliveredIds) && afterSession.deliveredIds.includes("ack-a1") && !afterSession.deliveredIds.includes("ack-b1") &&
+          !afterSession.pendingIds.includes("ack-a1") && afterSession.pendingIds.includes("ack-b1") &&
+          Array.isArray(after.deliveredIds) && after.deliveredIds.includes("ack-g1") && !after.deliveredIds.includes("ack-b1") &&
+          !after.deliveredIds.includes("ack-a1") &&
+          !after.pendingIds.includes("ack-g1") && after.pendingIds.includes("ack-b1"),
+          JSON.stringify({ afterSession: { deliveredIds: afterSession.deliveredIds, pendingIds: afterSession.pendingIds }, after: { deliveredIds: after.deliveredIds, pendingIds: after.pendingIds } }));
+        sessionEvent({ id: "session-ack-b" }, { type: "user/message", data: {} });
+        const unrelated = await (await bridgePost({})).json();
+        harness.check("an unrelated prompt does not acknowledge another page's pins", !unrelated.deliveredIds.includes("ack-b1") && unrelated.pendingIds.includes("ack-b1"), JSON.stringify({ deliveredIds: unrelated.deliveredIds, pendingIds: unrelated.pendingIds }));
+      }
     }
 
     server.close();
