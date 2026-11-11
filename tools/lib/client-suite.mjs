@@ -700,6 +700,8 @@ export async function runClientSuite(harness, { pluginDir }) {
     const renderer = extractFunction(overlay, "renderDraft");
     const opener = extractFunction(overlay, "openDraft");
     harness.check("opening a draft still renders it", renderer !== undefined && opener !== undefined && opener.includes("renderDraft("), renderer === undefined ? "renderDraft missing" : opener === undefined ? "openDraft missing" : "openDraft no longer calls renderDraft");
+    const poll = extractFunction(overlay, "pollStatus");
+    harness.check("the overlay removes queued pins only by delivered id", poll !== undefined && poll.includes("data.deliveredIds") && poll.includes("gone.has(p.id)") && !poll.includes("deliveredAt"), poll === undefined ? "pollStatus missing" : "pollStatus no longer keys removal on delivered ids");
   }
 
   harness.section("client: overlay hotkeys");
