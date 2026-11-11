@@ -1615,7 +1615,7 @@
     const rect = element.getBoundingClientRect();
     const ox = Math.min(Math.max(0, pin.offsets?.ox ?? rect.width / 2), rect.width);
     const oy = Math.min(Math.max(0, pin.offsets?.oy ?? rect.height / 2), rect.height);
-    return { x: rect.left + ox + window.scrollX, y: rect.top + oy + window.scrollY };
+    return { x: rect.left + ox, y: rect.top + oy };
   }
 
   function draftPoint() {

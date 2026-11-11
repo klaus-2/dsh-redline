@@ -689,6 +689,12 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("the popover drag handle is wired on every panel", ["composerNode, \"composer\"", "panel, \"pin\"", "panel, \"adjust\""].every((call) => template.includes(`wirePanelDrag(${call}`)), template.includes("function wirePanelDrag") ? "call missing" : "function missing");
     harness.check("the drag handle keeps the page scrollable from the panel body", css.includes(".popover .composer-target { cursor: grab; touch-action: none;") && css.includes(".composer-target button { cursor: pointer; touch-action: auto; }"), css.includes(".popover .composer-target { cursor: grab;") ? "body rule missing" : "handle rule missing");
     harness.check("the draft pin carries the tencil rim shimmer", css.includes(".pin-draft .pin-body") && css.includes("rim-travel 2.4s linear infinite"), css.includes("rim-travel") ? "draft rule missing" : "rim animation missing");
+    // .pin is position:fixed with no transformed ancestor, so anchorPoint must work in
+    // viewport coordinates; html2canvas is the one legitimate scroll consumer and keeps its offsets.
+    const anchor = extractFunction(overlay, "anchorPoint");
+    harness.check("the pin anchor uses viewport coordinates", anchor !== undefined && !anchor.includes("scrollX") && !anchor.includes("scrollY"), anchor === undefined ? "anchorPoint missing" : "anchorPoint still adds scroll offsets");
+    const capture = extractFunction(overlay, "captureCropFor");
+    harness.check("the screenshot capture still passes scroll offsets to html2canvas", capture !== undefined && capture.includes("scrollX: window.scrollX") && capture.includes("scrollY: window.scrollY"), capture === undefined ? "captureCropFor missing" : "captureCropFor lost its scroll offsets");
   }
 
   harness.section("client: overlay hotkeys");
