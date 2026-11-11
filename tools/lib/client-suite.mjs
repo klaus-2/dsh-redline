@@ -552,6 +552,32 @@ export async function runClientSuite(harness, { pluginDir }) {
       !template.includes("localStorage") && !overlay.includes("localStorage"),
       `template ${template.includes("localStorage")} | built ${overlay.includes("localStorage")}`);
 
+    const targetStart = template.indexOf("const TARGET = ");
+    const targetEnd = template.indexOf("})();", targetStart);
+    const targetExpr = targetStart === -1 || targetEnd === -1 ? "" : template.slice(targetStart + "const TARGET = ".length, targetEnd + 4);
+    const runTarget = (windowStub) => targetExpr === "" ? null : vm.runInNewContext(targetExpr, { window: windowStub, URL });
+    const proxyTarget = runTarget({ __LR__: { pageUrl: "https://site.example/review?x=1" }, location: { href: "http://127.0.0.1:47477/p/abc", origin: "http://127.0.0.1:47477", pathname: "/p/abc" } });
+    const guestTarget = runTarget({ location: { href: "https://guest.example/page?y=2", origin: "https://guest.example", pathname: "/page" } });
+    harness.check("the overlay keys the pins by the target site",
+      template.includes("const STORE_KEY = `lr:pins:${TARGET.origin}${TARGET.path}`") &&
+      overlay.includes("const STORE_KEY = `lr:pins:${TARGET.origin}${TARGET.path}`") &&
+      !template.includes('"lr:pins:" + PAGE_URL') &&
+      !overlay.includes('"lr:pins:" + PAGE_URL'),
+      `template ${template.includes("const STORE_KEY = `lr:pins:${TARGET.origin}${TARGET.path}`")}`);
+    harness.check("the overlay keys the panel positions by the target site",
+      template.includes("const PANEL_POS_KEY = `lr-panel-pos:${TARGET.origin}${TARGET.path}`") &&
+      overlay.includes("const PANEL_POS_KEY = `lr-panel-pos:${TARGET.origin}${TARGET.path}`") &&
+      !template.includes('"lr-panel-pos:" + PAGE_URL') &&
+      !overlay.includes('"lr-panel-pos:" + PAGE_URL'),
+      `template ${template.includes("const PANEL_POS_KEY = `lr-panel-pos:${TARGET.origin}${TARGET.path}`")}`);
+    harness.check("the overlay derives the target from the injected page url",
+      proxyTarget !== null && guestTarget !== null &&
+      proxyTarget.origin === "https://site.example" && proxyTarget.path === "/review" &&
+      guestTarget.origin === "https://guest.example" && guestTarget.path === "/page" &&
+      template.indexOf("const TARGET = ") < template.indexOf("const STORE_KEY = ") &&
+      template.indexOf("const TARGET = ") < template.indexOf("const PANEL_POS_KEY = "),
+      `proxy ${JSON.stringify(proxyTarget)} | guest ${JSON.stringify(guestTarget)}`);
+
     const injected = executed.find((code) => code.includes("window.__LR__ = Object.assign")) ?? injection;
     const cleanupLine = (injected ?? "").split("\n")[0];
     const clientSeed = { "lr-drawings": "old", "lr-drawings:https://a.example": "old", marker: "kept" };
@@ -564,38 +590,12 @@ export async function runClientSuite(harness, { pluginDir }) {
       JSON.stringify(Object.keys(clientStore)));
 
     const hostSource = readFileSync(path.join(pluginDir, "lib", "index.js"), "utf8");
-    const guardScript = /const guardScript = `([^`]*)`;/.exec(hostSource)?.[1] ?? "";
-    const guardCode = /<script>([\s\S]*?)<\/script>/.exec(guardScript)?.[1] ?? "";
-    const guardHref = "https://example.com/";
-    const guardOtherHref = "https://example.com/other";
-    const guardSeed = {
-      "lr-drawings": "old",
-      "lr-drawings:https://a.example": "old",
-      [`lr:pins:${guardOtherHref}`]: "old",
-      [`lr:pins:${guardHref}`]: "keep",
-      [`lr-panel-pos:${guardOtherHref}`]: "old",
-      [`lr-panel-pos:${guardHref}`]: "keep",
-      foreign: "keep"
-    };
-    const guardExpected = [`lr:pins:${guardHref}`, `lr-panel-pos:${guardHref}`, "foreign"];
-    const runStorageGuard = (code) => {
-      const session = storageShim(guardSeed);
-      const local = storageShim(guardSeed);
-      const context = vm.createContext({ window: { location: { href: guardHref }, sessionStorage: session, localStorage: local } });
-      vm.runInContext(code, context, { filename: "storage-guard.js" });
-      return { sessionKeys: Object.keys(session), localKeys: Object.keys(local) };
-    };
-    const guardResult = runStorageGuard(guardCode);
-    harness.check("the storage guard keeps only this page's keys",
-      guardCode.includes("window.location.href") &&
-      JSON.stringify(guardResult.sessionKeys) === JSON.stringify(guardExpected) &&
-      JSON.stringify(guardResult.localKeys) === JSON.stringify(guardExpected),
-      `session ${JSON.stringify(guardResult.sessionKeys)} | local ${JSON.stringify(guardResult.localKeys)}`);
-    const noGuardScript = guardScript.replace(/<script>[\s\S]*?<\/script>/, "<script></script>");
-    const noGuardCode = /<script>([\s\S]*?)<\/script>/.exec(noGuardScript)?.[1] ?? "";
-    const noGuardResult = runStorageGuard(noGuardCode);
-    assert.deepEqual(noGuardResult.sessionKeys, Object.keys(guardSeed));
-    assert.deepEqual(noGuardResult.localKeys, Object.keys(guardSeed));
+    harness.check("the host guard derives its keep-keys from the target url",
+      hostSource.includes("new URL(targetUrl)") &&
+      hostSource.includes("JSON.stringify(targetKeys.pin)") &&
+      hostSource.includes("JSON.stringify(targetKeys.panel)") &&
+      !/const pinKey = "lr:pins:" \+ href/.test(hostSource),
+      "the guard must not keep the href-keyed pin");
 
     const relayPurgeSeed = { "lr-drawings": "late", "lr-drawings:https://a.example": "late", marker: "kept", unrelated: "kept" };
     const loadRelayWithStorage = (code) => {

@@ -476,28 +476,33 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.check("the proxied page config does not broadcast drawings", pageConfig !== null && !("drawings" in pageConfig), JSON.stringify(pageConfig === null ? null : Object.keys(pageConfig)));
 
       const pageHref = `${base}/p/${enc(targetUrl)}`;
-      const otherHref = `${base}/p/${enc(`${targetUrl}other`)}`;
+      const targetPinKey = `lr:pins:${new URL(targetUrl).origin}${new URL(targetUrl).pathname}`;
+      const targetPanelKey = `lr-panel-pos:${new URL(targetUrl).origin}${new URL(targetUrl).pathname}`;
+      const foreignPinKey = "lr:pins:http://foreign.example/other";
+      const foreignPanelKey = "lr-panel-pos:http://foreign.example/other";
       const guardSeed = {
         "lr-drawings": "old",
         "lr-drawings:https://a.example": "old",
-        [`lr:pins:${otherHref}`]: "old",
-        [`lr:pins:${pageHref}`]: "keep",
-        [`lr-panel-pos:${otherHref}`]: "old",
+        [foreignPinKey]: "old",
+        [targetPinKey]: "keep",
+        [foreignPanelKey]: "old",
+        [targetPanelKey]: "keep",
         foreign: "keep"
       };
-      const guardExpected = [`lr:pins:${pageHref}`, "foreign"];
-      const runStorageGuard = (code) => {
-        const session = storageShim(guardSeed);
-        const local = storageShim(guardSeed);
+      const guardExpected = [targetPinKey, targetPanelKey, "foreign"];
+      const runStorageGuard = (code, seed = guardSeed) => {
+        const session = storageShim(seed);
+        const local = storageShim(seed);
         const context = vm.createContext({ window: { location: { href: pageHref }, sessionStorage: session, localStorage: local } });
         vm.runInContext(code, context, { filename: "storage-guard.js" });
         return { sessionKeys: Object.keys(session), localKeys: Object.keys(local) };
       };
-      const guardMatch = /<script>([\s\S]*?)<\/script>/.exec(html);
+      const guardMatch = /<script>([\s\S]*?)<\/script>/i.exec(html);
       const guardCode = guardMatch?.[1] ?? "";
       const guardResult = runStorageGuard(guardCode);
-      harness.check("the injected storage guard removes the legacy drawings key",
-        guardCode.includes("lr-drawings") && guardCode.includes("window.location.href") &&
+      harness.check("the injected storage guard keeps only this site's keys",
+        guardCode.includes("lr-drawings") &&
+        html.includes(targetPinKey) && html.includes(targetPanelKey) &&
         JSON.stringify(guardResult.sessionKeys) === JSON.stringify(guardExpected) &&
         JSON.stringify(guardResult.localKeys) === JSON.stringify(guardExpected),
         `session ${JSON.stringify(guardResult.sessionKeys)} | local ${JSON.stringify(guardResult.localKeys)}`);
@@ -588,15 +593,29 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.check("the fallthrough proxies the target", fallthrough.status === 200 && fallthroughHtml.includes("Sobre"));
       harness.includes("the fallthrough is rewritten too", fallthroughHtml, "window.__LR__=");
 
-      const headlessGuardMatch = /<script>([\s\S]*?)<\/script>/.exec(fallthroughHtml);
+      const aboutPinKey = `lr:pins:http://127.0.0.1:${targetPort}/about`;
+      const aboutPanelKey = `lr-panel-pos:http://127.0.0.1:${targetPort}/about`;
+      const headlessSeed = {
+        [aboutPinKey]: "keep",
+        [aboutPanelKey]: "keep",
+        [targetPinKey]: "old",
+        [foreignPinKey]: "old",
+        foreign: "keep"
+      };
+      const headlessExpected = [aboutPinKey, aboutPanelKey, "foreign"];
+      const headlessGuardMatch = /<script>([\s\S]*?)<\/script>/i.exec(fallthroughHtml);
       const headlessGuard = headlessGuardMatch?.[1] ?? "";
-      const headlessResult = runStorageGuard(headlessGuard);
+      const headlessResult = runStorageGuard(headlessGuard, headlessSeed);
       harness.check("the storage guard leads a page without a head too",
-        headlessGuard === guardCode &&
         headlessGuardMatch.index < /window\.__LR__=/.exec(fallthroughHtml)?.index &&
-        JSON.stringify(headlessResult.sessionKeys) === JSON.stringify(guardExpected) &&
-        JSON.stringify(headlessResult.localKeys) === JSON.stringify(guardExpected),
+        JSON.stringify(headlessResult.sessionKeys) === JSON.stringify(headlessExpected) &&
+        JSON.stringify(headlessResult.localKeys) === JSON.stringify(headlessExpected),
         `order=${headlessGuardMatch.index < /window\.__LR__=/.exec(fallthroughHtml)?.index} session ${JSON.stringify(headlessResult.sessionKeys)}`);
+      harness.check("the injected guard names the site under review, not the proxy origin",
+        fallthroughHtml.includes(`"${aboutPinKey}"`) &&
+        fallthroughHtml.includes(`"${aboutPanelKey}"`) &&
+        !fallthroughHtml.includes(`"${targetPinKey}"`),
+        `about ${aboutPinKey} | root ${targetPinKey}`);
 
       const raw = await fetch(`${base}/p/http://127.0.0.1:${targetPort}/`);
       harness.check("the raw target form works", raw.status === 200 && (await raw.text()).includes("/.lr/overlay.js"));
