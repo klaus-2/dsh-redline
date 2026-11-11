@@ -26,8 +26,16 @@
     if (BRIDGE === null || typeof BRIDGE.send !== "function") throw new Error("the Redline bridge is not available in this page");
     return await BRIDGE.send(type, payload ?? {});
   };
+  const TARGET = (() => {
+    try {
+      const url = new URL(typeof window.__LR__?.pageUrl === "string" && window.__LR__.pageUrl !== "" ? window.__LR__.pageUrl : window.location.href);
+      return { origin: url.origin, path: url.pathname };
+    } catch {
+      return { origin: window.location.origin, path: window.location.pathname };
+    }
+  })();
   const PAGE_URL = window.location.href;
-  const STORE_KEY = "lr:pins:" + PAGE_URL;
+  const STORE_KEY = `lr:pins:${TARGET.origin}${TARGET.path}`;
 
   try {
     window.CSS.registerProperty({ name: "--tencil-rim", syntax: "<angle>", inherits: false, initialValue: "0deg" });
@@ -587,7 +595,7 @@
     } catch {}
   }
 
-  const PANEL_POS_KEY = "lr-panel-pos:" + PAGE_URL;
+  const PANEL_POS_KEY = `lr-panel-pos:${TARGET.origin}${TARGET.path}`;
   const panelPositions = loadPanelPositions();
   function loadPanelPositions() {
     try {
