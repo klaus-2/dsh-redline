@@ -47,6 +47,20 @@ export async function runPackageSuite(harness, { pluginDir, packageName }) {
     if (!harness.check(`the ${readme} exists`, existsSync(path.join(pluginDir, readme)))) continue;
     harness.check(`the ${readme} is not a stub`, readFileSync(path.join(pluginDir, readme), "utf8").length > 500);
   }
+  {
+    const readmes = ["README.md", "README.pt-BR.md", "README.zh-CN.md"];
+    const sectionCounts = readmes.map((readme) => {
+      const file = path.join(pluginDir, readme);
+      if (!existsSync(file)) return -1;
+      return readFileSync(file, "utf8").split("\n").filter((line) => line.startsWith("## ")).length;
+    });
+    const english = sectionCounts[0];
+    harness.check(
+      "the translated readmes carry the same top-level sections as the english one",
+      english > 0 && sectionCounts.every((count) => count === english),
+      sectionCounts.join(" / ")
+    );
+  }
   harness.check("the license exists", existsSync(path.join(pluginDir, "LICENSE")));
   harness.check("the changelog exists", existsSync(path.join(pluginDir, "CHANGELOG.md")));
 
