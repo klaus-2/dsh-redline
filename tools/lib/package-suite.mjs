@@ -92,9 +92,9 @@ export async function runPackageSuite(harness, { pluginDir, packageName }) {
   harness.section("package: release invariants");
   const changelog = readFileSync(path.join(pluginDir, "CHANGELOG.md"), "utf8");
   harness.check(`the changelog documents ${manifest.version}`, changelog.includes(`## [${manifest.version}]`), manifest.version);
-  const newestSection = /## \[([^\]]+)\]/.exec(changelog)?.[1] ?? "";
+  const newestSection = /## \[(?!Unreleased)([^\]]+)\]/.exec(changelog)?.[1] ?? "";
   harness.eq("the newest changelog section is the current version", newestSection, manifest.version);
-  harness.check("the changelog follows the keep-a-changelog shape", /## \[/.test(changelog) && /### (Added|Fixed|Changed|Security)/.test(changelog));
+  harness.check("the changelog follows the keep-a-changelog shape", /## \[/.test(changelog) && /### (Added|Changed|Fixed|Removed)/.test(changelog));
   harness.check("the test script is wired", typeof manifest.scripts?.test === "string" && manifest.scripts.test !== "");
   harness.check("no npmrc is committed", !existsSync(path.join(pluginDir, ".npmrc")));
   harness.check("the vendor script is vendored", existsSync(path.join(pluginDir, "vendor", "html2canvas.min.js")));
