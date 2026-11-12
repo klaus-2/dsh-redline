@@ -107,13 +107,14 @@ The client face injects the overlay into every page the harness browser renders.
 ## Develop
 
 ```bash
-npm install
 npm run build
 npm test
 npm run strip-comments
 ```
 
-`overlay.template.js` + `tencil-overlay.css` are the sources; `lib/overlay.js` is generated — never edit it directly. `npm run strip-comments` reports what the comment stripper would change in the shipped sources; add `-- --write` to apply it. License and copyright notices are preserved in the JS and CSS sources. `tools/smoke.mjs` runs 33 checks (proxy, rewrite, intake, screenshots, context format, overlay integrity) against an isolated port.
+No dependencies to install — the plugin is plain Node.js.
+
+`overlay.template.js` + `tencil-overlay.css` are the sources; `lib/overlay.js` is generated — never edit it directly. `npm run strip-comments` reports what the comment stripper would change in the shipped sources; add `-- --write` to apply it. License and copyright notices are preserved in the JS and CSS sources; write mode also removes the contract and safety notes described in `CONTRIBUTING.md`, so it is a deliberate edit, not a formatter. `tools/smoke.mjs` exercises the proxy, HTML/CSS rewriting, annotation intake, cropped-screenshot persistence, the context format and overlay integrity against an isolated port and a temporary home; `tools/regression.mjs` adds the host, client and package suites, and it is the one that prints a check count.
 
 ## Scope
 

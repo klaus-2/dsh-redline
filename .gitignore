@@ -1,4 +1,5 @@
 node_modules/
+package-lock.json
 *.log
 boot-status.json
 client-status.json
