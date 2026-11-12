@@ -829,11 +829,14 @@ export async function runHostSuite(harness, { pluginDir }) {
 
     harness.section("host: a newer copy on disk waits for the next start");
     {
-      // The copy that runs says 1.0.24; a copy of 1.0.99 sits in the package folder waiting for a restart.
+      // The copy that runs is the released one; a copy with a bumped major sits
+      // in the package folder waiting for a restart.
+      const [newerMajor] = pluginVersion.split(".");
+      const newerVersion = `${Number(newerMajor) + 1}.0.0`;
       const staged = await mkdtemp(path.join(tmpdir(), "dsh-regression-newer-"));
       try {
         await mkdir(path.join(staged, "lib"), { recursive: true });
-        await writeFile(path.join(staged, "package.json"), JSON.stringify({ name: "dsh-redline", version: "1.0.99" }));
+        await writeFile(path.join(staged, "package.json"), JSON.stringify({ name: "dsh-redline", version: newerVersion }));
         await copyFile(path.join(pluginDir, "lib", "index.js"), path.join(staged, "lib", "index.js"));
         await copyFile(path.join(pluginDir, "lib", "overlay.js"), path.join(staged, "lib", "overlay.js"));
         await copyFile(path.join(pluginDir, "lib", "bridge.js"), path.join(staged, "lib", "bridge.js"));
@@ -845,11 +848,11 @@ export async function runHostSuite(harness, { pluginDir }) {
         const newerAuth = { [secretHeader]: secret };
         try {
           const newer = await (await fetch(`${newerBase}/.lr/settings`, { headers: newerAuth })).json();
-          harness.eq("the newer copy on disk is the pending install", newer.installed, "1.0.99");
-          harness.eq("the update route names the newer copy too", newer.update.installed, "1.0.99");
+          harness.eq("the newer copy on disk is the pending install", newer.installed, newerVersion);
+          harness.eq("the update route names the newer copy too", newer.update.installed, newerVersion);
           harness.eq("the running copy is still the one that runs", newer.version, pluginVersion);
           const newerUpdate = await (await fetch(`${newerBase}/.lr/update`, { headers: newerAuth })).json();
-          harness.eq("the update route reports the newer copy as installed", newerUpdate.update.installed, "1.0.99");
+          harness.eq("the update route reports the newer copy as installed", newerUpdate.update.installed, newerVersion);
         } finally {
           newerServer.close();
         }
