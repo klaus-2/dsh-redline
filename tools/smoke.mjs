@@ -94,6 +94,20 @@ let sessionCookie = "";
 }
 
 {
+  // Um navegador de verdade pede os sub-recursos do proxy só com o cookie da
+  // página: nenhum header nosso chega junto. A sessão já estabelecida basta, e
+  // nada além dela abre o prefixo.
+  const sub = `http://127.0.0.1:${TARGET_PORT}/style.css`;
+  const bare = await fetch(`${base}/.lr/proxy/${enc(sub)}`);
+  check("proxy: sub-recurso sem credencial → 401", bare.status === 401);
+  const forged = await fetch(`${base}/.lr/proxy/${enc(sub)}`, { headers: { cookie: "lr_session=00000000-0000-0000-0000-000000000000" } });
+  check("proxy: sessão forjada → 401", forged.status === 401);
+  const byCookie = await fetch(`${base}/.lr/proxy/${enc(sub)}`, { headers: { cookie: sessionCookie } });
+  const cssByCookie = await byCookie.text();
+  check("proxy: sessão da página → 200 + css", byCookie.status === 200 && /text\/css/.test(byCookie.headers.get("content-type") ?? "") && cssByCookie.includes("/.lr/proxy/"));
+}
+
+{
   const r = await fetch(`${base}/.lr/overlay.js`, { headers: auth });
   check("overlay.js servido", r.status === 200 && /text\/javascript/.test(r.headers.get("content-type") ?? ""));
   const publicOverlay = await fetch(`${base}/.lr/overlay.js`);
