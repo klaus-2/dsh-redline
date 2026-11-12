@@ -34,16 +34,6 @@ const REQUIRED_OVERLAY_SYMBOLS = [
   "const t = (key) =>"
 ];
 
-// The mirrors carry the strings of the settings panel as well as the overlay's. These are the
-// panel's, and they live in the client's table, not in the overlay's.
-const MIRROR_ONLY_KEYS = new Set([
-  "hotkeyComment",
-  "hotkeyAdjust",
-  "hotkeyDraw",
-  "capture",
-  "duplicateKey"
-]);
-
 function localeKeys(source) {
   const literal = extractObjectLiteral(source, "const UI_LOCALES");
   const locales = evaluateObjectLiteral(literal, "UI_LOCALES");
@@ -658,22 +648,82 @@ export async function runClientSuite(harness, { pluginDir }) {
       harness.check("every property of the inspector is labelled in every language", metaMissing.length === 0, metaMissing.slice(0, 8).join(", "));
 
       // The mirrors in locale/ are what a translator reads. A mirror that drifts from the inline
-      // table sends the translator to the wrong text.
+      // tables sends the translator to the wrong text. The mirrors carry BOTH inline tables: the
+      // overlay's and the settings panel's.
+      const panel = evaluateObjectLiteral(extractObjectLiteral(client, "const L = {"), "L") ?? {};
       const mirrorOf = { en: "en.json", pt: "pt-BR.json", zh: "zh-CN.json" };
       const drifted = [];
       for (const [code, file] of Object.entries(mirrorOf)) {
         const mirror = JSON.parse(readFileSync(path.join(pluginDir, "locale", file), "utf8"));
-        const dictionary = dictionaries[code] ?? {};
-        for (const [key, value] of Object.entries(dictionary)) {
+        const tables = { ...(dictionaries[code] ?? {}), ...(panel[code] ?? {}) };
+        for (const [key, value] of Object.entries(tables)) {
           if (mirror[key] !== value) drifted.push(`${code}:${key}`);
         }
         for (const key of Object.keys(mirror)) {
           if (key === "meta") continue;
-          if (dictionary[key] === undefined && !MIRROR_ONLY_KEYS.has(key)) drifted.push(`${code}:${key} (only in the mirror)`);
+          if (tables[key] === undefined) drifted.push(`${code}:${key} (only in the mirror)`);
         }
       }
       harness.check("the translation mirrors match the inline tables", drifted.length === 0, drifted.slice(0, 8).join(", "));
     }
+  }
+
+  harness.section("client: locale integrity");
+  {
+    const overlayLiteral = extractObjectLiteral(overlay, "const UI_LOCALES");
+    const cardLiteral = extractObjectLiteral(client, "const UI_LOCALES");
+    const panelLiteral = extractObjectLiteral(client, "const L = {");
+    const keyNames = (span) => {
+      const names = [];
+      for (const match of span.matchAll(/(?:^|[{,])\s*(?:"([A-Za-z0-9_.:-]+)"|([A-Za-z0-9_$-]+))\s*:/g)) names.push(match[1] ?? match[2]);
+      return names;
+    };
+    const duplicatesOf = (literal, codes, quoted) => {
+      if (literal === undefined) return ["table not found"];
+      const found = [];
+      for (const code of codes) {
+        const span = extractObjectLiteral(literal, quoted ? `"${code}":` : `${code}:`);
+        if (span === undefined) { found.push(`${code}:dictionary not found`); continue; }
+        const counts = new Map();
+        for (const key of keyNames(span)) counts.set(key, (counts.get(key) ?? 0) + 1);
+        for (const [key, count] of counts) if (count > 1) found.push(`${code}:${key}`);
+      }
+      return found;
+    };
+    const duplicates = [
+      ...duplicatesOf(overlayLiteral, ["en", "pt", "zh"], true).map((entry) => `overlay:${entry}`),
+      ...duplicatesOf(cardLiteral, ["en", "pt", "zh"], true).map((entry) => `card:${entry}`),
+      ...duplicatesOf(panelLiteral, ["en", "pt", "zh"], false).map((entry) => `panel:${entry}`)
+    ];
+    harness.check("no locale dictionary defines a key twice", duplicates.length === 0, duplicates.slice(0, 8).join(", "));
+
+    const card = evaluateObjectLiteral(cardLiteral, "UI_LOCALES");
+    const panel = evaluateObjectLiteral(panelLiteral, "L");
+    const incomplete = (table) => {
+      if (table === undefined) return ["table not found"];
+      const codes = Object.keys(table);
+      const reference = Object.keys(table[codes[0]] ?? {}).slice().sort();
+      const problems = [];
+      for (const code of codes) {
+        const keys = Object.keys(table[code] ?? {}).slice().sort();
+        if (JSON.stringify(keys) !== JSON.stringify(reference)) problems.push(`${code}:key set differs`);
+        for (const [key, value] of Object.entries(table[code] ?? {})) {
+          if (typeof value !== "string" || value === "") problems.push(`${code}:${key}:empty`);
+        }
+      }
+      return problems;
+    };
+    const cardProblems = incomplete(card);
+    harness.check("the client card dictionary is complete in every language", cardProblems.length === 0, cardProblems.slice(0, 8).join(", "));
+    const panelProblems = incomplete(panel);
+    harness.check("the settings panel dictionary is complete in every language", panelProblems.length === 0, panelProblems.slice(0, 8).join(", "));
+
+    const undefinedKeys = translationKeys(client).filter((key) => !key.endsWith(".*")).filter((key) => card === undefined || !(key in card.en));
+    harness.check("every client translation uses a key its dictionary defines", undefinedKeys.length === 0, undefinedKeys.slice(0, 8).join(", "));
+
+    const overlayTable = evaluateObjectLiteral(overlayLiteral, "UI_LOCALES");
+    const shared = overlayTable === undefined || panel === undefined ? ["table not found"] : Object.keys(panel.en).filter((key) => key in overlayTable.en);
+    harness.check("the overlay and the settings panel share no key", shared.length === 0, shared.slice(0, 8).join(", "));
   }
 
   harness.section("client: overlay build");
