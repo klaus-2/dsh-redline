@@ -92,6 +92,33 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.check("the health route answers", health.status === 200 && body.ok === true && body.name === "dsh-redline");
     }
 
+    harness.section("host: profile directory derivation");
+    {
+      const fixtureHome = path.join(path.parse(process.cwd()).root, "dsh-profile-fixture-home");
+      const fnSource = extractFunction(source, "resolveProfileDir");
+      const resolveProfileDir = typeof fnSource === "string"
+        ? vm.runInNewContext(`(${fnSource})`, { path })
+        : undefined;
+      const cases = [
+        ["the profile is derived from a web install",
+          path.join(fixtureHome, ".dsh", "profiles", "web", "node_modules", "dsh-redline"),
+          path.join(fixtureHome, ".dsh", "profiles", "web")],
+        ["the profile is derived through the pnpm virtual store",
+          path.join(fixtureHome, ".dsh", "profiles", "desktop", "node_modules", ".pnpm", "dsh-redline@1.0.23", "node_modules", "dsh-redline"),
+          path.join(fixtureHome, ".dsh", "profiles", "desktop")],
+        ["a repository checkout falls back to the desktop profile",
+          path.join(fixtureHome, "code", "dsh-redline"),
+          path.join(fixtureHome, ".dsh", "profiles", "desktop")],
+        ["the innermost profiles segment wins",
+          path.join(fixtureHome, "profiles", "outer", ".dsh", "profiles", "inner", "node_modules", "dsh-redline"),
+          path.join(fixtureHome, "profiles", "outer", ".dsh", "profiles", "inner")]
+      ];
+      for (const [name, packageDir, expected] of cases) {
+        const actual = typeof resolveProfileDir === "function" ? resolveProfileDir(packageDir, fixtureHome) : undefined;
+        harness.eq(name, actual, expected);
+      }
+    }
+
     harness.section("host: auth matrix");
     {
       let denied = 0;
