@@ -44,6 +44,7 @@ export async function runHostSuite(harness, { pluginDir }) {
     const { startServer, formatContext, apply, pendingBySession, globalPending } = await import(moduleUrl);
 
     const targetPort = await freePort();
+    const fixturePages = new Map();
     const target = createServer((req, res) => {
       const pathname = new URL(req.url, "http://x").pathname;
       if (pathname === "/style.css") {
@@ -60,6 +61,14 @@ export async function runHostSuite(harness, { pluginDir }) {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end("<html><body><h1>Sobre</h1></body></html>");
         return;
+      }
+      if (pathname.startsWith("/fixture/")) {
+        const body = fixturePages.get(pathname.slice("/fixture/".length));
+        if (typeof body === "string") {
+          res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+          res.end(body);
+          return;
+        }
       }
       res.writeHead(200, { "content-type": "image/png" });
       res.end(Buffer.from([0x89, 0x50]));
@@ -650,6 +659,39 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.check("the scheme-less target form works", noScheme.status === 200 && (await noScheme.text()).includes("window.__LR__="));
       const invalid = await fetch(`${base}/p/nao-e-url`);
       harness.check("an invalid target answers 400", invalid.status === 400 && (await invalid.text()).includes("Redline"));
+    }
+
+    harness.section("host: markup fixtures");
+    {
+      const fixtureBase = `http://127.0.0.1:${targetPort}`;
+      const proxy = (path) => `/.lr/proxy/${enc(`${fixtureBase}${path}`)}`;
+      const cases = [
+        ["an unquoted src is proxied", `<img src=/logo.png>`, (html) => html.includes(`src=${proxy("/logo.png")}`)],
+        ["an unquoted value containing = is proxied whole", `<a href=/search?q=1>x</a>`, (html) => html.includes(`href=/p/${enc(`${fixtureBase}/search?q=1`)}`)],
+        ["a double quoted src is still proxied", `<img src="/a.png">`, (html) => html.includes(`src="${proxy("/a.png")}"`)],
+        ["a single quoted src is still proxied", `<img src='/a.png'>`, (html) => html.includes(`src='${proxy("/a.png")}'`)],
+        ["a multiline tag still rewrites its src", `<img\n  src="/a.png"\n>`, (html) => html.includes(`src="${proxy("/a.png")}"`)],
+        ["a greater-than sign in a later value does not hide the src", `<img src="/a.png" alt="x > y">`, (html) => html.includes(`src="${proxy("/a.png")}"`)],
+        ["a srcset with two candidates rewrites both", `<img srcset="/a.png 1x, /b.png 2x">`, (html) => html.includes(`srcset="${proxy("/a.png")} 1x, ${proxy("/b.png")} 2x"`)],
+        ["a srcset data candidate is left alone", `<img srcset="data:image/png;base64,AAAA 1x, /b.png 2x">`, (html) => html.includes(`srcset="data:image/png;base64,AAAA 1x, ${proxy("/b.png")} 2x"`)],
+        ["a comma inside a srcset url does not split it", `<img srcset="/a.png?x=1,2 1x">`, (html) => html.includes(`srcset="${proxy("/a.png?x=1,2")} 1x"`)],
+        ["a srcset candidate ends at a comma after the url", `<img srcset="/a.png, /b.png 2x">`, (html) => html.includes(`srcset="${proxy("/a.png")}, ${proxy("/b.png")} 2x"`)],
+        ["an attribute value spanning a newline is rewritten", `<img src="/a\n.png">`, (html) => html.includes(`src="${proxy("/a.png")}"`)],
+        ["an unbalanced quote does not destroy markup", `<img src="/broken.png\n<p>markup here\n<a href="/about">x</a>`, (html) => html.includes("<p>markup here") && html.includes(`href="/p/${enc(`${fixtureBase}/about`)}"`)],
+        ["a fragment href is left alone", `<a href="#frag">x</a>`, (html) => html.includes(`<a href="#frag">`)],
+        ["a mailto href is left alone", `<a href="mailto:a@b.c">x</a>`, (html) => html.includes(`<a href="mailto:a@b.c">`)],
+        ["a javascript href is left alone", `<a href="javascript:void(0)">x</a>`, (html) => html.includes(`<a href="javascript:void(0)">`)],
+        ["a data src is left alone", `<img src="data:image/png;base64,AAAA">`, (html) => html.includes(`<img src="data:image/png;base64,AAAA">`)]
+      ];
+      for (const [name, body, assert] of cases) {
+        const key = name.replace(/[^a-z0-9]+/gi, "-");
+        fixturePages.set(key, `<!doctype html><html><body>${body}</body></html>`);
+        const url = `${fixtureBase}/fixture/${key}`;
+        const response = await fetch(`${base}/p/${enc(url)}`);
+        const html = await response.text();
+        harness.check(name, response.status === 200 && assert(html), html.slice(0, 300));
+      }
+      harness.skip("a greater-than sign before the src hides it", "known regex limitation: [^>]*? cannot cross a > inside an earlier quoted value");
     }
 
     harness.section("host: overlay and vendor");
