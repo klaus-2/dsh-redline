@@ -7,6 +7,7 @@ client-status.json
 
 # internal ops (never public)
 .sisyphus/
+plans/
 docs/REGISTER.md
 docs/RESEARCH.md
 docs/capture.md
