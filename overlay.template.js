@@ -100,6 +100,8 @@
       "groupBtn": "Group",
       "groupHint": "Click elements to group, then press Enter",
       "groupCreated": "Group created",
+      "viewportLabel": "Preview width",
+      "viewportReset": "Full width",
       "eyeTitle": "Show/hide pins",
       "statusTitle": "Live Review active",
       "pendingTitle": "Annotations waiting for your next prompt in the chat",
@@ -269,6 +271,8 @@
       "groupBtn": "Agrupar",
       "groupHint": "Clique nos elementos para agrupar, depois pressione Enter",
       "groupCreated": "Grupo criado",
+      "viewportLabel": "Largura do preview",
+      "viewportReset": "Largura total",
       "eyeTitle": "Mostrar/ocultar pins",
       "statusTitle": "Live Review ativo",
       "pendingTitle": "Anotações aguardando seu próximo prompt no chat",
@@ -438,6 +442,8 @@
       "groupBtn": "成组",
       "groupHint": "点击要成组的元素，然后按 Enter",
       "groupCreated": "组已创建",
+      "viewportLabel": "预览宽度",
+      "viewportReset": "全宽",
       "eyeTitle": "显示/隐藏图钉",
       "statusTitle": "Live Review 运行中",
       "pendingTitle": "标注将随你的下一条消息发送",
@@ -1469,10 +1475,22 @@
   const pendingSpan = el("span", { class: "tool-label", style: "display:none", title: t("pendingTitle") }, t("pendingCount").replace("{n}", 0));
   const adjustBtn = el("button", { class: "tool", title: t("adjustTitle") + " (" + formatHotkey(hotkeyAdjust) + ")", html: ICONS.sliders }, el("span", { class: "tool-label" }, t("adjustTool")), el("kbd", {}, formatHotkey(hotkeyAdjust)));
   const groupBtn = el("button", { class: "tool", title: t("groupBtn"), html: ICONS.group }, el("span", { class: "tool-label" }, t("groupBtn")));
+  const viewportPicker = el(
+    "select",
+    { class: "tool lr-viewport-picker", title: t("viewportLabel"), "aria-label": t("viewportLabel") },
+    el("option", { value: "" }, t("viewportReset")),
+    el("option", { value: "375" }, "375"),
+    el("option", { value: "768" }, "768"),
+    el("option", { value: "1280" }, "1280")
+  );
+  viewportPicker.addEventListener("change", () => {
+    const value = viewportPicker.value;
+    applyViewportPreset(value === "" ? null : Number(value));
+  });
   const eyeBtn = el("button", { class: "tool", title: "Mostrar/ocultar pins", html: ICONS.eye });
     drawBtn = el("button", { class: "tool", title: t("drawTitle") + " (" + formatHotkey(hotkeyDraw) + ")", html: ICONS_CANVAS.brush }, el("span", { class: "tool-label" }, t("drawTool")), el("kbd", {}, formatHotkey(hotkeyDraw)));
     drawBtn.addEventListener("click", () => toggleDraw());
-    toolbar.append(statusDot, divider, commentBtn, pendingSpan, adjustBtn, drawBtn, groupBtn, eyeBtn);
+    toolbar.append(statusDot, divider, commentBtn, pendingSpan, adjustBtn, drawBtn, groupBtn, viewportPicker, eyeBtn);
   wrap.append(hint, toolbar);
   rootDiv.append(wrap);
 
@@ -1498,6 +1516,10 @@
     drawBtn.querySelector("kbd").textContent = kbd("draw");
     groupBtn.title = t("groupBtn");
     groupBtn.querySelector(".tool-label").textContent = t("groupBtn");
+    viewportPicker.title = t("viewportLabel");
+    viewportPicker.setAttribute("aria-label", t("viewportLabel"));
+    const resetOption = viewportPicker.querySelector('option[value=""]');
+    if (resetOption !== null) resetOption.textContent = t("viewportReset");
     eyeBtn.title = t("eyeTitle");
     statusDot.title = t("statusTitle");
     pendingSpan.title = t("pendingTitle");
@@ -2085,7 +2107,7 @@
 
 
     if (screenshotOnSend) shot = await captureCropFor({ x: rect.left, y: rect.top, w: rect.width, h: rect.height });
-    pins.push({
+    const pin = {
       id: crypto.randomUUID(),
       tag: draft.anchorEl.localName,
       role: draft.anchorEl.getAttribute?.("role") ?? "",
@@ -2101,7 +2123,9 @@
       shot,
       status: "queued",
       at: Date.now()
-    });
+    };
+    if (viewportPresetWidth !== null) pin.viewportWidth = viewportPresetWidth;
+    pins.push(pin);
     savePins();
     draft = null;
     renderDraft();
@@ -2128,7 +2152,8 @@
         rect: p.rect,
         shot: p.shot ?? null,
         afterShot: p.afterShot ?? null,
-        groupId: p.groupId ?? null
+        groupId: p.groupId ?? null,
+        viewportWidth: p.viewportWidth ?? null
       }))
     };
     try {
@@ -2399,6 +2424,7 @@
         status: "queued",
         at: Date.now()
       });
+      if (viewportPresetWidth !== null) created[created.length - 1].viewportWidth = viewportPresetWidth;
     }
     pins.push(...created);
     savePins();
@@ -2444,6 +2470,29 @@
   function openGroupComposer() {
     if (!groupMode || groupPicks.length === 0) return;
     renderGroupComposer();
+  }
+
+  let viewportPresetWidth = null;
+  function applyViewportPreset(widthOrNull) {
+    viewportPresetWidth = widthOrNull;
+    const rootStyle = document.documentElement.style;
+    if (widthOrNull === null) {
+      rootStyle.removeProperty("max-width");
+      rootStyle.removeProperty("margin-left");
+      rootStyle.removeProperty("margin-right");
+    } else {
+      rootStyle.setProperty("max-width", `${widthOrNull}px`);
+      rootStyle.setProperty("margin-left", "auto");
+      rootStyle.setProperty("margin-right", "auto");
+    }
+    repositionPins();
+    if (draft !== null || adjustPanel !== null) {
+      repositionDraft();
+      if (adjustPanel !== null) applyPanelPosition(adjustPanel, "adjust");
+    }
+  }
+  function activeViewportWidth() {
+    return viewportPresetWidth;
   }
 
   function a11yAuditSection(target) {
@@ -3438,7 +3487,7 @@
       let pin = pins.find((p) => p.selector === adjustTargetSelector);
       if (!pin) {
         const rect = adjustTarget.getBoundingClientRect();
-        pins.push({
+        const newAdjustPin = {
           id: crypto.randomUUID(),
           tag: adjustTarget.localName,
           role: adjustTarget.getAttribute?.("role") ?? "",
@@ -3453,7 +3502,9 @@
           offsets: { ox: rect.width / 2, oy: rect.height / 2 },
           status: "queued",
           at: Date.now()
-        });
+        };
+        if (viewportPresetWidth !== null) newAdjustPin.viewportWidth = viewportPresetWidth;
+        pins.push(newAdjustPin);
         pin = pins[pins.length - 1];
       }
       for (const change of changes) {

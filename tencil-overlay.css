@@ -895,6 +895,16 @@ kbd {
 .tool-active kbd { background: rgba(255, 255, 255, 0.22); color: white; }
 .tool-label { font-weight: 500; color: inherit; }
 
+.lr-viewport-picker {
+  all: unset;
+  pointer-events: auto;
+  height: 32px; padding: 0 9px; border-radius: 999px;
+  display: inline-flex; align-items: center;
+  color: inherit; font-size: 12px; font-weight: 500;
+  cursor: pointer;
+}
+.lr-viewport-picker option { background: rgba(17, 17, 19, 0.95); color: rgba(255, 255, 255, 0.86); }
+
 .tool-off { color: rgba(255, 255, 255, 0.35); }
 .tool-send { background: var(--accent); color: white; }
 .tool-send:disabled { opacity: 0.5; cursor: default; }

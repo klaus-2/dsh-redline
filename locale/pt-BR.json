@@ -40,6 +40,8 @@
   "groupBtn": "Agrupar",
   "groupHint": "Clique nos elementos para agrupar, depois pressione Enter",
   "groupCreated": "Grupo criado",
+  "viewportLabel": "Largura do preview",
+  "viewportReset": "Largura total",
   "viewPending": "Ver as anotações pendentes",
   "sendNow": "Enviar as anotações ao agente agora",
   "sendBtn": "Enviar",

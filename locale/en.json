@@ -40,6 +40,8 @@
   "groupBtn": "Group",
   "groupHint": "Click elements to group, then press Enter",
   "groupCreated": "Group created",
+  "viewportLabel": "Preview width",
+  "viewportReset": "Full width",
   "viewPending": "View pending annotations",
   "sendNow": "Send the annotations to the agent now",
   "sendBtn": "Send",

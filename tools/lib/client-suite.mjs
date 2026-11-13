@@ -1116,6 +1116,7 @@ export async function runClientSuite(harness, { pluginDir }) {
           { target: { localName: "li", getAttribute: () => null, textContent: "Item" }, selector: "ul > li", rect: { x: 5, y: 6, w: 20, h: 20 }, offsets: { ox: 10, oy: 10 }, shot: "shot-c" }
         ],
         groupComposerNode: { querySelector: () => ({ value: "One comment for all three" }) },
+        viewportPresetWidth: null,
         crypto: { randomUUID: () => "uuid" },
         savePins: () => {},
         setGroupMode: () => {},
@@ -1166,6 +1167,50 @@ export async function runClientSuite(harness, { pluginDir }) {
       harness.check("overlay: leaving group mode with no picks creates no pins",
         creates && exits.includes("clearHighlight()"),
         exits.slice(0, 120));
+    }
+  }
+
+  harness.section("client: overlay viewport presets");
+  {
+    const applySource = extractFunction(overlay, "applyViewportPreset");
+    harness.check("the overlay keeps its viewport preset helpers",
+      applySource !== undefined && overlay.includes("viewportPicker") && overlay.includes("lr-viewport-picker"));
+    {
+      const runs = [];
+      const run = applySource === undefined ? undefined : evaluateExpression(`(document, widthOrNull, repositionPins, repositionDraft, draft, adjustPanel) => {\nlet viewportPresetWidth = null;\n${applySource}\napplyViewportPreset(widthOrNull);\nreturn viewportPresetWidth;\n}`, "applyViewportPreset");
+      const makeDocument = () => {
+        const style = { maxWidth: "", marginLeft: "", marginRight: "", setProperty(name, value) { this[name] = value; }, removeProperty(name) { this[name] = ""; } };
+        return { documentElement: { style }, writes: style };
+      };
+      const doc1 = makeDocument();
+      const width = run === undefined ? undefined : run(doc1, 375, () => runs.push("reposition"), () => {}, null, null);
+      const applied = doc1.writes;
+      const doc3 = makeDocument();
+      doc3.writes.setProperty("max-width", "768px");
+      doc3.writes.setProperty("margin-left", "auto");
+      const reset = run(doc3, null, () => runs.push("reposition"), () => {}, null, null);
+      const doc4 = makeDocument();
+      let draftCalls = 0;
+      run(doc4, 768, () => runs.push("reposition"), () => { draftCalls += 1; }, { anchor: true }, null);      harness.check("overlay: the preset picker constrains documentElement with maxWidth and centers it",
+        width === 375 && applied["max-width"] === "375px" && applied["margin-left"] === "auto" && applied["margin-right"] === "auto",
+        JSON.stringify({ width, applied: { maxWidth: applied["max-width"], marginLeft: applied["margin-left"], marginRight: applied["margin-right"] } }));
+      harness.check("overlay: reset clears the width constraint",
+        reset === null && doc3.writes["max-width"] === "" && doc3.writes["margin-left"] === "" && doc3.writes["margin-right"] === "",
+        JSON.stringify({ reset, after: { maxWidth: doc3.writes["max-width"], marginLeft: doc3.writes["margin-left"] } }));
+      harness.check("overlay: applying a preset repositions pins manually",
+        runs.length === 3 && runs.every((name) => name === "reposition"),
+        JSON.stringify(runs));
+      harness.check("overlay: applying a preset repositions the open draft", draftCalls === 1, `draft reposition calls: ${draftCalls}`);
+    }
+    {
+      const snapshotSource = extractFunction(overlay, "postSnapshot");
+      const pickerLine = overlay.split("\n").find((line) => line.includes("pins.push(pin)") || (line.includes("viewportWidth = viewportPresetWidth") && line.includes("pin.viewportWidth")));
+      const submit = extractFunction(overlay, "submitDraft");
+      const whitelist = snapshotSource !== undefined && snapshotSource.includes("viewportWidth: p.viewportWidth ?? null");
+      const tagged = submit !== undefined && submit.includes("viewportPresetWidth !== null");
+      harness.check("overlay: pins created under an active preset record the preset width, not innerWidth",
+        whitelist && tagged && !overlay.includes("viewportWidth: window.innerWidth") && pickerLine !== undefined,
+        JSON.stringify({ whitelist, tagged, line: pickerLine?.trim().slice(0, 80) }));
     }
   }
 
