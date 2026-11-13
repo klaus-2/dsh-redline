@@ -1013,6 +1013,94 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
   }
 
+  harness.section("client: overlay accessibility audit");
+  {
+    const sandbox = {
+      getComputedStyle: (node) => node.computed ?? { color: "", backgroundColor: "" },
+      document: { getElementById: () => null }
+    };
+    vm.createContext(sandbox);
+    const semanticMatch = /const A11Y_SEMANTIC_TAGS = (new Set\(\[[^\]]*\]\))/.exec(overlay);
+    sandbox.A11Y_SEMANTIC_TAGS = semanticMatch === null ? new Set() : evaluateExpression(semanticMatch[1], "A11Y_SEMANTIC_TAGS");
+    for (const name of ["parseColor", "relativeLuminance", "contrastRatio", "resolveReadableBackground", "accessibleName", "auditElement"]) {
+      const source = extractFunction(overlay, name);
+      if (source !== undefined) vm.runInContext(source, sandbox, { filename: `${name}.js` });
+    }
+    const fakeEl = (options = {}) => ({
+      tagName: options.tagName ?? "DIV",
+      textContent: options.text ?? "",
+      computed: options.computed ?? { color: "rgb(0, 0, 0)", backgroundColor: "rgba(0, 0, 0, 0)" },
+      parentElement: options.parent ?? null,
+      getAttribute(name) {
+        const attrs = options.attrs ?? {};
+        return name in attrs ? attrs[name] : null;
+      },
+      getBoundingClientRect: () => options.rect ?? { width: 100, height: 30 },
+      ownerDocument: { getElementById: (id) => options.byId?.[id] ?? null }
+    });
+    const { contrastRatio, resolveReadableBackground, accessibleName, auditElement } = sandbox;
+    harness.check("the overlay keeps its accessibility helpers",
+      typeof contrastRatio === "function" && typeof resolveReadableBackground === "function" && typeof accessibleName === "function" && typeof auditElement === "function");
+    {
+      const blackOnWhite = contrastRatio("#000000", "#ffffff");
+      const grayOnWhite = contrastRatio("#777777", "#ffffff");
+      harness.check("overlay: contrast ratio matches the WCAG relative luminance formula",
+        blackOnWhite !== null && Math.abs(blackOnWhite - 21) < 0.01 &&
+        grayOnWhite !== null && Math.abs(grayOnWhite - 4.48) < 0.05,
+        JSON.stringify({ blackOnWhite, grayOnWhite }));
+    }
+    {
+      const gradient = fakeEl({ computed: { color: "rgb(0, 0, 0)", backgroundColor: "linear-gradient(90deg, #fff, #000)" } });
+      const transparentChain = fakeEl({ computed: { color: "rgb(0, 0, 0)", backgroundColor: "rgba(0, 0, 0, 0)" }, parent: fakeEl({ computed: { color: "rgb(0, 0, 0)", backgroundColor: "transparent" } }) });
+      const gradientRow = auditElement(gradient).find((row) => row.check === "contrast");
+      const transparentRow = auditElement(transparentChain).find((row) => row.check === "contrast");
+      harness.check("overlay: contrast reports unknown for gradient and transparent-only backgrounds",
+        resolveReadableBackground(gradient) === "unknown" && resolveReadableBackground(transparentChain) === "unknown" &&
+        contrastRatio("rgb(0, 0, 0)", "unknown") === null &&
+        gradientRow?.status === "unknown" && transparentRow?.status === "unknown",
+        JSON.stringify({ gradient: resolveReadableBackground(gradient), transparent: resolveReadableBackground(transparentChain), gradientRow, transparentRow }));
+    }
+    {
+      const labelled = fakeEl({ attrs: { "aria-label": "Save changes", alt: "disk", "aria-labelledby": "title" }, text: "text", byId: { title: { textContent: "Title" } } });
+      const altOnly = fakeEl({ tagName: "IMG", attrs: { alt: "team photo" }, text: "ignored" });
+      const labelledByOnly = fakeEl({ attrs: { "aria-labelledby": "title" }, byId: { title: { textContent: "Title" } } });
+      const textOnly = fakeEl({ text: "  Click me  " });
+      const titleOnly = fakeEl({ attrs: { title: "Tooltip" } });
+      harness.check("overlay: accessible name prefers aria-label, then alt, then text content",
+        accessibleName(labelled) === "Save changes" && accessibleName(altOnly) === "team photo" &&
+        accessibleName(labelledByOnly) === "Title" && accessibleName(textOnly) === "Click me" &&
+        accessibleName(titleOnly) === "Tooltip" && accessibleName(fakeEl()) === "",
+        JSON.stringify({ labelled: accessibleName(labelled), altOnly: accessibleName(altOnly), labelledBy: accessibleName(labelledByOnly), text: accessibleName(textOnly) }));
+    }
+    {
+      const bareImg = fakeEl({ tagName: "IMG" });
+      const decorativeImg = fakeEl({ tagName: "IMG", attrs: { alt: "" } });
+      const plainDiv = fakeEl();
+      const altStatus = (el) => auditElement(el).find((row) => row.check === "imgAlt")?.status;
+      harness.check("overlay: an img without an alt attribute fails the alt check",
+        altStatus(bareImg) === "fail" && altStatus(decorativeImg) === "pass" && altStatus(plainDiv) === "n/a",
+        JSON.stringify({ bareImg: altStatus(bareImg), decorative: altStatus(decorativeImg), div: altStatus(plainDiv) }));
+    }
+    {
+      const small = auditElement(fakeEl({ rect: { width: 23, height: 40 } })).find((row) => row.check === "targetSize");
+      const narrow = auditElement(fakeEl({ rect: { width: 40, height: 23 } })).find((row) => row.check === "targetSize");
+      const exact = auditElement(fakeEl({ rect: { width: 24, height: 24 } })).find((row) => row.check === "targetSize");
+      harness.check("overlay: target size fails below 24 by 24 pixels",
+        small?.status === "fail" && narrow?.status === "fail" && exact?.status === "pass",
+        JSON.stringify({ small, narrow, exact }));
+    }
+    {
+      const imgRows = auditElement(fakeEl({ tagName: "IMG", attrs: { alt: "x" } }));
+      const divRows = auditElement(fakeEl({ attrs: { role: "button" } }));
+      const renderer = extractFunction(overlay, "renderPinPanel");
+      harness.check("overlay: the popover audit renders exactly five rows",
+        imgRows.length === 5 && divRows.length === 5 &&
+        JSON.stringify(imgRows.map((row) => row.check)) === JSON.stringify(["contrast", "name", "imgAlt", "role", "targetSize"]) &&
+        renderer !== undefined && renderer.includes("a11yAuditSection(auditTarget)"),
+        JSON.stringify({ imgRows: imgRows.map((row) => row.check), divRows: divRows.map((row) => row.check), wired: renderer?.includes("a11yAuditSection") }));
+    }
+  }
+
   harness.section("client: overlay hotkeys");
   {
     const parseHotkey = evaluateExpression(extractFunction(overlay, "parseHotkey"), "parseHotkey");

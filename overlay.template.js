@@ -85,6 +85,17 @@
       "cssCopied": "CSS copied to clipboard",
       "cssCopyFailed": "Could not copy CSS",
       "tokenSuggestions": "Design tokens",
+      "a11yTitle": "Accessibility",
+      "a11yContrast": "Text contrast",
+      "a11yAccessibleName": "Accessible name",
+      "a11yImgAlt": "Image alt",
+      "a11yRole": "Role",
+      "a11yTargetSize": "Target size",
+      "a11yPass": "Pass",
+      "a11yFail": "Fail",
+      "a11yWarn": "Warn",
+      "a11yUnknown": "Unknown",
+      "a11yNotApplicable": "n/a",
       "eyeTitle": "Show/hide pins",
       "statusTitle": "Live Review active",
       "pendingTitle": "Annotations waiting for your next prompt in the chat",
@@ -240,6 +251,17 @@
       "cssCopied": "CSS copiado para a área de transferência",
       "cssCopyFailed": "Não foi possível copiar o CSS",
       "tokenSuggestions": "Tokens de design",
+      "a11yTitle": "Acessibilidade",
+      "a11yContrast": "Contraste do texto",
+      "a11yAccessibleName": "Nome acessível",
+      "a11yImgAlt": "Alt da imagem",
+      "a11yRole": "Papel",
+      "a11yTargetSize": "Tamanho do alvo",
+      "a11yPass": "Passa",
+      "a11yFail": "Falha",
+      "a11yWarn": "Atenção",
+      "a11yUnknown": "Desconhecido",
+      "a11yNotApplicable": "n/a",
       "eyeTitle": "Mostrar/ocultar pins",
       "statusTitle": "Live Review ativo",
       "pendingTitle": "Anotações aguardando seu próximo prompt no chat",
@@ -395,6 +417,17 @@
       "cssCopied": "CSS 已复制到剪贴板",
       "cssCopyFailed": "无法复制 CSS",
       "tokenSuggestions": "设计令牌",
+      "a11yTitle": "无障碍",
+      "a11yContrast": "文字对比度",
+      "a11yAccessibleName": "可访问名称",
+      "a11yImgAlt": "图片 alt",
+      "a11yRole": "角色",
+      "a11yTargetSize": "目标尺寸",
+      "a11yPass": "通过",
+      "a11yFail": "未通过",
+      "a11yWarn": "警告",
+      "a11yUnknown": "未知",
+      "a11yNotApplicable": "不适用",
       "eyeTitle": "显示/隐藏图钉",
       "statusTitle": "Live Review 运行中",
       "pendingTitle": "标注将随你的下一条消息发送",
@@ -705,6 +738,16 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     .pin-bubble-changes { color: var(--n-600); font-size: 11px; margin-top: 4px; }
     .pin-bubble-stale { color: var(--error); font-size: 11px; margin-top: 4px; }
+    .lr-a11y { display: grid; gap: 3px; margin: 6px 0 0; padding: 6px 8px; border-radius: 8px; background: var(--n-100); }
+    .lr-a11y-title { color: var(--n-500); font-size: 11px; font-weight: 600; }
+    .lr-a11y-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--n-600); }
+    .lr-a11y-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lr-a11y-value { max-width: 120px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--n-500); }
+    .lr-a11y-chip { flex: none; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; }
+    .lr-a11y-chip.pass { background: color-mix(in oklab, var(--done), white 75%); color: var(--done); }
+    .lr-a11y-chip.fail { background: color-mix(in oklab, var(--error), white 75%); color: var(--error); }
+    .lr-a11y-chip.warn { background: color-mix(in oklab, var(--warn), white 75%); color: var(--warn); }
+    .lr-a11y-chip.unknown, .lr-a11y-chip.n\/a { background: var(--n-200); color: var(--n-600); }
     .pin-bubble-actions { display: flex; gap: 6px; padding: 6px 10px 10px; }
     .pin-bubble-actions button { all: unset; cursor: pointer; padding: 3px 10px; border-radius: 8px;
       font-size: 12px; background: var(--n-100); color: var(--n-950); }
@@ -2168,6 +2211,92 @@
     if (write && typeof write.then === "function") write.then(() => toast(t("cssCopied"))).catch(() => toast(t("cssCopyFailed")));
     else toast(t("cssCopyFailed"));
   }
+  const A11Y_SEMANTIC_TAGS = new Set(["button", "input", "select", "textarea", "img", "h1", "h2", "h3", "h4", "h5", "h6", "nav", "main", "header", "footer", "ul", "ol", "table"]);
+  const A11Y_ROW_LABELS = { contrast: "a11yContrast", name: "a11yAccessibleName", imgAlt: "a11yImgAlt", role: "a11yRole", targetSize: "a11yTargetSize" };
+  const A11Y_STATUS_KEYS = { pass: "a11yPass", fail: "a11yFail", warn: "a11yWarn", unknown: "a11yUnknown", "n/a": "a11yNotApplicable" };
+  function relativeLuminance(color) {
+    const channel = (raw) => {
+      const c = raw / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * channel(color.r) + 0.7152 * channel(color.g) + 0.0722 * channel(color.b);
+  }
+  function contrastRatio(fg, bg) {
+    const front = typeof fg === "string" ? parseColor(fg) : fg;
+    const back = typeof bg === "string" ? parseColor(bg) : bg;
+    if (front === null || back === null || (front.a ?? 1) < 1 || (back.a ?? 1) < 1) return null;
+    const l1 = relativeLuminance(front);
+    const l2 = relativeLuminance(back);
+    const [lighter, darker] = l1 >= l2 ? [l1, l2] : [l2, l1];
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+  function resolveReadableBackground(el) {
+    let node = el;
+    while (node !== null && node !== undefined) {
+      const background = getComputedStyle(node).backgroundColor ?? "";
+      const parsed = parseColor(background);
+      if (parsed !== null && parsed.a >= 1) return background;
+      if (parsed === null) return "unknown";
+      node = node.parentElement ?? null;
+    }
+    return "unknown";
+  }
+  function accessibleName(el) {
+    const attr = (name) => {
+      const value = el.getAttribute?.(name);
+      return typeof value === "string" ? value : "";
+    };
+    const label = attr("aria-label").trim();
+    if (label !== "") return label;
+    const labelledBy = attr("aria-labelledby").trim();
+    if (labelledBy !== "") {
+      const doc = el.ownerDocument ?? document;
+      const parts = labelledBy.split(/\s+/u).map((id) => doc.getElementById?.(id)?.textContent ?? "").filter((text) => text.trim() !== "");
+      if (parts.length > 0) return parts.join(" ").trim();
+    }
+    const alt = attr("alt").trim();
+    if (alt !== "") return alt;
+    const text = typeof el.textContent === "string" ? el.textContent.trim() : "";
+    if (text !== "") return text;
+    const title = attr("title").trim();
+    if (title !== "") return title;
+    return "";
+  }
+  function auditElement(el) {
+    const attr = (name) => {
+      const value = el.getAttribute?.(name);
+      return typeof value === "string" ? value : null;
+    };
+    const rows = [];
+    const style = getComputedStyle(el);
+    const ratio = contrastRatio(style.color, resolveReadableBackground(el));
+    rows.push({ check: "contrast", status: ratio === null ? "unknown" : ratio >= 4.5 ? "pass" : "fail", value: ratio === null ? "unknown" : String(Math.round(ratio * 100) / 100) });
+    const name = accessibleName(el);
+    rows.push({ check: "name", status: name === "" ? "fail" : "pass", value: name });
+    const tag = typeof el.tagName === "string" ? el.tagName.toLowerCase() : "";
+    if (tag === "img") {
+      const alt = attr("alt");
+      rows.push({ check: "imgAlt", status: alt === null ? "fail" : "pass", value: alt ?? "" });
+    } else {
+      rows.push({ check: "imgAlt", status: "n/a", value: "" });
+    }
+    const role = attr("role");
+    if (role !== null && role.trim() !== "") rows.push({ check: "role", status: "pass", value: role.trim() });
+    else if (A11Y_SEMANTIC_TAGS.has(tag) || (tag === "a" && attr("href") !== null && attr("href") !== "")) rows.push({ check: "role", status: "pass", value: tag });
+    else rows.push({ check: "role", status: "warn", value: "none" });
+    const rect = el.getBoundingClientRect?.() ?? { width: 0, height: 0 };
+    rows.push({ check: "targetSize", status: rect.width >= 24 && rect.height >= 24 ? "pass" : "fail", value: `${Math.round(rect.width)}×${Math.round(rect.height)}` });
+    return rows;
+  }
+  function a11yAuditSection(target) {
+    const rows = auditElement(target);
+    return rows.length === 0 ? null : el("div", { class: "lr-a11y" },
+      el("div", { class: "lr-a11y-title" }, t("a11yTitle")),
+      rows.map((row) => el("div", { class: "lr-a11y-row" },
+        el("span", { class: "lr-a11y-label" }, t(A11Y_ROW_LABELS[row.check] ?? row.check)),
+        el("span", { class: "lr-a11y-value" }, row.value),
+        el("span", { class: `lr-a11y-chip ${row.status === "n/a" ? "na" : row.status}` }, t(A11Y_STATUS_KEYS[row.status] ?? row.status)))));
+  }
 
   function renderPinPanel(pin) {
     pinPanelNode?.remove();
@@ -2190,9 +2319,11 @@
       renderPinPanel(pin);
       renderPins();
     });
+    const auditTarget = locate(pin.selector);
     panel.append(
       el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, `${pins.filter((p) => p.status !== "resolvido").indexOf(pin) + 1} · ${quickLabel(locate(pin.selector) ?? pin.tag)}`)),
       el("div", { class: "pin-bubble-body" }, el("div", { class: "pin-bubble-meta" }, `${pin.selector.slice(0, 90)}${pin.component ? ` · ${pin.component}` : ""}`), pin.stale === true ? el("div", { class: "pin-bubble-stale" }, t("pinStale")) : null, changesText !== "" ? el("div", { class: "pin-bubble-changes" }, changesText) : null, textChangeText !== "" ? el("div", { class: "pin-bubble-changes" }, textChangeText) : null),
+      auditTarget === null || pin.tag === "canvas" ? null : a11yAuditSection(auditTarget),
       el("div", { class: "prompt-input" }, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }), submit)),
       el(
         "div",

@@ -355,6 +355,18 @@ kbd {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
+.lr-a11y { display: grid; gap: 3px; padding: 6px 8px; border-radius: 8px; background: var(--n-100); }
+.lr-a11y-title { color: var(--n-500); font-size: 11px; font-weight: 600; }
+.lr-a11y-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--n-600); }
+.lr-a11y-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lr-a11y-value { max-width: 120px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--n-500); }
+.lr-a11y-chip { flex: none; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; }
+.lr-a11y-chip.pass { background: color-mix(in oklab, var(--done), white 75%); color: var(--done); }
+.lr-a11y-chip.fail { background: color-mix(in oklab, var(--error), white 75%); color: var(--error); }
+.lr-a11y-chip.warn { background: color-mix(in oklab, var(--warn), white 75%); color: var(--warn); }
+.lr-a11y-chip.unknown { background: var(--n-200); color: var(--n-600); }
+.lr-a11y-chip.na { background: var(--n-200); color: var(--n-600); }
+
 .prompt-input {
   display: grid; gap: 6px;
   background: var(--surface);
