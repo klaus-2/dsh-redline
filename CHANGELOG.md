@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-13
+
+This release expands the review toolkit: the inspector suggests the site's
+design tokens, adjusted pins produce an applicable CSS patch and capture the
+before and after of the change, one comment covers a group of elements, the
+page previews at fixed widths, the pin popover audits accessibility, and the
+pending annotations export as a report.
+
+_The new toolbar controls and popover sections appear after the dsh restarts
+with the updated plugin: the host serves the overlay the installed version
+carries._
+
+### Added
+
+- **The style inspector suggests the site's own design tokens.** When a color,
+  spacing, typography or radius field holds a value that matches a CSS custom
+  property defined on the page, the inspector offers chips with the matching
+  `var(--token)` names, and choosing one records the token reference instead
+  of the literal value, so the fix keeps following the design system.
+  ([`2ec6c4f`](https://github.com/klaus-2/dsh-redline/commit/2ec6c4f))
+
+- **Adjusted pins produce a CSS patch the agent can apply directly.** The
+  recorded changes build a `selector { property: value; }` block: the pin
+  popover copies it to the clipboard, and the context the agent receives
+  renders the same block under "Requested CSS", keeping token references as
+  written instead of resolved values.
+  ([`07f9340`](https://github.com/klaus-2/dsh-redline/commit/07f9340))
+
+- **Pins whose element disappears are marked stale instead of drifting
+  silently.** A page that re-renders under a pinned marker used to leave the
+  marker floating at its old position with no sign the target was gone. The
+  overlay re-resolves each pin's selector when the page mutates, repositions
+  the markers that still resolve, dims the ones that no longer do and warns
+  in the popover, and dragging a stale marker re-anchors it to the element
+  under the drop point.
+  ([`9b58eeb`](https://github.com/klaus-2/dsh-redline/commit/9b58eeb))
+
+- **The pending annotations export as a Markdown or JSON report.** Two buttons
+  in the pending card download every annotation the host holds, each with its
+  target, selector, comment, recorded adjustments and screenshot paths, so the
+  feedback moves into issues and chats outside the harness. The report covers
+  pending annotations only; delivered ones are gone from the snapshot.
+  ([`d9e0c4f`](https://github.com/klaus-2/dsh-redline/commit/d9e0c4f))
+
+- **One comment covers a group of elements.** Picking several elements in
+  group mode files them as one annotation with a single comment, and the agent
+  context renders the group as one numbered section listing every member's own
+  selector and screenshot, so repeating the same request across five buttons
+  stops costing five separate pins. Groups live on one page; navigating away
+  clears them with the rest of the page's annotations.
+  ([`c51715e`](https://github.com/klaus-2/dsh-redline/commit/c51715e))
+
+- **The page previews at fixed widths, and pins record the width they
+  captured.** A toolbar picker constrains the page to 375, 768 or 1280 pixels
+  and centers it, pins created under a preset record that width, and the agent
+  context names it, so layout problems that only appear in one width band
+  survive into the review. Pages using `100vw` units or fixed-position
+  navigation do not honor the constraint.
+  ([`3726a81`](https://github.com/klaus-2/dsh-redline/commit/3726a81))
+
+- **The pin popover audits the element for five common accessibility
+  problems.** Opening a pin checks text contrast against the effective
+  background, the accessible name, `alt` on images, an explicit or implicit
+  role and the 24-pixel minimum target size, and each row reports pass, fail,
+  warn, unknown or not applicable, so the reviewer gets an objective second
+  read without leaving the overlay.
+  ([`ff4e680`](https://github.com/klaus-2/dsh-redline/commit/ff4e680))
+
+- **Adjusted pins capture the before and after of the change.** Confirming
+  adjustments saves two crops of the marked region, one with the original
+  styles and one with the live adjustments applied, and the agent context
+  lists both image paths, so the agent sees the exact visual effect the
+  reviewer asked for instead of inferring it from property pairs.
+  ([`f7172ff`](https://github.com/klaus-2/dsh-redline/commit/f7172ff))
+
 ## [1.1.0] - 2026-11-12
 
 This release hardens everything the plugin shares with the pages it reviews and
@@ -170,10 +245,11 @@ positions are discarded the first time each site loads after updating.
   only in memory in the overlay; the only repository of saved drawings is the
   host store behind the instance secret.
   ([`7afc873`](https://github.com/klaus-2/dsh-redline/commit/7afc873))
-- **The generated overlay is rebuilt with its template, and panel positions now
-  live in `sessionStorage`.** Unsent drawings are memory-only and do not
-  survive a reload; pins stay tab-scoped, and legacy Web Storage keys are
-  purged when the page loads.
+- **Panel positions are tab-scoped now.** The saved position of a panel
+  followed every tab of the same site through a key shared across tabs;
+  positions live in `sessionStorage` per tab now and survive that tab's
+  reloads.
+  ([`7afc873`](https://github.com/klaus-2/dsh-redline/commit/7afc873))
 
 ## [1.0.23] - 2026-11-08
 
