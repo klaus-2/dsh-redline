@@ -754,6 +754,466 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("the overlay removes queued pins only by delivered id", poll !== undefined && poll.includes("data.deliveredIds") && poll.includes("gone.has(p.id)") && !poll.includes("deliveredAt"), poll === undefined ? "pollStatus missing" : "pollStatus no longer keys removal on delivered ids");
   }
 
+  harness.section("client: overlay pin re-anchoring");
+  {
+    const auditSource = extractFunction(overlay, "auditPinAnchors");
+    const audit = auditSource === undefined ? undefined : evaluateExpression(`(locate, pins, pinNodes) => {\n${auditSource}\nauditPinAnchors();\n}`, "auditPinAnchors");
+    const nodeWithClasses = () => {
+      const classes = new Set();
+      return { classes, classList: { add: (name) => classes.add(name), remove: (name) => classes.delete(name) } };
+    };
+    harness.check("the overlay keeps its anchor auditor", audit !== undefined);
+    {
+      const staleNode = nodeWithClasses();
+      const liveNode = nodeWithClasses();
+      const pins = [
+        { id: "gone", tag: "h1", selector: "#gone" },
+        { id: "here", tag: "h1", selector: "#here" }
+      ];
+      const pinNodes = new Map([["gone", { node: staleNode }], ["here", { node: liveNode }]]);
+      const locate = (selector) => (selector === "#here" ? { id: "here" } : null);
+      if (audit !== undefined) audit(locate, pins, pinNodes);
+      const renderer = extractFunction(overlay, "renderPins");
+      harness.check("overlay: the debounced observer path marks unlocatable pins stale instead of reusing the old rect",
+        audit !== undefined && pins[0].stale === true && staleNode.classes.has("lr-pin-stale") &&
+        pins[1].stale !== true && !liveNode.classes.has("lr-pin-stale") &&
+        renderer !== undefined && renderer.includes("pin.stale === true ? null :"),
+        JSON.stringify({ stale: pins.map((p) => p.stale), renderedFallback: renderer?.includes("?? { x: pin.rect.x") }));
+    }
+    {
+      const drawNode = nodeWithClasses();
+      const realNode = nodeWithClasses();
+      const pins = [
+        { id: "draw", tag: "canvas", selector: "canvas:drawing" },
+        { id: "real", tag: "h1", selector: "#real" }
+      ];
+      const pinNodes = new Map([["draw", { node: drawNode }], ["real", { node: realNode }]]);
+      if (audit !== undefined) audit(() => null, pins, pinNodes);
+      harness.check("overlay: canvas draw pins are exempt from stale classification",
+        audit !== undefined && pins[0].stale === undefined && drawNode.classes.size === 0 &&
+        pins[1].stale === true && realNode.classes.has("lr-pin-stale"),
+        JSON.stringify({ draw: pins[0].stale, real: pins[1].stale, drawClasses: [...drawNode.classes] }));
+    }
+    {
+      const reposition = extractFunction(overlay, "repositionPins");
+      const scrollLine = overlay.split("\n").find((line) => line.includes('addEventListener("scroll"') && line.includes("repositionPins")) ?? "";
+      const resizeLine = overlay.split("\n").find((line) => line.includes('addEventListener("resize"') && line.includes("repositionPins")) ?? "";
+      harness.check("overlay: the scroll and resize paths reposition without classifying stale",
+        reposition !== undefined && !reposition.includes("auditPinAnchors") &&
+        scrollLine.includes("repositionPins") && resizeLine.includes("repositionPins"),
+        JSON.stringify({ scroll: scrollLine.trim(), resize: resizeLine.trim() }));
+    }
+    {
+      const node = nodeWithClasses();
+      const pins = [{ id: "p", tag: "h1", selector: "#x" }];
+      const pinNodes = new Map([["p", { node }]]);
+      let element = null;
+      if (audit !== undefined) audit(() => element, pins, pinNodes);
+      const marked = pins[0].stale === true && node.classes.has("lr-pin-stale");
+      element = { id: "x" };
+      if (audit !== undefined) audit(() => element, pins, pinNodes);
+      const recovered = pins[0].stale === false && !node.classes.has("lr-pin-stale");
+      const dragClears = extractFunction(overlay, "wirePinDrag").includes("pin.stale = false");
+      harness.check("overlay: stale clears when the target is found again or the pin is re-anchored by drag",
+        audit !== undefined && marked && recovered && dragClears,
+        JSON.stringify({ marked, recovered, dragClears }));
+    }
+  }
+
+  harness.section("client: overlay before/after captures");
+  {
+    const captureSource = extractFunction(overlay, "captureBeforeAfter");
+    const runCapture = captureSource === undefined ? undefined : evaluateExpression(`(screenshotOnSend, captureCropFor, restoreAll, applyCommitted, adjustPatch, target, pin) => {\n${captureSource}\nreturn captureBeforeAfter(target, pin);\n}`, "captureBeforeAfter");
+    const captureTarget = { getBoundingClientRect: () => ({ left: 10, top: 20, width: 100, height: 50 }) };
+    harness.check("the overlay keeps its capture chain", runCapture !== undefined);
+    const makeStubs = () => {
+      const state = { order: [], rects: [], applyArgs: null };
+      return {
+        state,
+        capture: async (rect) => { state.order.push("capture"); state.rects.push(rect); return state.order.filter((step) => step === "capture").length === 1 ? "after-data" : "before-data"; },
+        restore: () => { state.order.push("restore"); },
+        apply: (patch, changes, textChange) => { state.order.push("apply"); state.applyArgs = [patch, changes, textChange]; }
+      };
+    };
+    {
+      const { state, capture, restore, apply } = makeStubs();
+      const pin = { changes: [{ prop: "color", before: "#000", after: "red" }], shot: null };
+      const pending = runCapture === undefined ? null : runCapture(true, capture, restore, apply, { id: "patch" }, captureTarget, pin);
+      await pending;
+      harness.check("overlay: confirm captures the after shot before restore and the before shot after restore",
+        pending !== null && state.order.join(",") === "capture,restore,capture,apply" &&
+        state.rects.length === 2 && state.rects[0] === state.rects[1] &&
+        pin.afterShot === "after-data" && pin.shot === "before-data" &&
+        state.applyArgs !== null && state.applyArgs[0]?.id === "patch" && state.applyArgs[1] === pin.changes,
+        JSON.stringify({ order: state.order, afterShot: pin.afterShot, shot: pin.shot }));
+    }
+    {
+      const { state, capture, restore, apply } = makeStubs();
+      const pin = { changes: [{ prop: "color", before: "#000", after: "red" }], shot: "old-shot" };
+      const pending = runCapture === undefined ? null : runCapture(false, capture, restore, apply, { id: "patch" }, captureTarget, pin);
+      await pending;
+      harness.check("overlay: confirm skips captures when screenshots are disabled",
+        pending !== null && state.order.length === 0 && pin.afterShot === undefined && pin.shot === "old-shot",
+        JSON.stringify({ order: state.order, shot: pin.shot }));
+    }
+    {
+      const { state, capture, restore, apply } = makeStubs();
+      const emptyPin = { changes: [], shot: "kept" };
+      const textOnlyPin = { changes: [], textChange: { before: "a", after: "b" }, shot: null };
+      const first = runCapture === undefined ? null : runCapture(true, capture, restore, apply, { id: "patch" }, captureTarget, emptyPin);
+      await first;
+      const before = state.order.length;
+      const second = runCapture === undefined ? null : runCapture(true, capture, restore, apply, { id: "patch" }, captureTarget, textOnlyPin);
+      await second;
+      harness.check("overlay: confirm skips captures when the adjustment has no changes and no text change",
+        first !== null && second !== null && before === 0 && emptyPin.shot === "kept" && emptyPin.afterShot === undefined &&
+        state.order.length > before && textOnlyPin.afterShot !== undefined && textOnlyPin.shot !== null,
+        JSON.stringify({ emptyOrder: state.order.slice(0, before), textOrder: state.order.slice(before) }));
+    }
+    {
+      const postSource = extractFunction(overlay, "postSnapshot");
+      let captured = null;
+      const bridgeSend = async (type, payload) => { captured = payload; return { ok: true }; };
+      const pins = [{ id: "x", tag: "h1", selector: "#x", comment: "c", changes: [], status: "queued", shot: "before-data", afterShot: "after-data", stale: true }];
+      if (postSource !== undefined) {
+        const post = evaluateExpression(`(bridgeSend, pins, PAGE_URL, document, setHint, updateToolbar, toast, t) => {\n${postSource}\nreturn postSnapshot();\n}`, "postSnapshot");
+        await post(bridgeSend, pins, "http://page/", { title: "T" }, () => {}, () => {}, () => {}, (key) => key);
+      }
+      const forwarded = captured?.pins?.[0];
+      harness.check("overlay: postSnapshot forwards afterShot on the pin payload",
+        forwarded !== undefined && forwarded.afterShot === "after-data" && forwarded.shot === "before-data" &&
+        !("stale" in forwarded) && forwarded.stale === undefined,
+        JSON.stringify(forwarded ?? captured));
+    }
+  }
+
+  harness.section("client: overlay css patch copy");
+  {
+    const buildSource = extractFunction(overlay, "buildCssPatch");
+    const buildCssPatch = buildSource === undefined ? undefined : evaluateExpression(buildSource, "buildCssPatch");
+    harness.check("the overlay keeps its css patch builder", buildCssPatch !== undefined);
+    harness.check("overlay: buildCssPatch renders the selector with one property per committed change",
+      buildCssPatch !== undefined &&
+      buildCssPatch({ selector: "body h1", changes: [{ prop: "color", before: "#000", after: "red" }, { prop: "border-radius", before: "0", after: "4px" }] }) === "body h1 { color: red; border-radius: 4px; }",
+      buildCssPatch === undefined ? "builder missing" : JSON.stringify(buildCssPatch({ selector: "body h1", changes: [{ prop: "color", before: "#000", after: "red" }] })));
+    harness.check("overlay: buildCssPatch ignores text changes and canvas pins",
+      buildCssPatch !== undefined &&
+      buildCssPatch({ selector: "body h1", changes: [], textChange: { before: "a", after: "b" } }) === "" &&
+      buildCssPatch({ tag: "canvas", selector: "canvas:drawing", changes: [{ prop: "color", before: "#000", after: "red" }] }) === "",
+      "canvas or text-only pins must produce no css");
+    harness.check("overlay: buildCssPatch keeps var() values verbatim",
+      buildCssPatch !== undefined &&
+      buildCssPatch({ selector: "body h1", changes: [{ prop: "color", before: "#000", after: "var(--brand)" }] }) === "body h1 { color: var(--brand); }",
+      buildCssPatch === undefined ? "builder missing" : JSON.stringify(buildCssPatch({ selector: "body h1", changes: [{ prop: "color", before: "#000", after: "var(--brand)" }] })));
+    {
+      const copySource = extractFunction(overlay, "copyCssPatch");
+      const renderer = extractFunction(overlay, "renderPinPanel");
+      let written = [];
+      let toasts = [];
+      const navigatorStub = { clipboard: { writeText: async (text) => { written.push(text); } } };
+      const copy = copySource === undefined ? undefined : evaluateExpression(`(navigator, toast, t, buildCssPatch, pin) => {\n${copySource}\ncopyCssPatch(pin);\n}`, "copyCssPatch");
+      if (copy !== undefined) copy(navigatorStub, (text) => toasts.push(text), (key) => key, buildCssPatch, { selector: "body h1", changes: [{ prop: "color", before: "#000", after: "red" }] });
+      let failingToasts = [];
+      const failingNavigator = { clipboard: { writeText: async () => { throw new Error("denied"); } } };
+      if (copy !== undefined) copy(failingNavigator, (text) => failingToasts.push(text), (key) => key, buildCssPatch, { selector: "body h1", changes: [{ prop: "color", before: "#000", after: "red" }] });
+      await flush();
+      harness.check("overlay: the popover copy button writes the patch via the clipboard",
+        copy !== undefined && renderer !== undefined && renderer.includes("pin.changes.length > 0") && renderer.includes("copyCssPatch(pin)") &&
+        JSON.stringify(written) === JSON.stringify(["body h1 { color: red; }"]) && JSON.stringify(toasts) === JSON.stringify(["cssCopied"]) &&
+        JSON.stringify(failingToasts) === JSON.stringify(["cssCopyFailed"]),
+        JSON.stringify({ written, toasts, failingToasts, conditional: renderer?.includes("pin.changes.length > 0") }));
+    }
+  }
+
+  harness.section("client: overlay token suggestions");
+  {
+    const fakeEl = (tag, attrs = {}, ...children) => {
+      const node = { tag, attrs, children: [], handlers: {}, append(child) { if (child !== null && child !== undefined) this.children.push(child); }, addEventListener(type, fn) { this.handlers[type] = fn; } };
+      for (const [key, value] of Object.entries(attrs)) node[key === "class" ? "className" : key] = value;
+      for (const child of children) node.append(child);
+      return node;
+    };
+    harness.check("the overlay keeps its token helpers",
+      extractFunction(overlay, "collectCustomProps") !== undefined && extractFunction(overlay, "matchTokensByValue") !== undefined && extractFunction(overlay, "tokenSuggestionsFor") !== undefined && extractFunction(overlay, "tokenChipRow") !== undefined);
+    {
+      const source = extractFunction(overlay, "collectCustomProps");
+      const collect = source === undefined ? undefined : evaluateExpression(`(getComputedStyle, target) => {\n${source}\nreturn collectCustomProps(target);\n}`, "collectCustomProps");
+      const fakeStyle = {
+        length: 5,
+        props: { "color": "red", "--brand": " #000000 ", "--bad~name": "x", "--": "y", "--spacing-md": "16px" },
+        item(index) { return Object.keys(this.props)[index] ?? ""; },
+        getPropertyValue(name) { return this.props[name] ?? ""; }
+      };
+      const props = collect === undefined ? undefined : collect(() => fakeStyle, {});
+      harness.check("overlay: custom property collection only accepts valid token names from the target computed style",
+        props !== undefined && JSON.stringify(props) === JSON.stringify([{ name: "--brand", value: " #000000 " }, { name: "--spacing-md", value: "16px" }]),
+        JSON.stringify(props ?? "collector missing"));
+    }
+    {
+      const match = evaluateExpression(extractFunction(overlay, "matchTokensByValue"), "matchTokensByValue");
+      harness.check("overlay: token matching compares resolved values for exact equality",
+        match !== undefined &&
+        JSON.stringify(match([{ name: "--a", value: "16px" }], "16px")) === JSON.stringify(["--a"]) &&
+        JSON.stringify(match([{ name: "--a", value: " 16px " }], " 16px ")) === JSON.stringify(["--a"]) &&
+        JSON.stringify(match([{ name: "--a", value: "16px" }], "17px")) === JSON.stringify([]) &&
+        JSON.stringify(match([{ name: "--a", value: "16px" }], "   ")) === JSON.stringify([]),
+        JSON.stringify({ equal: match?.([{ name: "--a", value: "16px" }], "16px"), trimmed: match?.([{ name: "--a", value: " 16px " }], " 16px ") }));
+    }
+    {
+      const sandbox = { el: fakeEl, t: (key) => key, tokenSuggestionsFor: () => [], makeTokenProbe: () => null };
+      vm.createContext(sandbox);
+      for (const name of ["tokenChipRowFromNames", "tokenChipRow"]) {
+        const source = extractFunction(overlay, name);
+        if (source !== undefined) vm.runInContext(source, sandbox, { filename: `${name}.js` });
+      }
+      const emptyRow = typeof sandbox.tokenChipRow === "function" ? sandbox.tokenChipRow({}, "16px", () => {}) : undefined;
+      const match = evaluateExpression(extractFunction(overlay, "matchTokensByValue"), "matchTokensByValue");
+      harness.check("overlay: token chips are absent when the page defines no matching custom properties",
+        emptyRow === null && match !== undefined && JSON.stringify(match([{ name: "--a", value: "9px" }], "16px")) === JSON.stringify([]),
+        JSON.stringify({ emptyRow, noMatch: match?.([{ name: "--a", value: "9px" }], "16px") }));
+    }
+    {
+      const sandbox = {
+        EDITABLE_PROPS: editableProps(overlay),
+        adjustValues: new Map([["color", "#000000"]]),
+        adjustInvalid: new Set(),
+        adjustPatch: { element: { style: { setProperty() {}, getPropertyValue: () => "", getPropertyPriority: () => "" } }, originalStyles: new Map(), computedBaselines: new Map([["color", "#000000"]]), originalText: null },
+        adjustTarget: null,
+        adjustLedger: new Map(),
+        adjustTargetSelector: "",
+        rerenderAdjustRows: () => {},
+        tokenSuggestionsFor: () => ["--brand-color"],
+        makeTokenProbe: () => null,
+        t: (key) => key,
+        el: fakeEl
+      };
+      vm.createContext(sandbox);
+      for (const name of ["isSafeValue", "previewStyle", "adjustBaseline", "adjustUpdateProperty", "adjustCurrentChanges", "tokenChipRowFromNames", "tokenChipRow"]) {
+        const source = extractFunction(overlay, name);
+        if (source !== undefined) vm.runInContext(source, sandbox, { filename: `${name}.js` });
+      }
+      const applied = [];
+      const row = typeof sandbox.tokenChipRow === "function" ? sandbox.tokenChipRow({}, "#000000", (name) => { applied.push(name); sandbox.adjustUpdateProperty("color", `var(${name})`); }) : undefined;
+      const chip = row?.children?.[1];
+      if (chip?.handlers?.click !== undefined) chip.handlers.click();
+      const committed = typeof sandbox.adjustCurrentChanges === "function" ? sandbox.adjustCurrentChanges() : undefined;
+      const propertyRowSource = extractFunction(overlay, "propertyRow");
+      harness.check("overlay: choosing a token chip records var(--name) as the after value",
+        row !== undefined && chip !== undefined && chip.textContent === "--brand-color" &&
+        JSON.stringify(applied) === JSON.stringify(["--brand-color"]) &&
+        JSON.stringify(committed) === JSON.stringify([{ prop: "color", before: "#000000", after: "var(--brand-color)" }]) &&
+        propertyRowSource !== undefined && propertyRowSource.includes("adjustUpdateProperty(prop, `var(${tokenName})`)"),
+        JSON.stringify({ applied, committed, chipText: chip?.textContent }));
+    }
+    {
+      const chipRowSource = extractFunction(overlay, "tokenChipRowFromNames");
+      harness.check("overlay: token suggestion labels are rendered via textContent",
+        chipRowSource !== undefined && chipRowSource.includes("textContent") && !chipRowSource.includes("html:"),
+        chipRowSource === undefined ? "chip row missing" : "chip labels must not use the html attribute");
+    }
+  }
+
+  harness.section("client: overlay accessibility audit");
+  {
+    const sandbox = {
+      getComputedStyle: (node) => node.computed ?? { color: "", backgroundColor: "" },
+      document: { getElementById: () => null }
+    };
+    vm.createContext(sandbox);
+    const semanticMatch = /const A11Y_SEMANTIC_TAGS = (new Set\(\[[^\]]*\]\))/.exec(overlay);
+    sandbox.A11Y_SEMANTIC_TAGS = semanticMatch === null ? new Set() : evaluateExpression(semanticMatch[1], "A11Y_SEMANTIC_TAGS");
+    for (const name of ["parseColor", "relativeLuminance", "contrastRatio", "resolveReadableBackground", "accessibleName", "auditElement"]) {
+      const source = extractFunction(overlay, name);
+      if (source !== undefined) vm.runInContext(source, sandbox, { filename: `${name}.js` });
+    }
+    const fakeEl = (options = {}) => ({
+      tagName: options.tagName ?? "DIV",
+      textContent: options.text ?? "",
+      computed: options.computed ?? { color: "rgb(0, 0, 0)", backgroundColor: "rgba(0, 0, 0, 0)" },
+      parentElement: options.parent ?? null,
+      getAttribute(name) {
+        const attrs = options.attrs ?? {};
+        return name in attrs ? attrs[name] : null;
+      },
+      getBoundingClientRect: () => options.rect ?? { width: 100, height: 30 },
+      ownerDocument: { getElementById: (id) => options.byId?.[id] ?? null }
+    });
+    const { contrastRatio, resolveReadableBackground, accessibleName, auditElement } = sandbox;
+    harness.check("the overlay keeps its accessibility helpers",
+      typeof contrastRatio === "function" && typeof resolveReadableBackground === "function" && typeof accessibleName === "function" && typeof auditElement === "function");
+    {
+      const blackOnWhite = contrastRatio("#000000", "#ffffff");
+      const grayOnWhite = contrastRatio("#777777", "#ffffff");
+      harness.check("overlay: contrast ratio matches the WCAG relative luminance formula",
+        blackOnWhite !== null && Math.abs(blackOnWhite - 21) < 0.01 &&
+        grayOnWhite !== null && Math.abs(grayOnWhite - 4.48) < 0.05,
+        JSON.stringify({ blackOnWhite, grayOnWhite }));
+    }
+    {
+      const gradient = fakeEl({ computed: { color: "rgb(0, 0, 0)", backgroundColor: "linear-gradient(90deg, #fff, #000)" } });
+      const transparentChain = fakeEl({ computed: { color: "rgb(0, 0, 0)", backgroundColor: "rgba(0, 0, 0, 0)" }, parent: fakeEl({ computed: { color: "rgb(0, 0, 0)", backgroundColor: "transparent" } }) });
+      const gradientRow = auditElement(gradient).find((row) => row.check === "contrast");
+      const transparentRow = auditElement(transparentChain).find((row) => row.check === "contrast");
+      harness.check("overlay: contrast reports unknown for gradient and transparent-only backgrounds",
+        resolveReadableBackground(gradient) === "unknown" && resolveReadableBackground(transparentChain) === "unknown" &&
+        contrastRatio("rgb(0, 0, 0)", "unknown") === null &&
+        gradientRow?.status === "unknown" && transparentRow?.status === "unknown",
+        JSON.stringify({ gradient: resolveReadableBackground(gradient), transparent: resolveReadableBackground(transparentChain), gradientRow, transparentRow }));
+    }
+    {
+      const labelled = fakeEl({ attrs: { "aria-label": "Save changes", alt: "disk", "aria-labelledby": "title" }, text: "text", byId: { title: { textContent: "Title" } } });
+      const altOnly = fakeEl({ tagName: "IMG", attrs: { alt: "team photo" }, text: "ignored" });
+      const labelledByOnly = fakeEl({ attrs: { "aria-labelledby": "title" }, byId: { title: { textContent: "Title" } } });
+      const textOnly = fakeEl({ text: "  Click me  " });
+      const titleOnly = fakeEl({ attrs: { title: "Tooltip" } });
+      harness.check("overlay: accessible name prefers aria-label, then alt, then text content",
+        accessibleName(labelled) === "Save changes" && accessibleName(altOnly) === "team photo" &&
+        accessibleName(labelledByOnly) === "Title" && accessibleName(textOnly) === "Click me" &&
+        accessibleName(titleOnly) === "Tooltip" && accessibleName(fakeEl()) === "",
+        JSON.stringify({ labelled: accessibleName(labelled), altOnly: accessibleName(altOnly), labelledBy: accessibleName(labelledByOnly), text: accessibleName(textOnly) }));
+    }
+    {
+      const bareImg = fakeEl({ tagName: "IMG" });
+      const decorativeImg = fakeEl({ tagName: "IMG", attrs: { alt: "" } });
+      const plainDiv = fakeEl();
+      const altStatus = (el) => auditElement(el).find((row) => row.check === "imgAlt")?.status;
+      harness.check("overlay: an img without an alt attribute fails the alt check",
+        altStatus(bareImg) === "fail" && altStatus(decorativeImg) === "pass" && altStatus(plainDiv) === "n/a",
+        JSON.stringify({ bareImg: altStatus(bareImg), decorative: altStatus(decorativeImg), div: altStatus(plainDiv) }));
+    }
+    {
+      const small = auditElement(fakeEl({ rect: { width: 23, height: 40 } })).find((row) => row.check === "targetSize");
+      const narrow = auditElement(fakeEl({ rect: { width: 40, height: 23 } })).find((row) => row.check === "targetSize");
+      const exact = auditElement(fakeEl({ rect: { width: 24, height: 24 } })).find((row) => row.check === "targetSize");
+      harness.check("overlay: target size fails below 24 by 24 pixels",
+        small?.status === "fail" && narrow?.status === "fail" && exact?.status === "pass",
+        JSON.stringify({ small, narrow, exact }));
+    }
+    {
+      const imgRows = auditElement(fakeEl({ tagName: "IMG", attrs: { alt: "x" } }));
+      const divRows = auditElement(fakeEl({ attrs: { role: "button" } }));
+      const renderer = extractFunction(overlay, "renderPinPanel");
+      harness.check("overlay: the popover audit renders exactly five rows",
+        imgRows.length === 5 && divRows.length === 5 &&
+        JSON.stringify(imgRows.map((row) => row.check)) === JSON.stringify(["contrast", "name", "imgAlt", "role", "targetSize"]) &&
+        renderer !== undefined && renderer.includes("a11yAuditSection(auditTarget)"),
+        JSON.stringify({ imgRows: imgRows.map((row) => row.check), divRows: divRows.map((row) => row.check), wired: renderer?.includes("a11yAuditSection") }));
+    }
+  }
+
+  harness.section("client: overlay group mode");
+  {
+    const finalizeSource = extractFunction(overlay, "finalizeGroup");
+    const pickSource = extractFunction(overlay, "groupPick");
+    harness.check("the overlay keeps its group mode helpers",
+      finalizeSource !== undefined && pickSource !== undefined && extractFunction(overlay, "setGroupMode") !== undefined && overlay.includes("groupBtn"));
+    {
+      const sandbox = {
+        pins: [],
+        groupPicks: [
+          { target: { localName: "h1", getAttribute: () => null, textContent: "Title one" }, selector: "h1:first-of-type", rect: { x: 1, y: 2, w: 30, h: 20 }, offsets: { ox: 15, oy: 10 }, shot: "shot-a" },
+          { target: { localName: "p", getAttribute: () => "paragraph", textContent: "Body" }, selector: "p.hero", rect: { x: 3, y: 4, w: 40, h: 50 }, offsets: { ox: 20, oy: 25 }, shot: "shot-b" },
+          { target: { localName: "li", getAttribute: () => null, textContent: "Item" }, selector: "ul > li", rect: { x: 5, y: 6, w: 20, h: 20 }, offsets: { ox: 10, oy: 10 }, shot: "shot-c" }
+        ],
+        groupComposerNode: { querySelector: () => ({ value: "One comment for all three" }) },
+        viewportPresetWidth: null,
+        crypto: { randomUUID: () => "uuid" },
+        savePins: () => {},
+        setGroupMode: () => {},
+        renderPins: () => {},
+        toast: () => {},
+        t: (key) => key,
+        reactComponentName: () => null,
+        PAGE_URL: "http://page/"
+      };
+      vm.createContext(sandbox);
+      vm.runInContext(finalizeSource ?? "", sandbox, { filename: "finalizeGroup.js" });
+      const created = sandbox.finalizeGroup();
+      const ids = created.map((pin) => pin.groupId);
+      const comments = created.map((pin) => pin.comment);
+      harness.check("overlay: group mode assigns the same groupId to every member pin",
+        Array.isArray(created) && created.length === 3 && ids.every((id) => typeof id === "string" && id !== "") &&
+        ids.every((id) => id === ids[0]),
+        JSON.stringify({ count: created.length, ids, comments }));
+      harness.check("overlay: the group comment is copied to every member",
+        comments.length === 3 && comments.every((text) => text === "One comment for all three"),
+        JSON.stringify(comments));
+      harness.check("overlay: each group member captures its own crop",
+        created.every((pin) => typeof pin.shot === "string" && pin.shot !== "") &&
+        new Set(created.map((pin) => pin.shot)).size === 3 &&
+        JSON.stringify(created.map((pin) => pin.rect)) === JSON.stringify([{ x: 1, y: 2, w: 30, h: 20 }, { x: 3, y: 4, w: 40, h: 50 }, { x: 5, y: 6, w: 20, h: 20 }]),
+        JSON.stringify(created.map((pin) => ({ shot: pin.shot, rect: pin.rect }))));
+    }
+    {
+      const pick = pickSource === undefined ? undefined : evaluateExpression(`(Element, groupMode, target, groupPicks, captureCropFor, screenshotOnSend, cssPath) => {\n${pickSource}\nreturn groupPick(target);\n}`, "groupPick");
+      if (pick !== undefined) {
+        const canvasTarget = { tagName: "CANVAS", localName: "canvas", getBoundingClientRect: () => ({ left: 0, top: 0, width: 10, height: 10 }) };
+        const picks = [];
+        const capture = async () => "unused";
+        const rejectsCanvas = await pick(class Element {}, true, canvasTarget, picks, capture, true, () => "canvas:drawing");
+        const notInMode = await pick(class Element {}, false, { tagName: "P", getBoundingClientRect: () => ({ left: 0, top: 0, width: 10, height: 10 }) }, picks, capture, true, () => "p");
+        const offToggle = { tagName: "P", getBoundingClientRect: () => ({ left: 0, top: 0, width: 10, height: 10 }) };
+        const toggledOff = await pick(class Element {}, true, offToggle, picks, async () => { throw new Error("capture raced with toggle-off"); }, true, () => "p");
+        harness.check("overlay: group picking ignores canvas draw pins",
+          rejectsCanvas === undefined && picks.length === 0 && notInMode === undefined && toggledOff === undefined && picks.length === 0,
+          JSON.stringify({ picks: picks.length, results: [rejectsCanvas, notInMode, toggledOff] }));
+      } else {
+        harness.check("overlay: group picking ignores canvas draw pins", false, "groupPick missing");
+      }
+    }
+    {
+      const exits = extractFunction(overlay, "setGroupMode") ?? "";
+      const creates = exits.includes("groupPicks = []") || exits.includes("clearGroupPicks()");
+      harness.check("overlay: leaving group mode with no picks creates no pins",
+        creates && exits.includes("clearHighlight()"),
+        exits.slice(0, 120));
+    }
+  }
+
+  harness.section("client: overlay viewport presets");
+  {
+    const applySource = extractFunction(overlay, "applyViewportPreset");
+    harness.check("the overlay keeps its viewport preset helpers",
+      applySource !== undefined && overlay.includes("viewportPicker") && overlay.includes("lr-viewport-picker"));
+    {
+      const runs = [];
+      const run = applySource === undefined ? undefined : evaluateExpression(`(document, widthOrNull, repositionPins, repositionDraft, draft, adjustPanel) => {\nlet viewportPresetWidth = null;\n${applySource}\napplyViewportPreset(widthOrNull);\nreturn viewportPresetWidth;\n}`, "applyViewportPreset");
+      const makeDocument = () => {
+        const style = { maxWidth: "", marginLeft: "", marginRight: "", setProperty(name, value) { this[name] = value; }, removeProperty(name) { this[name] = ""; } };
+        return { documentElement: { style }, writes: style };
+      };
+      const doc1 = makeDocument();
+      const width = run === undefined ? undefined : run(doc1, 375, () => runs.push("reposition"), () => {}, null, null);
+      const applied = doc1.writes;
+      const doc3 = makeDocument();
+      doc3.writes.setProperty("max-width", "768px");
+      doc3.writes.setProperty("margin-left", "auto");
+      const reset = run(doc3, null, () => runs.push("reposition"), () => {}, null, null);
+      const doc4 = makeDocument();
+      let draftCalls = 0;
+      run(doc4, 768, () => runs.push("reposition"), () => { draftCalls += 1; }, { anchor: true }, null);      harness.check("overlay: the preset picker constrains documentElement with maxWidth and centers it",
+        width === 375 && applied["max-width"] === "375px" && applied["margin-left"] === "auto" && applied["margin-right"] === "auto",
+        JSON.stringify({ width, applied: { maxWidth: applied["max-width"], marginLeft: applied["margin-left"], marginRight: applied["margin-right"] } }));
+      harness.check("overlay: reset clears the width constraint",
+        reset === null && doc3.writes["max-width"] === "" && doc3.writes["margin-left"] === "" && doc3.writes["margin-right"] === "",
+        JSON.stringify({ reset, after: { maxWidth: doc3.writes["max-width"], marginLeft: doc3.writes["margin-left"] } }));
+      harness.check("overlay: applying a preset repositions pins manually",
+        runs.length === 3 && runs.every((name) => name === "reposition"),
+        JSON.stringify(runs));
+      harness.check("overlay: applying a preset repositions the open draft", draftCalls === 1, `draft reposition calls: ${draftCalls}`);
+    }
+    {
+      const snapshotSource = extractFunction(overlay, "postSnapshot");
+      const pickerLine = overlay.split("\n").find((line) => line.includes("pins.push(pin)") || (line.includes("viewportWidth = viewportPresetWidth") && line.includes("pin.viewportWidth")));
+      const submit = extractFunction(overlay, "submitDraft");
+      const whitelist = snapshotSource !== undefined && snapshotSource.includes("viewportWidth: p.viewportWidth ?? null");
+      const tagged = submit !== undefined && submit.includes("viewportPresetWidth !== null");
+      harness.check("overlay: pins created under an active preset record the preset width, not innerWidth",
+        whitelist && tagged && !overlay.includes("viewportWidth: window.innerWidth") && pickerLine !== undefined,
+        JSON.stringify({ whitelist, tagged, line: pickerLine?.trim().slice(0, 80) }));
+    }
+  }
+
   harness.section("client: overlay hotkeys");
   {
     const parseHotkey = evaluateExpression(extractFunction(overlay, "parseHotkey"), "parseHotkey");
@@ -2463,6 +2923,89 @@ export async function runClientSuite(harness, { pluginDir }) {
       harness.eq("the copy that landed on disk is remembered", localStorage.getItem("dsh-redline.updated"), "1.0.17");
       const reason = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("did not start"));
       harness.check("the row says why the copy did not start", reason.length > 0, JSON.stringify(after.tree).slice(0, 200));
+    }
+  }
+
+  harness.section("client: the pending card exports the report");
+  {
+    const fetchCalls = [];
+    let failing = false;
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const downloads = [];
+    const created = [];
+    const documentStub = {
+      createElement(tag) {
+        const node = { tag, href: "", download: "", click: () => downloads.push({ href: node.href, download: node.download }), style: {}, setAttribute() {} };
+        created.push(node);
+        return node;
+      },
+      documentElement: {},
+      head: { appendChild() {} },
+      body: { appendChild() {} },
+      readyState: "complete",
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener() {},
+      removeEventListener() {}
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      document: documentStub,
+      fetch: async (url, options) => {
+        const target = String(url);
+        if (target.includes("/.lr/report")) {
+          fetchCalls.push({ url: target, headers: options?.headers ?? {}, format: new URL(target).searchParams.get("format") });
+          if (failing) return jsonResponse({ ok: false }, 500);
+          return jsonResponse({ ok: true, count: 0 });
+        }
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/pending")) return jsonResponse({ ok: true, count: 2, snapshotId: "snap-9", pageTitle: "Demo", pins: [{ id: "p1", index: 1, tag: "h1", comment: "c", selector: "body h1", component: "", text: "", role: "" }] });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    await flush(4);
+    const card = client.slots.find((slot) => slot.spec.id === "dsh-redline" && slot.spec.name === "conversation.input.dock");
+    harness.check("the pending card registers in the dock", card !== undefined);
+    if (card !== undefined) {
+      const first = renderOnce(stub, card.component, {});
+      for (const effect of first.effects) effect();
+      await flush(4);
+      const open = renderOnce(stub, card.component, {});
+      const summary = findElements(open.tree, (element) => element.props?.className === "lr-summary");
+      if (summary.length === 1) {
+        summary[0].props.onClick();
+        await flush(2);
+      }
+      const expanded = renderOnce(stub, card.component, {});
+      const mdButton = findElements(expanded.tree, (element) => element.props?.className === "lr-report-md");
+      const jsonButton = findElements(expanded.tree, (element) => element.props?.className === "lr-report-json");
+      harness.eq("the card exposes the two report buttons", mdButton.length + jsonButton.length, 2);
+      if (mdButton.length === 1 && jsonButton.length === 1) {
+        await mdButton[0].props.onClick();
+        await jsonButton[0].props.onClick();
+        await flush(3);
+        const ok = fetchCalls.length === 2 && fetchCalls.every((call) => call.url.includes("/.lr/report?") && call.url.includes("format=") && call.headers["x-dsh-redline-secret"] === "a".repeat(64)) &&
+          fetchCalls.some((call) => call.format === "md") && fetchCalls.some((call) => call.format === "json") &&
+          downloads.length === 2 && downloads.every((entry) => String(entry.download).startsWith("redline-report-snap-9."));
+        harness.check("client: export buttons request the report with the secret header and the requested format", ok, JSON.stringify({ calls: fetchCalls, downloads }));
+        failing = true;
+        fetchCalls.length = 0;
+        downloads.length = 0;
+        await mdButton[0].props.onClick();
+        await flush(3);
+        const failed = renderOnce(stub, card.component, {});
+        const errorLine = findElements(failed.tree, (element) => element.props?.className === "lr-report-error");
+        harness.check("client: export failure renders an inline error instead of a broken download",
+          errorLine.length === 1 && typeof errorLine[0].props?.children === "string" && errorLine[0].props.children !== "reportFailed" && errorLine[0].props.children.includes("download failed") && downloads.length === 0,
+          JSON.stringify({ error: errorLine.length, text: errorLine[0]?.props?.children, downloads: downloads.length }));
+      }
     }
   }
 }

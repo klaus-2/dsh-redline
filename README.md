@@ -43,6 +43,14 @@ For each pin, one block in a single snapshot:
 - Element picking with hover highlight on any page the harness browser renders
 - Per-pin comments, editable in place, with resolve/reopen/delete
 - Live style inspector with rollback: drag-to-scrub numbers, color pickers, presets, linked box-model and radius edits, shadow and transform composers, per-row reset
+- Design-token suggestions in the inspector: the page's own `var(--token)` is offered when its resolved value matches the value being edited
+- CSS patch export: the committed adjustments render as a copyable `selector { prop: value; }` rule in the overlay and as a `Requested CSS:` block in the agent context
+- Stale pin re-anchoring: when the target element leaves the DOM the pin is flagged and the popover warns, and dragging the marker re-binds it
+- Before/after screenshots per adjusted pin: the after crop is captured live, then the page is restored and the before crop is captured from the same frame
+- Group comments: toolbar group mode collects N elements and posts one comment copied to every member pin (page-scoped — groups cannot span pages)
+- Responsive preview presets: constrain the page to 375/768/1280 px or reset to full width; pins created under a preset record its width (note: `100vw` units and `position: fixed` navbars do not respect the constraint)
+- Per-element accessibility audit in the pin popover: text contrast, accessible name, image alt, role presence and 24×24 target size
+- Pending report export: download the pending annotations as Markdown or JSON from the pending card (secret-gated, pending-only scope)
 - Cropped screenshots per pin (not the whole viewport)
 - Annotations attach to the next message of the session you are viewing, rendered as a native chat card
 - Reconciliation: removing a pin from the card removes it from the page overlay too

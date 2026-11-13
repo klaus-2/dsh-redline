@@ -105,6 +105,7 @@ kbd {
   border-radius: 4px;
   pointer-events: none;
 }
+.highlight.group-pick { border-style: dashed; border-width: 2px; border-color: var(--done); background: color-mix(in oklab, var(--done), white 85%); }
 .highlight-label {
   position: fixed; left: 0; top: 0;
   display: flex; gap: 6px; align-items: center;
@@ -176,6 +177,7 @@ kbd {
 .pin-resolved { --pin: #7b7d7a; }
 .pin-resolved .pin-body { opacity: 0.8; }
 .pin-queued .pin-body { background: white; color: var(--accent); border: 2px dashed var(--accent); }
+.pin.lr-pin-stale .pin-body { opacity: 0.55; outline: 2px dashed #e5484d; outline-offset: 2px; }
 
 .pin-working .pin-body {
   isolation: isolate;
@@ -353,6 +355,18 @@ kbd {
   letter-spacing: 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+.lr-a11y { display: grid; gap: 3px; padding: 6px 8px; border-radius: 8px; background: var(--n-100); }
+.lr-a11y-title { color: var(--n-500); font-size: 11px; font-weight: 600; }
+.lr-a11y-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--n-600); }
+.lr-a11y-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lr-a11y-value { max-width: 120px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--n-500); }
+.lr-a11y-chip { flex: none; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; }
+.lr-a11y-chip.pass { background: color-mix(in oklab, var(--done), white 75%); color: var(--done); }
+.lr-a11y-chip.fail { background: color-mix(in oklab, var(--error), white 75%); color: var(--error); }
+.lr-a11y-chip.warn { background: color-mix(in oklab, var(--warn), white 75%); color: var(--warn); }
+.lr-a11y-chip.unknown { background: var(--n-200); color: var(--n-600); }
+.lr-a11y-chip.na { background: var(--n-200); color: var(--n-600); }
 
 .prompt-input {
   display: grid; gap: 6px;
@@ -880,6 +894,16 @@ kbd {
 .tool-active { background: var(--accent); color: white; }
 .tool-active kbd { background: rgba(255, 255, 255, 0.22); color: white; }
 .tool-label { font-weight: 500; color: inherit; }
+
+.lr-viewport-picker {
+  all: unset;
+  pointer-events: auto;
+  height: 32px; padding: 0 9px; border-radius: 999px;
+  display: inline-flex; align-items: center;
+  color: inherit; font-size: 12px; font-weight: 500;
+  cursor: pointer;
+}
+.lr-viewport-picker option { background: rgba(17, 17, 19, 0.95); color: rgba(255, 255, 255, 0.86); }
 
 .tool-off { color: rgba(255, 255, 255, 0.35); }
 .tool-send { background: var(--accent); color: white; }

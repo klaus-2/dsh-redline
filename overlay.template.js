@@ -54,6 +54,7 @@
     camera: Icon(14, '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>', '<circle cx="12" cy="13" r="3"/>'),
     check: Icon(13, '<path d="M20 6 9 17l-5-5"/>'),
     sliders: Icon(16, '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/>', '<path d="M1 14h6M9 8h6M17 16h6"/>'),
+    group: Icon(16, '<rect x="3" y="3" width="7" height="7" rx="1.5"/>', '<rect x="14" y="3" width="7" height="7" rx="1.5"/>', '<rect x="3" y="14" width="7" height="7" rx="1.5"/>', '<path d="M17.5 14v7M14 17.5h7"/>'),
     code: Icon(12, '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>')
   };
 
@@ -80,6 +81,27 @@
       "resolved": "Resolve",
       "reopen": "Reopen",
       "del": "Delete",
+      "pinStale": "Target not found — pin is stale. Drag the marker to re-anchor.",
+      "copyCss": "Copy CSS",
+      "cssCopied": "CSS copied to clipboard",
+      "cssCopyFailed": "Could not copy CSS",
+      "tokenSuggestions": "Design tokens",
+      "a11yTitle": "Accessibility",
+      "a11yContrast": "Text contrast",
+      "a11yAccessibleName": "Accessible name",
+      "a11yImgAlt": "Image alt",
+      "a11yRole": "Role",
+      "a11yTargetSize": "Target size",
+      "a11yPass": "Pass",
+      "a11yFail": "Fail",
+      "a11yWarn": "Warn",
+      "a11yUnknown": "Unknown",
+      "a11yNotApplicable": "n/a",
+      "groupBtn": "Group",
+      "groupHint": "Click elements to group, then press Enter",
+      "groupCreated": "Group created",
+      "viewportLabel": "Preview width",
+      "viewportReset": "Full width",
       "eyeTitle": "Show/hide pins",
       "statusTitle": "Live Review active",
       "pendingTitle": "Annotations waiting for your next prompt in the chat",
@@ -230,6 +252,27 @@
       "resolved": "✓ Resolvido",
       "reopen": "Reabrir",
       "del": "Excluir",
+      "pinStale": "Alvo não encontrado — pin obsoleto. Arraste o marcador para reancorar.",
+      "copyCss": "Copiar CSS",
+      "cssCopied": "CSS copiado para a área de transferência",
+      "cssCopyFailed": "Não foi possível copiar o CSS",
+      "tokenSuggestions": "Tokens de design",
+      "a11yTitle": "Acessibilidade",
+      "a11yContrast": "Contraste do texto",
+      "a11yAccessibleName": "Nome acessível",
+      "a11yImgAlt": "Alt da imagem",
+      "a11yRole": "Papel",
+      "a11yTargetSize": "Tamanho do alvo",
+      "a11yPass": "Passa",
+      "a11yFail": "Falha",
+      "a11yWarn": "Atenção",
+      "a11yUnknown": "Desconhecido",
+      "a11yNotApplicable": "n/a",
+      "groupBtn": "Agrupar",
+      "groupHint": "Clique nos elementos para agrupar, depois pressione Enter",
+      "groupCreated": "Grupo criado",
+      "viewportLabel": "Largura do preview",
+      "viewportReset": "Largura total",
       "eyeTitle": "Mostrar/ocultar pins",
       "statusTitle": "Live Review ativo",
       "pendingTitle": "Anotações aguardando seu próximo prompt no chat",
@@ -380,6 +423,27 @@
       "resolved": "标记已解决",
       "reopen": "重新打开",
       "del": "删除",
+      "pinStale": "未找到目标 — 图钉已失效。拖动标记以重新锚定。",
+      "copyCss": "复制 CSS",
+      "cssCopied": "CSS 已复制到剪贴板",
+      "cssCopyFailed": "无法复制 CSS",
+      "tokenSuggestions": "设计令牌",
+      "a11yTitle": "无障碍",
+      "a11yContrast": "文字对比度",
+      "a11yAccessibleName": "可访问名称",
+      "a11yImgAlt": "图片 alt",
+      "a11yRole": "角色",
+      "a11yTargetSize": "目标尺寸",
+      "a11yPass": "通过",
+      "a11yFail": "未通过",
+      "a11yWarn": "警告",
+      "a11yUnknown": "未知",
+      "a11yNotApplicable": "不适用",
+      "groupBtn": "成组",
+      "groupHint": "点击要成组的元素，然后按 Enter",
+      "groupCreated": "组已创建",
+      "viewportLabel": "预览宽度",
+      "viewportReset": "全宽",
       "eyeTitle": "显示/隐藏图钉",
       "statusTitle": "Live Review 运行中",
       "pendingTitle": "标注将随你的下一条消息发送",
@@ -689,6 +753,17 @@
     .pin-bubble-meta { color: var(--n-500); font-size: 11px; word-break: break-all; margin-bottom: 4px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     .pin-bubble-changes { color: var(--n-600); font-size: 11px; margin-top: 4px; }
+    .pin-bubble-stale { color: var(--error); font-size: 11px; margin-top: 4px; }
+    .lr-a11y { display: grid; gap: 3px; margin: 6px 0 0; padding: 6px 8px; border-radius: 8px; background: var(--n-100); }
+    .lr-a11y-title { color: var(--n-500); font-size: 11px; font-weight: 600; }
+    .lr-a11y-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--n-600); }
+    .lr-a11y-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lr-a11y-value { max-width: 120px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--n-500); }
+    .lr-a11y-chip { flex: none; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; }
+    .lr-a11y-chip.pass { background: color-mix(in oklab, var(--done), white 75%); color: var(--done); }
+    .lr-a11y-chip.fail { background: color-mix(in oklab, var(--error), white 75%); color: var(--error); }
+    .lr-a11y-chip.warn { background: color-mix(in oklab, var(--warn), white 75%); color: var(--warn); }
+    .lr-a11y-chip.unknown, .lr-a11y-chip.n\/a { background: var(--n-200); color: var(--n-600); }
     .pin-bubble-actions { display: flex; gap: 6px; padding: 6px 10px 10px; }
     .pin-bubble-actions button { all: unset; cursor: pointer; padding: 3px 10px; border-radius: 8px;
       font-size: 12px; background: var(--n-100); color: var(--n-950); }
@@ -716,6 +791,10 @@
     .lr-row-wide .lr-row-ctl { justify-content: flex-start; }
     .lr-reset { all: unset; cursor: pointer; flex: none; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 6px; color: var(--accent); font-size: 13px; }
     .lr-reset:hover { background: var(--n-200); }
+    .lr-token-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+    .lr-token-label { flex: none; font-size: 10px; color: var(--n-500); }
+    .lr-token-chip { all: unset; cursor: pointer; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 7px; border-radius: 8px; background: var(--n-100); color: var(--accent); font-size: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .lr-token-chip:hover { background: var(--n-200); }
     .lr-field { all: unset; box-sizing: border-box; flex: 1; min-width: 0; height: 26px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--n-100); color: var(--n-950); font-size: 12px; font-family: inherit; }
     .lr-field:focus { border-color: var(--accent); }
     .lr-field-num { width: 78px; flex: none; text-align: right; }
@@ -1054,7 +1133,7 @@
 
   function toggleDraw(on) {
     drawMode = typeof on === "boolean" ? on : !drawMode;
-    if (drawMode) { setMode(null); closePanels(); }
+    if (drawMode) { setMode(null); if (groupMode) setGroupMode(false); closePanels(); }
     closeDrawMenu();
     drawSel = null;
     drawDrag = null;
@@ -1395,10 +1474,23 @@
   const commentBtn = el("button", { class: "tool", title: t("commentTitle") + " (" + formatHotkey(hotkeyComment) + ")", html: ICONS.comment }, el("span", { class: "tool-label" }, t("commentTool")), el("kbd", {}, formatHotkey(hotkeyComment)));
   const pendingSpan = el("span", { class: "tool-label", style: "display:none", title: t("pendingTitle") }, t("pendingCount").replace("{n}", 0));
   const adjustBtn = el("button", { class: "tool", title: t("adjustTitle") + " (" + formatHotkey(hotkeyAdjust) + ")", html: ICONS.sliders }, el("span", { class: "tool-label" }, t("adjustTool")), el("kbd", {}, formatHotkey(hotkeyAdjust)));
+  const groupBtn = el("button", { class: "tool", title: t("groupBtn"), html: ICONS.group }, el("span", { class: "tool-label" }, t("groupBtn")));
+  const viewportPicker = el(
+    "select",
+    { class: "tool lr-viewport-picker", title: t("viewportLabel"), "aria-label": t("viewportLabel") },
+    el("option", { value: "" }, t("viewportReset")),
+    el("option", { value: "375" }, "375"),
+    el("option", { value: "768" }, "768"),
+    el("option", { value: "1280" }, "1280")
+  );
+  viewportPicker.addEventListener("change", () => {
+    const value = viewportPicker.value;
+    applyViewportPreset(value === "" ? null : Number(value));
+  });
   const eyeBtn = el("button", { class: "tool", title: "Mostrar/ocultar pins", html: ICONS.eye });
     drawBtn = el("button", { class: "tool", title: t("drawTitle") + " (" + formatHotkey(hotkeyDraw) + ")", html: ICONS_CANVAS.brush }, el("span", { class: "tool-label" }, t("drawTool")), el("kbd", {}, formatHotkey(hotkeyDraw)));
     drawBtn.addEventListener("click", () => toggleDraw());
-    toolbar.append(statusDot, divider, commentBtn, pendingSpan, adjustBtn, drawBtn, eyeBtn);
+    toolbar.append(statusDot, divider, commentBtn, pendingSpan, adjustBtn, drawBtn, groupBtn, viewportPicker, eyeBtn);
   wrap.append(hint, toolbar);
   rootDiv.append(wrap);
 
@@ -1422,6 +1514,12 @@
     drawBtn.title = t("drawTitle") + " (" + kbd("draw") + ")";
     drawBtn.querySelector(".tool-label").textContent = t("drawTool");
     drawBtn.querySelector("kbd").textContent = kbd("draw");
+    groupBtn.title = t("groupBtn");
+    groupBtn.querySelector(".tool-label").textContent = t("groupBtn");
+    viewportPicker.title = t("viewportLabel");
+    viewportPicker.setAttribute("aria-label", t("viewportLabel"));
+    const resetOption = viewportPicker.querySelector('option[value=""]');
+    if (resetOption !== null) resetOption.textContent = t("viewportReset");
     eyeBtn.title = t("eyeTitle");
     statusDot.title = t("statusTitle");
     pendingSpan.title = t("pendingTitle");
@@ -1471,6 +1569,7 @@
     const pending = pins.filter((p) => p.status === "queued").length;
     commentBtn.classList.toggle("tool-active", mode === "picking");
     adjustBtn.classList.toggle("tool-active", mode === "adjust");
+    groupBtn.classList.toggle("tool-active", groupMode);
     pendingSpan.textContent = pending > 0 ? t("pendingCount").replace("{n}", pending) : "";
     pendingSpan.style.display = pending > 0 ? "" : "none";
     eyeBtn.innerHTML = hidden ? ICONS.eyeOff : ICONS.eye;
@@ -1507,7 +1606,7 @@
   document.addEventListener(
     "mousemove",
     (event) => {
-      if (mode === null || draft !== null) return;
+      if ((mode === null && !groupMode) || draft !== null) return;
       if (event.composedPath().some((n) => n === host || (n instanceof Node && host.contains(n)))) return;
       const target = event.target instanceof Element ? event.target : null;
       if (!target || target === hovered) return;
@@ -1519,7 +1618,7 @@
   document.addEventListener(
     "click",
     (event) => {
-      if (mode === null || draft !== null) return;
+      if (mode === null && !groupMode) return;
       if (event.composedPath().some((n) => n === host || (n instanceof Node && host.contains(n)))) return;
       const target = event.target instanceof Element ? event.target : null;
       if (!target) return;
@@ -1532,6 +1631,10 @@
       } else if (mode === "adjust") {
         openAdjustPanel(target);
         setMode(null);
+      } else if (groupMode) {
+        event.preventDefault();
+        event.stopPropagation();
+        void groupPick(target);
       }
     },
     true
@@ -1568,6 +1671,7 @@
       else if (hotkeyMatches(event, hotkeyDraw)) toggleDraw();
       if (event.key === "Escape") {
         if (drawMode) { toggleDraw(false); return; }
+        if (groupMode) { setGroupMode(false); return; }
         if (adjustPanel !== null) {
           closeAdjustPanel(true);
           return;
@@ -1576,6 +1680,10 @@
           draft = null;
           renderDraft();
         } else if (mode !== null) setMode(null);
+      }
+      if (event.key === "Enter" && groupMode && groupComposerNode === null) {
+        event.preventDefault();
+        openGroupComposer();
       }
     },
     true
@@ -1595,8 +1703,19 @@
     }
     updateToolbar();
   }
-  commentBtn.addEventListener("click", () => { if (drawMode) toggleDraw(false); setMode("picking"); });
-  adjustBtn.addEventListener("click", () => { if (drawMode) toggleDraw(false); setMode("adjust"); });
+  commentBtn.addEventListener("click", () => { if (drawMode) toggleDraw(false); if (groupMode) setGroupMode(false); setMode("picking"); });
+  adjustBtn.addEventListener("click", () => { if (drawMode) toggleDraw(false); if (groupMode) setGroupMode(false); setMode("adjust"); });
+  groupBtn.addEventListener("click", () => {
+    if (groupMode && groupComposerNode !== null) {
+      groupComposerNode.querySelector("textarea")?.focus({ preventScroll: true });
+      return;
+    }
+    if (groupMode && groupPicks.length > 0) {
+      openGroupComposer();
+      return;
+    }
+    setGroupMode(!groupMode);
+  });
   eyeBtn.addEventListener("click", () => {
     hidden = !hidden;
     updateToolbar();
@@ -1640,7 +1759,7 @@
         if (pin.status === "resolvido") continue;
         alive.add(pin.id);
         let node = pinNodes.get(pin.id)?.node;
-        const point = anchorPoint(pin) ?? { x: pin.rect.x, y: pin.rect.y };
+        const point = anchorPoint(pin) ?? (pin.stale === true ? null : { x: pin.rect.x, y: pin.rect.y });
         if (!node) {
           node = el("button", { class: "pin", title: pin.comment });
           node.append(el("span", { class: "pin-body" }, ""));
@@ -1653,8 +1772,8 @@
           absLayer.append(node);
           pinNodes.set(pin.id, { node });
         }
-        node.className = `pin pin-${pinVariant(pin)}${openPinId === pin.id ? " pin-open" : ""}`;
-        node.style.transform = `translate(${point.x}px, ${point.y}px)`;
+        node.className = `pin pin-${pinVariant(pin)}${pin.stale === true ? " lr-pin-stale" : ""}${openPinId === pin.id ? " pin-open" : ""}`;
+        if (point) node.style.transform = `translate(${point.x}px, ${point.y}px)`;
         const number = pins.filter((p) => p.status !== "resolvido").indexOf(pin) + 1;
         const glyph = pin.status === "resolvido" ? ICONS.check : String(number || "•");
         node.querySelector(".pin-body").innerHTML = `<span class="pin-glyph">${glyph}</span>`;
@@ -1674,7 +1793,13 @@
       const pin = pins.find((p) => p.id === id);
       if (!pin) continue;
       const point = anchorPoint(pin);
-      if (point) entry.node.style.transform = `translate(${point.x}px, ${point.y}px)`;
+      if (point) {
+        entry.node.style.transform = `translate(${point.x}px, ${point.y}px)`;
+        if (pin.stale === true) {
+          pin.stale = false;
+          entry.node.classList.remove("lr-pin-stale");
+        }
+      }
     }
     repositionDraft();
   }
@@ -1689,12 +1814,31 @@
       applyPanelPosition(composerNode, "composer");
     }
   }
+  function auditPinAnchors() {
+    for (const pin of pins) {
+      if (pin.tag === "canvas") continue;
+      const found = locate(pin.selector) !== null;
+      const node = pinNodes.get(pin.id)?.node;
+      if (found) {
+        if (pin.stale === true) {
+          pin.stale = false;
+          node?.classList.remove("lr-pin-stale");
+        }
+      } else {
+        pin.stale = true;
+        node?.classList.add("lr-pin-stale");
+      }
+    }
+  }
   window.addEventListener("scroll", repositionPins, { passive: true });
   window.addEventListener("resize", repositionPins);
   let mutationTimer = null;
   new MutationObserver(() => {
     clearTimeout(mutationTimer);
-    mutationTimer = setTimeout(repositionPins, 400);
+    mutationTimer = setTimeout(() => {
+      repositionPins();
+      auditPinAnchors();
+    }, 400);
   }).observe(document.body ?? document.documentElement, { childList: true, subtree: true, attributes: true });
 
 
@@ -1725,6 +1869,7 @@
         const point = insidePage({ x: endEvent.clientX, y: endEvent.clientY });
         const element = document.elementsFromPoint(point.x, point.y).find((n) => n !== host && n !== document.documentElement) ?? document.body;
         pin.selector = cssPath(element);
+        pin.stale = false;
         const rect = element.getBoundingClientRect();
         pin.offsets = { ox: point.x - rect.left, oy: point.y - rect.top };
         pin.rect = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
@@ -1962,7 +2107,7 @@
 
 
     if (screenshotOnSend) shot = await captureCropFor({ x: rect.left, y: rect.top, w: rect.width, h: rect.height });
-    pins.push({
+    const pin = {
       id: crypto.randomUUID(),
       tag: draft.anchorEl.localName,
       role: draft.anchorEl.getAttribute?.("role") ?? "",
@@ -1978,7 +2123,9 @@
       shot,
       status: "queued",
       at: Date.now()
-    });
+    };
+    if (viewportPresetWidth !== null) pin.viewportWidth = viewportPresetWidth;
+    pins.push(pin);
     savePins();
     draft = null;
     renderDraft();
@@ -2003,7 +2150,10 @@
         changes: p.changes,
         textChange: p.textChange ?? null,
         rect: p.rect,
-        shot: p.shot ?? null
+        shot: p.shot ?? null,
+        afterShot: p.afterShot ?? null,
+        groupId: p.groupId ?? null,
+        viewportWidth: p.viewportWidth ?? null
       }))
     };
     try {
@@ -2110,6 +2260,251 @@
   let adjustPanel = null;
   let adjustTarget = null;
 
+  function buildCssPatch(pin) {
+    if (pin.tag === "canvas") return "";
+    if (!Array.isArray(pin.changes) || pin.changes.length === 0) return "";
+    const declarations = pin.changes.map((change) => `${change.prop}: ${change.after}`).join("; ");
+    return `${pin.selector} { ${declarations}; }`;
+  }
+  function copyCssPatch(pin) {
+    const write = navigator.clipboard?.writeText(buildCssPatch(pin));
+    if (write && typeof write.then === "function") write.then(() => toast(t("cssCopied"))).catch(() => toast(t("cssCopyFailed")));
+    else toast(t("cssCopyFailed"));
+  }
+  const A11Y_SEMANTIC_TAGS = new Set(["button", "input", "select", "textarea", "img", "h1", "h2", "h3", "h4", "h5", "h6", "nav", "main", "header", "footer", "ul", "ol", "table"]);
+  const A11Y_ROW_LABELS = { contrast: "a11yContrast", name: "a11yAccessibleName", imgAlt: "a11yImgAlt", role: "a11yRole", targetSize: "a11yTargetSize" };
+  const A11Y_STATUS_KEYS = { pass: "a11yPass", fail: "a11yFail", warn: "a11yWarn", unknown: "a11yUnknown", "n/a": "a11yNotApplicable" };
+  function relativeLuminance(color) {
+    const channel = (raw) => {
+      const c = raw / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * channel(color.r) + 0.7152 * channel(color.g) + 0.0722 * channel(color.b);
+  }
+  function contrastRatio(fg, bg) {
+    const front = typeof fg === "string" ? parseColor(fg) : fg;
+    const back = typeof bg === "string" ? parseColor(bg) : bg;
+    if (front === null || back === null || (front.a ?? 1) < 1 || (back.a ?? 1) < 1) return null;
+    const l1 = relativeLuminance(front);
+    const l2 = relativeLuminance(back);
+    const [lighter, darker] = l1 >= l2 ? [l1, l2] : [l2, l1];
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+  function resolveReadableBackground(el) {
+    let node = el;
+    while (node !== null && node !== undefined) {
+      const background = getComputedStyle(node).backgroundColor ?? "";
+      const parsed = parseColor(background);
+      if (parsed !== null && parsed.a >= 1) return background;
+      if (parsed === null) return "unknown";
+      node = node.parentElement ?? null;
+    }
+    return "unknown";
+  }
+  function accessibleName(el) {
+    const attr = (name) => {
+      const value = el.getAttribute?.(name);
+      return typeof value === "string" ? value : "";
+    };
+    const label = attr("aria-label").trim();
+    if (label !== "") return label;
+    const labelledBy = attr("aria-labelledby").trim();
+    if (labelledBy !== "") {
+      const doc = el.ownerDocument ?? document;
+      const parts = labelledBy.split(/\s+/u).map((id) => doc.getElementById?.(id)?.textContent ?? "").filter((text) => text.trim() !== "");
+      if (parts.length > 0) return parts.join(" ").trim();
+    }
+    const alt = attr("alt").trim();
+    if (alt !== "") return alt;
+    const text = typeof el.textContent === "string" ? el.textContent.trim() : "";
+    if (text !== "") return text;
+    const title = attr("title").trim();
+    if (title !== "") return title;
+    return "";
+  }
+  function auditElement(el) {
+    const attr = (name) => {
+      const value = el.getAttribute?.(name);
+      return typeof value === "string" ? value : null;
+    };
+    const rows = [];
+    const style = getComputedStyle(el);
+    const ratio = contrastRatio(style.color, resolveReadableBackground(el));
+    rows.push({ check: "contrast", status: ratio === null ? "unknown" : ratio >= 4.5 ? "pass" : "fail", value: ratio === null ? "unknown" : String(Math.round(ratio * 100) / 100) });
+    const name = accessibleName(el);
+    rows.push({ check: "name", status: name === "" ? "fail" : "pass", value: name });
+    const tag = typeof el.tagName === "string" ? el.tagName.toLowerCase() : "";
+    if (tag === "img") {
+      const alt = attr("alt");
+      rows.push({ check: "imgAlt", status: alt === null ? "fail" : "pass", value: alt ?? "" });
+    } else {
+      rows.push({ check: "imgAlt", status: "n/a", value: "" });
+    }
+    const role = attr("role");
+    if (role !== null && role.trim() !== "") rows.push({ check: "role", status: "pass", value: role.trim() });
+    else if (A11Y_SEMANTIC_TAGS.has(tag) || (tag === "a" && attr("href") !== null && attr("href") !== "")) rows.push({ check: "role", status: "pass", value: tag });
+    else rows.push({ check: "role", status: "warn", value: "none" });
+    const rect = el.getBoundingClientRect?.() ?? { width: 0, height: 0 };
+    rows.push({ check: "targetSize", status: rect.width >= 24 && rect.height >= 24 ? "pass" : "fail", value: `${Math.round(rect.width)}×${Math.round(rect.height)}` });
+    return rows;
+  }
+  let groupMode = false;
+  let groupPicks = [];
+  let groupComposerNode = null;
+  function setGroupMode(on) {
+    if (on === groupMode) return;
+    groupMode = on;
+    if (on) {
+      setMode(null);
+      if (drawMode) toggleDraw(false);
+      if (draft !== null) { draft = null; renderDraft(); }
+      closePanels();
+      setHint(t("groupHint"));
+    } else {
+      clearGroupPicks();
+      groupComposerNode?.remove();
+      groupComposerNode = null;
+      clearHighlight();
+      setHint(null);
+    }
+    updateToolbar();
+  }
+  function clearGroupPicks() {
+    for (const pick of groupPicks) pick.marker?.remove();
+    groupPicks = [];
+  }
+  function groupPickMarker(target) {
+    const box = target.getBoundingClientRect();
+    const marker = el("div", { class: "highlight group-pick" });
+    Object.assign(marker.style, { transform: `translate(${box.left}px, ${box.top}px)`, width: `${box.width}px`, height: `${box.height}px` });
+    fixedLayer.append(marker);
+    return marker;
+  }
+  async function groupPick(target) {
+    if (!groupMode) return;
+    if (!(target instanceof Element) || target.tagName.toLowerCase() === "canvas") return;
+    if (groupPicks.some((pick) => pick.target === target)) return;
+    const rect = target.getBoundingClientRect();
+    const shot = screenshotOnSend ? await captureCropFor({ x: rect.left, y: rect.top, w: rect.width, h: rect.height }) : null;
+    if (!groupMode) return;
+    const pick = {
+      target,
+      selector: cssPath(target),
+      rect: { x: rect.left, y: rect.top, w: rect.width, h: rect.height },
+      offsets: { ox: rect.width / 2, oy: rect.height / 2 },
+      shot,
+      marker: groupPickMarker(target)
+    };
+    groupPicks.push(pick);
+  }
+  function finalizeGroup() {
+    const comment = (groupComposerNode?.querySelector("textarea")?.value ?? "").trim();
+    if (comment === "" || groupPicks.length === 0) {
+      setGroupMode(false);
+      return [];
+    }
+    const groupId = `${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+    const created = [];
+    for (const pick of groupPicks) {
+      created.push({
+        id: crypto.randomUUID(),
+        tag: pick.target.localName,
+        role: pick.target.getAttribute?.("role") ?? "",
+        label: pick.target.getAttribute?.("aria-label") ?? "",
+        selector: pick.selector,
+        text: (pick.target.textContent ?? "").trim().slice(0, 300),
+        component: reactComponentName(pick.target) ?? "",
+        comment,
+        changes: [],
+        pageUrl: PAGE_URL,
+        rect: pick.rect,
+        offsets: pick.offsets,
+        shot: pick.shot,
+        groupId,
+        status: "queued",
+        at: Date.now()
+      });
+      if (viewportPresetWidth !== null) created[created.length - 1].viewportWidth = viewportPresetWidth;
+    }
+    pins.push(...created);
+    savePins();
+    setGroupMode(false);
+    renderPins();
+    toast(t("groupCreated"));
+    return created;
+  }
+  function renderGroupComposer() {
+    if (!groupMode || groupPicks.length === 0) return;
+    if (groupComposerNode !== null) {
+      const count = groupComposerNode.querySelector(".group-count");
+      if (count !== null) count.textContent = String(groupPicks.length);
+      return;
+    }
+    mountShadow();
+    const WIDTH = 320;
+    const composer = el("div", { class: "popover composer", style: `width:${WIDTH}px;left:24px;top:64px` });
+    const textarea = el("textarea", { placeholder: t("composerPlaceholder") });
+    const submit = el("button", { class: "send", title: t("sendTitle") }, ICONS.arrowUp);
+    submit.addEventListener("click", () => finalizeGroup());
+    textarea.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        finalizeGroup();
+      }
+      if (e.key === "Escape") setGroupMode(false);
+    });
+    composer.append(
+      el(
+        "div",
+        { class: "composer-target" },
+        el("span", { class: "chip" }, ICONS.group, el("span", { class: "group-count" }, String(groupPicks.length))),
+        el("span", { class: "composer-provider" }, el("span", { class: "composer-provider-label" }, t("groupHint"))),
+        el("button", { class: "lr-close", title: t("composerClose"), onclick: () => setGroupMode(false) }, "✕")
+      ),
+      el("div", { class: "prompt-input" }, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }), submit))
+    );
+    fixedLayer.append(composer);
+    groupComposerNode = composer;
+    textarea.focus({ preventScroll: true });
+  }
+  function openGroupComposer() {
+    if (!groupMode || groupPicks.length === 0) return;
+    renderGroupComposer();
+  }
+
+  let viewportPresetWidth = null;
+  function applyViewportPreset(widthOrNull) {
+    viewportPresetWidth = widthOrNull;
+    const rootStyle = document.documentElement.style;
+    if (widthOrNull === null) {
+      rootStyle.removeProperty("max-width");
+      rootStyle.removeProperty("margin-left");
+      rootStyle.removeProperty("margin-right");
+    } else {
+      rootStyle.setProperty("max-width", `${widthOrNull}px`);
+      rootStyle.setProperty("margin-left", "auto");
+      rootStyle.setProperty("margin-right", "auto");
+    }
+    repositionPins();
+    if (draft !== null || adjustPanel !== null) {
+      repositionDraft();
+      if (adjustPanel !== null) applyPanelPosition(adjustPanel, "adjust");
+    }
+  }
+  function activeViewportWidth() {
+    return viewportPresetWidth;
+  }
+
+  function a11yAuditSection(target) {
+    const rows = auditElement(target);
+    return rows.length === 0 ? null : el("div", { class: "lr-a11y" },
+      el("div", { class: "lr-a11y-title" }, t("a11yTitle")),
+      rows.map((row) => el("div", { class: "lr-a11y-row" },
+        el("span", { class: "lr-a11y-label" }, t(A11Y_ROW_LABELS[row.check] ?? row.check)),
+        el("span", { class: "lr-a11y-value" }, row.value),
+        el("span", { class: `lr-a11y-chip ${row.status === "n/a" ? "na" : row.status}` }, t(A11Y_STATUS_KEYS[row.status] ?? row.status)))));
+  }
+
   function renderPinPanel(pin) {
     pinPanelNode?.remove();
     pinPanelNode = null;
@@ -2131,13 +2526,16 @@
       renderPinPanel(pin);
       renderPins();
     });
+    const auditTarget = locate(pin.selector);
     panel.append(
       el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, `${pins.filter((p) => p.status !== "resolvido").indexOf(pin) + 1} · ${quickLabel(locate(pin.selector) ?? pin.tag)}`)),
-      el("div", { class: "pin-bubble-body" }, el("div", { class: "pin-bubble-meta" }, `${pin.selector.slice(0, 90)}${pin.component ? ` · ${pin.component}` : ""}`), changesText !== "" ? el("div", { class: "pin-bubble-changes" }, changesText) : null, textChangeText !== "" ? el("div", { class: "pin-bubble-changes" }, textChangeText) : null),
+      el("div", { class: "pin-bubble-body" }, el("div", { class: "pin-bubble-meta" }, `${pin.selector.slice(0, 90)}${pin.component ? ` · ${pin.component}` : ""}`), pin.stale === true ? el("div", { class: "pin-bubble-stale" }, t("pinStale")) : null, changesText !== "" ? el("div", { class: "pin-bubble-changes" }, changesText) : null, textChangeText !== "" ? el("div", { class: "pin-bubble-changes" }, textChangeText) : null),
+      auditTarget === null || pin.tag === "canvas" ? null : a11yAuditSection(auditTarget),
       el("div", { class: "prompt-input" }, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }), submit)),
       el(
         "div",
         { class: "pin-bubble-actions" },
+        pin.changes.length > 0 ? el("button", { onclick: () => copyCssPatch(pin) }, t("copyCss")) : null,
         el("button", {
           onclick: () => {
             pin.status = pin.status === "resolvido" ? "queued" : "resolvido";
@@ -2368,6 +2766,16 @@
       if (patch.originalText !== null) patch.originalText.node.data = textChange.after;
     }
   }
+  async function captureBeforeAfter(target, pin) {
+    if ((pin.changes?.length ?? 0) === 0 && !pin.textChange) return;
+    if (!screenshotOnSend) return;
+    const rect = target.getBoundingClientRect();
+    const box = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
+    pin.afterShot = await captureCropFor(box);
+    restoreAll(adjustPatch);
+    pin.shot = await captureCropFor(box);
+    applyCommitted(adjustPatch, pin.changes, pin.textChange);
+  }
 
 
   let adjustPatch = null;
@@ -2452,6 +2860,7 @@
   function inspectorRow(label, control, opts = {}) {
     const row = el("div", { class: `lr-row${opts.wide ? " lr-row-wide" : ""}${opts.staticLabel ? " lr-row-static" : ""}` });
     row.append(el("span", { class: "lr-row-label" }, label));
+    if (opts.tokens) row.append(opts.tokens);
     const ctl = el("span", { class: "lr-row-ctl" });
     ctl.append(control);
     row.append(ctl);
@@ -2801,6 +3210,53 @@
     const comment = adjustCommentInput?.value?.trim() ?? "";
     return comment !== "" || adjustCurrentChanges().length > 0 || (adjustPatch?.originalText !== null && adjustText !== (adjustPatch?.originalText?.value ?? ""));
   }
+  const TOKEN_SUGGESTION_PROPS = new Set(["color", "background-color", "border-color", "font-family", "margin-top", "margin-right", "margin-bottom", "margin-left", "padding-top", "padding-right", "padding-bottom", "padding-left", "border-radius"]);
+  function collectCustomProps(target) {
+    const style = getComputedStyle(target);
+    const props = [];
+    for (let index = 0; index < style.length; index += 1) {
+      const name = style.item(index);
+      if (!/^--[A-Za-z0-9_-]+$/.test(name)) continue;
+      props.push({ name, value: style.getPropertyValue(name) });
+    }
+    return props;
+  }
+  function matchTokensByValue(props, currentValue) {
+    const wanted = typeof currentValue === "string" ? currentValue.trim() : "";
+    if (wanted === "") return [];
+    return props.filter((prop) => prop.value.trim() === wanted).map((prop) => prop.name);
+  }
+  function makeTokenProbe(target, props) {
+    const probe = document.createElement("span");
+    probe.setAttribute("aria-hidden", "true");
+    for (const prop of props) probe.style.setProperty(prop.name, prop.value);
+    (target.parentElement ?? target).append(probe);
+    return probe;
+  }
+  function tokenSuggestionsFor(target, currentValue, makeProbe) {
+    const props = collectCustomProps(target);
+    if (props.length === 0) return [];
+    const probe = makeProbe(target, props);
+    const probeStyle = getComputedStyle(probe);
+    const names = matchTokensByValue(props.map((prop) => ({ name: prop.name, value: probeStyle.getPropertyValue(prop.name) })), currentValue);
+    probe.remove();
+    return names;
+  }
+  function tokenChipRowFromNames(names, applyToken) {
+    if (!Array.isArray(names) || names.length === 0) return null;
+    const row = el("div", { class: "lr-token-row" });
+    row.append(el("span", { class: "lr-token-label" }, t("tokenSuggestions")));
+    for (const name of names) {
+      const chip = el("button", { type: "button", class: "lr-token-chip", title: name });
+      chip.textContent = name;
+      chip.addEventListener("click", () => applyToken(name));
+      row.append(chip);
+    }
+    return row;
+  }
+  function tokenChipRow(target, currentValue, applyToken) {
+    return tokenChipRowFromNames(tokenSuggestionsFor(target, currentValue, makeTokenProbe), applyToken);
+  }
   function propertyRow(prop) {
     const meta = PROP_META[prop];
     if (meta === undefined) return null;
@@ -2813,7 +3269,11 @@
       refreshDisplay = () => control.__refresh(adjustValues.get(prop) ?? "", adjustInvalid.has(prop));
     } else if (meta.kind === "menu") {
       control = menuControl(meta.options ?? [], value, (next) => adjustUpdateProperty(prop, next));
-      refreshDisplay = () => { control.value = adjustValues.get(prop) ?? ""; };
+      refreshDisplay = () => {
+        const current = adjustValues.get(prop) ?? "";
+        if (current !== "" && ![...control.options].some((option) => option.value === current)) control.append(el("option", { value: current }, current));
+        control.value = current;
+      };
     } else if (prop === "opacity") {
       const toDisplay = (raw) => {
         const normalized = raw.trim() === "" ? "1" : raw;
@@ -2839,12 +3299,20 @@
       changed: () => adjustChanged(prop),
       onReset: () => adjustReset(prop),
       rerender: adjustRerender,
-      refresh: refreshDisplay
+      refresh: refreshDisplay,
+      tokens: TOKEN_SUGGESTION_PROPS.has(prop) && value !== "" ? tokenChipRow(adjustTarget, value, (tokenName) => adjustUpdateProperty(prop, `var(${tokenName})`)) : null
     });
   }
   function quadRow(label, props4, badges4, min) {
     const wrap = quadControl(props4, badges4, props4.map((p) => adjustNumericFallback(p)), min, (prop, next) => adjustUpdateProperty(prop, next));
-    return inspectorRow(label, wrap, { wide: true, staticLabel: true, changed: () => props4.some((p) => adjustChanged(p)), onReset: () => { props4.forEach((p) => adjustReset(p)); wrap.__refresh(); }, rerender: adjustRerender });
+    const source = props4.map((p) => adjustValues.get(p) ?? "").find((v) => v !== "") ?? "";
+    const names = source === "" ? [] : tokenSuggestionsFor(adjustTarget, source, makeTokenProbe);
+    return inspectorRow(label, wrap, { wide: true, staticLabel: true, changed: () => props4.some((p) => adjustChanged(p)), onReset: () => { props4.forEach((p) => adjustReset(p)); wrap.__refresh(); }, rerender: adjustRerender, tokens: tokenChipRowFromNames(names, (tokenName) => {
+      for (const p of props4) {
+        if ((adjustValues.get(p) ?? "") === source) adjustUpdateProperty(p, `var(${tokenName})`);
+      }
+      wrap.__refresh();
+    }) });
   }
 
   let adjustCommentInput = null;
@@ -3009,7 +3477,7 @@
     const cancel = el("button", { class: "lr-cancel", type: "button" }, t("cancelBtn"));
     cancel.addEventListener("click", () => closeAdjustPanel(true));
     adjustConfirmBtn = el("button", { class: "lr-confirm", type: "button", title: "Confirmar ajustes" }, t("confirmBtn"));
-    adjustConfirmBtn.addEventListener("click", () => {
+    adjustConfirmBtn.addEventListener("click", async () => {
       const changes = adjustCurrentChanges();
       const textChanged = adjustPatch !== null && adjustPatch.originalText !== null && adjustText !== adjustPatch.originalText.value;
       if (!adjustCanConfirm()) return;
@@ -3019,7 +3487,7 @@
       let pin = pins.find((p) => p.selector === adjustTargetSelector);
       if (!pin) {
         const rect = adjustTarget.getBoundingClientRect();
-        pins.push({
+        const newAdjustPin = {
           id: crypto.randomUUID(),
           tag: adjustTarget.localName,
           role: adjustTarget.getAttribute?.("role") ?? "",
@@ -3034,7 +3502,9 @@
           offsets: { ox: rect.width / 2, oy: rect.height / 2 },
           status: "queued",
           at: Date.now()
-        });
+        };
+        if (viewportPresetWidth !== null) newAdjustPin.viewportWidth = viewportPresetWidth;
+        pins.push(newAdjustPin);
         pin = pins[pins.length - 1];
       }
       for (const change of changes) {
@@ -3055,6 +3525,7 @@
       pin.comment = adjustCommentInput.value.trim();
       pin.status = "queued";
       pin.at = Date.now();
+      await captureBeforeAfter(adjustTarget, pin);
       savePins();
       renderPins();
       postSnapshot();
