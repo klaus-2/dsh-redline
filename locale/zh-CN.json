@@ -25,6 +25,7 @@
   "copyCss": "复制 CSS",
   "cssCopied": "CSS 已复制到剪贴板",
   "cssCopyFailed": "无法复制 CSS",
+  "tokenSuggestions": "设计令牌",
   "viewPending": "查看待发送标注",
   "sendNow": "立即把标注发送给智能体",
   "sendBtn": "发送",

@@ -25,6 +25,7 @@
   "copyCss": "Copiar CSS",
   "cssCopied": "CSS copiado para a área de transferência",
   "cssCopyFailed": "Não foi possível copiar o CSS",
+  "tokenSuggestions": "Tokens de design",
   "viewPending": "Ver as anotações pendentes",
   "sendNow": "Enviar as anotações ao agente agora",
   "sendBtn": "Enviar",

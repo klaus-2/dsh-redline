@@ -25,6 +25,7 @@
   "copyCss": "Copy CSS",
   "cssCopied": "CSS copied to clipboard",
   "cssCopyFailed": "Could not copy CSS",
+  "tokenSuggestions": "Design tokens",
   "viewPending": "View pending annotations",
   "sendNow": "Send the annotations to the agent now",
   "sendBtn": "Send",

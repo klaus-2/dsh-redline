@@ -925,6 +925,94 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
   }
 
+  harness.section("client: overlay token suggestions");
+  {
+    const fakeEl = (tag, attrs = {}, ...children) => {
+      const node = { tag, attrs, children: [], handlers: {}, append(child) { if (child !== null && child !== undefined) this.children.push(child); }, addEventListener(type, fn) { this.handlers[type] = fn; } };
+      for (const [key, value] of Object.entries(attrs)) node[key === "class" ? "className" : key] = value;
+      for (const child of children) node.append(child);
+      return node;
+    };
+    harness.check("the overlay keeps its token helpers",
+      extractFunction(overlay, "collectCustomProps") !== undefined && extractFunction(overlay, "matchTokensByValue") !== undefined && extractFunction(overlay, "tokenSuggestionsFor") !== undefined && extractFunction(overlay, "tokenChipRow") !== undefined);
+    {
+      const source = extractFunction(overlay, "collectCustomProps");
+      const collect = source === undefined ? undefined : evaluateExpression(`(getComputedStyle, target) => {\n${source}\nreturn collectCustomProps(target);\n}`, "collectCustomProps");
+      const fakeStyle = {
+        length: 5,
+        props: { "color": "red", "--brand": " #000000 ", "--bad~name": "x", "--": "y", "--spacing-md": "16px" },
+        item(index) { return Object.keys(this.props)[index] ?? ""; },
+        getPropertyValue(name) { return this.props[name] ?? ""; }
+      };
+      const props = collect === undefined ? undefined : collect(() => fakeStyle, {});
+      harness.check("overlay: custom property collection only accepts valid token names from the target computed style",
+        props !== undefined && JSON.stringify(props) === JSON.stringify([{ name: "--brand", value: " #000000 " }, { name: "--spacing-md", value: "16px" }]),
+        JSON.stringify(props ?? "collector missing"));
+    }
+    {
+      const match = evaluateExpression(extractFunction(overlay, "matchTokensByValue"), "matchTokensByValue");
+      harness.check("overlay: token matching compares resolved values for exact equality",
+        match !== undefined &&
+        JSON.stringify(match([{ name: "--a", value: "16px" }], "16px")) === JSON.stringify(["--a"]) &&
+        JSON.stringify(match([{ name: "--a", value: " 16px " }], " 16px ")) === JSON.stringify(["--a"]) &&
+        JSON.stringify(match([{ name: "--a", value: "16px" }], "17px")) === JSON.stringify([]) &&
+        JSON.stringify(match([{ name: "--a", value: "16px" }], "   ")) === JSON.stringify([]),
+        JSON.stringify({ equal: match?.([{ name: "--a", value: "16px" }], "16px"), trimmed: match?.([{ name: "--a", value: " 16px " }], " 16px ") }));
+    }
+    {
+      const sandbox = { el: fakeEl, t: (key) => key, tokenSuggestionsFor: () => [], makeTokenProbe: () => null };
+      vm.createContext(sandbox);
+      for (const name of ["tokenChipRowFromNames", "tokenChipRow"]) {
+        const source = extractFunction(overlay, name);
+        if (source !== undefined) vm.runInContext(source, sandbox, { filename: `${name}.js` });
+      }
+      const emptyRow = typeof sandbox.tokenChipRow === "function" ? sandbox.tokenChipRow({}, "16px", () => {}) : undefined;
+      const match = evaluateExpression(extractFunction(overlay, "matchTokensByValue"), "matchTokensByValue");
+      harness.check("overlay: token chips are absent when the page defines no matching custom properties",
+        emptyRow === null && match !== undefined && JSON.stringify(match([{ name: "--a", value: "9px" }], "16px")) === JSON.stringify([]),
+        JSON.stringify({ emptyRow, noMatch: match?.([{ name: "--a", value: "9px" }], "16px") }));
+    }
+    {
+      const sandbox = {
+        EDITABLE_PROPS: editableProps(overlay),
+        adjustValues: new Map([["color", "#000000"]]),
+        adjustInvalid: new Set(),
+        adjustPatch: { element: { style: { setProperty() {}, getPropertyValue: () => "", getPropertyPriority: () => "" } }, originalStyles: new Map(), computedBaselines: new Map([["color", "#000000"]]), originalText: null },
+        adjustTarget: null,
+        adjustLedger: new Map(),
+        adjustTargetSelector: "",
+        rerenderAdjustRows: () => {},
+        tokenSuggestionsFor: () => ["--brand-color"],
+        makeTokenProbe: () => null,
+        t: (key) => key,
+        el: fakeEl
+      };
+      vm.createContext(sandbox);
+      for (const name of ["isSafeValue", "previewStyle", "adjustBaseline", "adjustUpdateProperty", "adjustCurrentChanges", "tokenChipRowFromNames", "tokenChipRow"]) {
+        const source = extractFunction(overlay, name);
+        if (source !== undefined) vm.runInContext(source, sandbox, { filename: `${name}.js` });
+      }
+      const applied = [];
+      const row = typeof sandbox.tokenChipRow === "function" ? sandbox.tokenChipRow({}, "#000000", (name) => { applied.push(name); sandbox.adjustUpdateProperty("color", `var(${name})`); }) : undefined;
+      const chip = row?.children?.[1];
+      if (chip?.handlers?.click !== undefined) chip.handlers.click();
+      const committed = typeof sandbox.adjustCurrentChanges === "function" ? sandbox.adjustCurrentChanges() : undefined;
+      const propertyRowSource = extractFunction(overlay, "propertyRow");
+      harness.check("overlay: choosing a token chip records var(--name) as the after value",
+        row !== undefined && chip !== undefined && chip.textContent === "--brand-color" &&
+        JSON.stringify(applied) === JSON.stringify(["--brand-color"]) &&
+        JSON.stringify(committed) === JSON.stringify([{ prop: "color", before: "#000000", after: "var(--brand-color)" }]) &&
+        propertyRowSource !== undefined && propertyRowSource.includes("adjustUpdateProperty(prop, `var(${tokenName})`)"),
+        JSON.stringify({ applied, committed, chipText: chip?.textContent }));
+    }
+    {
+      const chipRowSource = extractFunction(overlay, "tokenChipRowFromNames");
+      harness.check("overlay: token suggestion labels are rendered via textContent",
+        chipRowSource !== undefined && chipRowSource.includes("textContent") && !chipRowSource.includes("html:"),
+        chipRowSource === undefined ? "chip row missing" : "chip labels must not use the html attribute");
+    }
+  }
+
   harness.section("client: overlay hotkeys");
   {
     const parseHotkey = evaluateExpression(extractFunction(overlay, "parseHotkey"), "parseHotkey");
