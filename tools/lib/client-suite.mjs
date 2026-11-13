@@ -1124,11 +1124,16 @@ export async function runClientSuite(harness, { pluginDir }) {
         toast: () => {},
         t: (key) => key,
         reactComponentName: () => null,
-        PAGE_URL: "http://page/"
+        PAGE_URL: "http://page/",
+        postSnapshotCalls: []
       };
+      sandbox.postSnapshot = () => sandbox.postSnapshotCalls.push(1);
       vm.createContext(sandbox);
       vm.runInContext(finalizeSource ?? "", sandbox, { filename: "finalizeGroup.js" });
       const created = sandbox.finalizeGroup();
+      harness.check("overlay: finalizing a group posts the snapshot to the host",
+        sandbox.postSnapshotCalls.length === 1,
+        JSON.stringify({ posts: sandbox.postSnapshotCalls.length }));
       const ids = created.map((pin) => pin.groupId);
       const comments = created.map((pin) => pin.comment);
       harness.check("overlay: group mode assigns the same groupId to every member pin",
@@ -1147,13 +1152,19 @@ export async function runClientSuite(harness, { pluginDir }) {
     {
       const pick = pickSource === undefined ? undefined : evaluateExpression(`(Element, groupMode, target, groupPicks, captureCropFor, screenshotOnSend, cssPath) => {\n${pickSource}\nreturn groupPick(target);\n}`, "groupPick");
       if (pick !== undefined) {
-        const canvasTarget = { tagName: "CANVAS", localName: "canvas", getBoundingClientRect: () => ({ left: 0, top: 0, width: 10, height: 10 }) };
+        const makeElement = (tagName) => {
+          const instance = new (class Element {})();
+          instance.tagName = tagName;
+          instance.localName = tagName.toLowerCase();
+          instance.getBoundingClientRect = () => ({ left: 0, top: 0, width: 10, height: 10 });
+          return instance;
+        };
+        const canvasTarget = makeElement("CANVAS");
         const picks = [];
         const capture = async () => "unused";
         const rejectsCanvas = await pick(class Element {}, true, canvasTarget, picks, capture, true, () => "canvas:drawing");
-        const notInMode = await pick(class Element {}, false, { tagName: "P", getBoundingClientRect: () => ({ left: 0, top: 0, width: 10, height: 10 }) }, picks, capture, true, () => "p");
-        const offToggle = { tagName: "P", getBoundingClientRect: () => ({ left: 0, top: 0, width: 10, height: 10 }) };
-        const toggledOff = await pick(class Element {}, true, offToggle, picks, async () => { throw new Error("capture raced with toggle-off"); }, true, () => "p");
+        const notInMode = await pick(class Element {}, false, makeElement("P"), picks, capture, true, () => "p");
+        const toggledOff = await pick(class Element {}, true, makeElement("P"), picks, async () => { throw new Error("capture raced with toggle-off"); }, true, () => "p");
         harness.check("overlay: group picking ignores canvas draw pins",
           rejectsCanvas === undefined && picks.length === 0 && notInMode === undefined && toggledOff === undefined && picks.length === 0,
           JSON.stringify({ picks: picks.length, results: [rejectsCanvas, notInMode, toggledOff] }));
