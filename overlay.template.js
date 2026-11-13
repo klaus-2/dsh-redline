@@ -54,6 +54,7 @@
     camera: Icon(14, '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>', '<circle cx="12" cy="13" r="3"/>'),
     check: Icon(13, '<path d="M20 6 9 17l-5-5"/>'),
     sliders: Icon(16, '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/>', '<path d="M1 14h6M9 8h6M17 16h6"/>'),
+    group: Icon(16, '<rect x="3" y="3" width="7" height="7" rx="1.5"/>', '<rect x="14" y="3" width="7" height="7" rx="1.5"/>', '<rect x="3" y="14" width="7" height="7" rx="1.5"/>', '<path d="M17.5 14v7M14 17.5h7"/>'),
     code: Icon(12, '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>')
   };
 
@@ -96,6 +97,9 @@
       "a11yWarn": "Warn",
       "a11yUnknown": "Unknown",
       "a11yNotApplicable": "n/a",
+      "groupBtn": "Group",
+      "groupHint": "Click elements to group, then press Enter",
+      "groupCreated": "Group created",
       "eyeTitle": "Show/hide pins",
       "statusTitle": "Live Review active",
       "pendingTitle": "Annotations waiting for your next prompt in the chat",
@@ -262,6 +266,9 @@
       "a11yWarn": "Atenção",
       "a11yUnknown": "Desconhecido",
       "a11yNotApplicable": "n/a",
+      "groupBtn": "Agrupar",
+      "groupHint": "Clique nos elementos para agrupar, depois pressione Enter",
+      "groupCreated": "Grupo criado",
       "eyeTitle": "Mostrar/ocultar pins",
       "statusTitle": "Live Review ativo",
       "pendingTitle": "Anotações aguardando seu próximo prompt no chat",
@@ -428,6 +435,9 @@
       "a11yWarn": "警告",
       "a11yUnknown": "未知",
       "a11yNotApplicable": "不适用",
+      "groupBtn": "成组",
+      "groupHint": "点击要成组的元素，然后按 Enter",
+      "groupCreated": "组已创建",
       "eyeTitle": "显示/隐藏图钉",
       "statusTitle": "Live Review 运行中",
       "pendingTitle": "标注将随你的下一条消息发送",
@@ -1117,7 +1127,7 @@
 
   function toggleDraw(on) {
     drawMode = typeof on === "boolean" ? on : !drawMode;
-    if (drawMode) { setMode(null); closePanels(); }
+    if (drawMode) { setMode(null); if (groupMode) setGroupMode(false); closePanels(); }
     closeDrawMenu();
     drawSel = null;
     drawDrag = null;
@@ -1458,10 +1468,11 @@
   const commentBtn = el("button", { class: "tool", title: t("commentTitle") + " (" + formatHotkey(hotkeyComment) + ")", html: ICONS.comment }, el("span", { class: "tool-label" }, t("commentTool")), el("kbd", {}, formatHotkey(hotkeyComment)));
   const pendingSpan = el("span", { class: "tool-label", style: "display:none", title: t("pendingTitle") }, t("pendingCount").replace("{n}", 0));
   const adjustBtn = el("button", { class: "tool", title: t("adjustTitle") + " (" + formatHotkey(hotkeyAdjust) + ")", html: ICONS.sliders }, el("span", { class: "tool-label" }, t("adjustTool")), el("kbd", {}, formatHotkey(hotkeyAdjust)));
+  const groupBtn = el("button", { class: "tool", title: t("groupBtn"), html: ICONS.group }, el("span", { class: "tool-label" }, t("groupBtn")));
   const eyeBtn = el("button", { class: "tool", title: "Mostrar/ocultar pins", html: ICONS.eye });
     drawBtn = el("button", { class: "tool", title: t("drawTitle") + " (" + formatHotkey(hotkeyDraw) + ")", html: ICONS_CANVAS.brush }, el("span", { class: "tool-label" }, t("drawTool")), el("kbd", {}, formatHotkey(hotkeyDraw)));
     drawBtn.addEventListener("click", () => toggleDraw());
-    toolbar.append(statusDot, divider, commentBtn, pendingSpan, adjustBtn, drawBtn, eyeBtn);
+    toolbar.append(statusDot, divider, commentBtn, pendingSpan, adjustBtn, drawBtn, groupBtn, eyeBtn);
   wrap.append(hint, toolbar);
   rootDiv.append(wrap);
 
@@ -1485,6 +1496,8 @@
     drawBtn.title = t("drawTitle") + " (" + kbd("draw") + ")";
     drawBtn.querySelector(".tool-label").textContent = t("drawTool");
     drawBtn.querySelector("kbd").textContent = kbd("draw");
+    groupBtn.title = t("groupBtn");
+    groupBtn.querySelector(".tool-label").textContent = t("groupBtn");
     eyeBtn.title = t("eyeTitle");
     statusDot.title = t("statusTitle");
     pendingSpan.title = t("pendingTitle");
@@ -1534,6 +1547,7 @@
     const pending = pins.filter((p) => p.status === "queued").length;
     commentBtn.classList.toggle("tool-active", mode === "picking");
     adjustBtn.classList.toggle("tool-active", mode === "adjust");
+    groupBtn.classList.toggle("tool-active", groupMode);
     pendingSpan.textContent = pending > 0 ? t("pendingCount").replace("{n}", pending) : "";
     pendingSpan.style.display = pending > 0 ? "" : "none";
     eyeBtn.innerHTML = hidden ? ICONS.eyeOff : ICONS.eye;
@@ -1570,7 +1584,7 @@
   document.addEventListener(
     "mousemove",
     (event) => {
-      if (mode === null || draft !== null) return;
+      if ((mode === null && !groupMode) || draft !== null) return;
       if (event.composedPath().some((n) => n === host || (n instanceof Node && host.contains(n)))) return;
       const target = event.target instanceof Element ? event.target : null;
       if (!target || target === hovered) return;
@@ -1582,7 +1596,7 @@
   document.addEventListener(
     "click",
     (event) => {
-      if (mode === null || draft !== null) return;
+      if (mode === null && !groupMode) return;
       if (event.composedPath().some((n) => n === host || (n instanceof Node && host.contains(n)))) return;
       const target = event.target instanceof Element ? event.target : null;
       if (!target) return;
@@ -1595,6 +1609,10 @@
       } else if (mode === "adjust") {
         openAdjustPanel(target);
         setMode(null);
+      } else if (groupMode) {
+        event.preventDefault();
+        event.stopPropagation();
+        void groupPick(target);
       }
     },
     true
@@ -1631,6 +1649,7 @@
       else if (hotkeyMatches(event, hotkeyDraw)) toggleDraw();
       if (event.key === "Escape") {
         if (drawMode) { toggleDraw(false); return; }
+        if (groupMode) { setGroupMode(false); return; }
         if (adjustPanel !== null) {
           closeAdjustPanel(true);
           return;
@@ -1639,6 +1658,10 @@
           draft = null;
           renderDraft();
         } else if (mode !== null) setMode(null);
+      }
+      if (event.key === "Enter" && groupMode && groupComposerNode === null) {
+        event.preventDefault();
+        openGroupComposer();
       }
     },
     true
@@ -1658,8 +1681,19 @@
     }
     updateToolbar();
   }
-  commentBtn.addEventListener("click", () => { if (drawMode) toggleDraw(false); setMode("picking"); });
-  adjustBtn.addEventListener("click", () => { if (drawMode) toggleDraw(false); setMode("adjust"); });
+  commentBtn.addEventListener("click", () => { if (drawMode) toggleDraw(false); if (groupMode) setGroupMode(false); setMode("picking"); });
+  adjustBtn.addEventListener("click", () => { if (drawMode) toggleDraw(false); if (groupMode) setGroupMode(false); setMode("adjust"); });
+  groupBtn.addEventListener("click", () => {
+    if (groupMode && groupComposerNode !== null) {
+      groupComposerNode.querySelector("textarea")?.focus({ preventScroll: true });
+      return;
+    }
+    if (groupMode && groupPicks.length > 0) {
+      openGroupComposer();
+      return;
+    }
+    setGroupMode(!groupMode);
+  });
   eyeBtn.addEventListener("click", () => {
     hidden = !hidden;
     updateToolbar();
@@ -2093,7 +2127,8 @@
         textChange: p.textChange ?? null,
         rect: p.rect,
         shot: p.shot ?? null,
-        afterShot: p.afterShot ?? null
+        afterShot: p.afterShot ?? null,
+        groupId: p.groupId ?? null
       }))
     };
     try {
@@ -2288,6 +2323,129 @@
     rows.push({ check: "targetSize", status: rect.width >= 24 && rect.height >= 24 ? "pass" : "fail", value: `${Math.round(rect.width)}×${Math.round(rect.height)}` });
     return rows;
   }
+  let groupMode = false;
+  let groupPicks = [];
+  let groupComposerNode = null;
+  function setGroupMode(on) {
+    if (on === groupMode) return;
+    groupMode = on;
+    if (on) {
+      setMode(null);
+      if (drawMode) toggleDraw(false);
+      if (draft !== null) { draft = null; renderDraft(); }
+      closePanels();
+      setHint(t("groupHint"));
+    } else {
+      clearGroupPicks();
+      groupComposerNode?.remove();
+      groupComposerNode = null;
+      clearHighlight();
+      setHint(null);
+    }
+    updateToolbar();
+  }
+  function clearGroupPicks() {
+    for (const pick of groupPicks) pick.marker?.remove();
+    groupPicks = [];
+  }
+  function groupPickMarker(target) {
+    const box = target.getBoundingClientRect();
+    const marker = el("div", { class: "highlight group-pick" });
+    Object.assign(marker.style, { transform: `translate(${box.left}px, ${box.top}px)`, width: `${box.width}px`, height: `${box.height}px` });
+    fixedLayer.append(marker);
+    return marker;
+  }
+  async function groupPick(target) {
+    if (!groupMode) return;
+    if (!(target instanceof Element) || target.tagName.toLowerCase() === "canvas") return;
+    if (groupPicks.some((pick) => pick.target === target)) return;
+    const rect = target.getBoundingClientRect();
+    const shot = screenshotOnSend ? await captureCropFor({ x: rect.left, y: rect.top, w: rect.width, h: rect.height }) : null;
+    if (!groupMode) return;
+    const pick = {
+      target,
+      selector: cssPath(target),
+      rect: { x: rect.left, y: rect.top, w: rect.width, h: rect.height },
+      offsets: { ox: rect.width / 2, oy: rect.height / 2 },
+      shot,
+      marker: groupPickMarker(target)
+    };
+    groupPicks.push(pick);
+  }
+  function finalizeGroup() {
+    const comment = (groupComposerNode?.querySelector("textarea")?.value ?? "").trim();
+    if (comment === "" || groupPicks.length === 0) {
+      setGroupMode(false);
+      return [];
+    }
+    const groupId = `${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+    const created = [];
+    for (const pick of groupPicks) {
+      created.push({
+        id: crypto.randomUUID(),
+        tag: pick.target.localName,
+        role: pick.target.getAttribute?.("role") ?? "",
+        label: pick.target.getAttribute?.("aria-label") ?? "",
+        selector: pick.selector,
+        text: (pick.target.textContent ?? "").trim().slice(0, 300),
+        component: reactComponentName(pick.target) ?? "",
+        comment,
+        changes: [],
+        pageUrl: PAGE_URL,
+        rect: pick.rect,
+        offsets: pick.offsets,
+        shot: pick.shot,
+        groupId,
+        status: "queued",
+        at: Date.now()
+      });
+    }
+    pins.push(...created);
+    savePins();
+    setGroupMode(false);
+    renderPins();
+    toast(t("groupCreated"));
+    return created;
+  }
+  function renderGroupComposer() {
+    if (!groupMode || groupPicks.length === 0) return;
+    if (groupComposerNode !== null) {
+      const count = groupComposerNode.querySelector(".group-count");
+      if (count !== null) count.textContent = String(groupPicks.length);
+      return;
+    }
+    mountShadow();
+    const WIDTH = 320;
+    const composer = el("div", { class: "popover composer", style: `width:${WIDTH}px;left:24px;top:64px` });
+    const textarea = el("textarea", { placeholder: t("composerPlaceholder") });
+    const submit = el("button", { class: "send", title: t("sendTitle") }, ICONS.arrowUp);
+    submit.addEventListener("click", () => finalizeGroup());
+    textarea.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        finalizeGroup();
+      }
+      if (e.key === "Escape") setGroupMode(false);
+    });
+    composer.append(
+      el(
+        "div",
+        { class: "composer-target" },
+        el("span", { class: "chip" }, ICONS.group, el("span", { class: "group-count" }, String(groupPicks.length))),
+        el("span", { class: "composer-provider" }, el("span", { class: "composer-provider-label" }, t("groupHint"))),
+        el("button", { class: "lr-close", title: t("composerClose"), onclick: () => setGroupMode(false) }, "✕")
+      ),
+      el("div", { class: "prompt-input" }, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }), submit))
+    );
+    fixedLayer.append(composer);
+    groupComposerNode = composer;
+    textarea.focus({ preventScroll: true });
+  }
+  function openGroupComposer() {
+    if (!groupMode || groupPicks.length === 0) return;
+    renderGroupComposer();
+  }
+
   function a11yAuditSection(target) {
     const rows = auditElement(target);
     return rows.length === 0 ? null : el("div", { class: "lr-a11y" },

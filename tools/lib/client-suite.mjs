@@ -1101,6 +1101,74 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
   }
 
+  harness.section("client: overlay group mode");
+  {
+    const finalizeSource = extractFunction(overlay, "finalizeGroup");
+    const pickSource = extractFunction(overlay, "groupPick");
+    harness.check("the overlay keeps its group mode helpers",
+      finalizeSource !== undefined && pickSource !== undefined && extractFunction(overlay, "setGroupMode") !== undefined && overlay.includes("groupBtn"));
+    {
+      const sandbox = {
+        pins: [],
+        groupPicks: [
+          { target: { localName: "h1", getAttribute: () => null, textContent: "Title one" }, selector: "h1:first-of-type", rect: { x: 1, y: 2, w: 30, h: 20 }, offsets: { ox: 15, oy: 10 }, shot: "shot-a" },
+          { target: { localName: "p", getAttribute: () => "paragraph", textContent: "Body" }, selector: "p.hero", rect: { x: 3, y: 4, w: 40, h: 50 }, offsets: { ox: 20, oy: 25 }, shot: "shot-b" },
+          { target: { localName: "li", getAttribute: () => null, textContent: "Item" }, selector: "ul > li", rect: { x: 5, y: 6, w: 20, h: 20 }, offsets: { ox: 10, oy: 10 }, shot: "shot-c" }
+        ],
+        groupComposerNode: { querySelector: () => ({ value: "One comment for all three" }) },
+        crypto: { randomUUID: () => "uuid" },
+        savePins: () => {},
+        setGroupMode: () => {},
+        renderPins: () => {},
+        toast: () => {},
+        t: (key) => key,
+        reactComponentName: () => null,
+        PAGE_URL: "http://page/"
+      };
+      vm.createContext(sandbox);
+      vm.runInContext(finalizeSource ?? "", sandbox, { filename: "finalizeGroup.js" });
+      const created = sandbox.finalizeGroup();
+      const ids = created.map((pin) => pin.groupId);
+      const comments = created.map((pin) => pin.comment);
+      harness.check("overlay: group mode assigns the same groupId to every member pin",
+        Array.isArray(created) && created.length === 3 && ids.every((id) => typeof id === "string" && id !== "") &&
+        ids.every((id) => id === ids[0]),
+        JSON.stringify({ count: created.length, ids, comments }));
+      harness.check("overlay: the group comment is copied to every member",
+        comments.length === 3 && comments.every((text) => text === "One comment for all three"),
+        JSON.stringify(comments));
+      harness.check("overlay: each group member captures its own crop",
+        created.every((pin) => typeof pin.shot === "string" && pin.shot !== "") &&
+        new Set(created.map((pin) => pin.shot)).size === 3 &&
+        JSON.stringify(created.map((pin) => pin.rect)) === JSON.stringify([{ x: 1, y: 2, w: 30, h: 20 }, { x: 3, y: 4, w: 40, h: 50 }, { x: 5, y: 6, w: 20, h: 20 }]),
+        JSON.stringify(created.map((pin) => ({ shot: pin.shot, rect: pin.rect }))));
+    }
+    {
+      const pick = pickSource === undefined ? undefined : evaluateExpression(`(Element, groupMode, target, groupPicks, captureCropFor, screenshotOnSend, cssPath) => {\n${pickSource}\nreturn groupPick(target);\n}`, "groupPick");
+      if (pick !== undefined) {
+        const canvasTarget = { tagName: "CANVAS", localName: "canvas", getBoundingClientRect: () => ({ left: 0, top: 0, width: 10, height: 10 }) };
+        const picks = [];
+        const capture = async () => "unused";
+        const rejectsCanvas = await pick(class Element {}, true, canvasTarget, picks, capture, true, () => "canvas:drawing");
+        const notInMode = await pick(class Element {}, false, { tagName: "P", getBoundingClientRect: () => ({ left: 0, top: 0, width: 10, height: 10 }) }, picks, capture, true, () => "p");
+        const offToggle = { tagName: "P", getBoundingClientRect: () => ({ left: 0, top: 0, width: 10, height: 10 }) };
+        const toggledOff = await pick(class Element {}, true, offToggle, picks, async () => { throw new Error("capture raced with toggle-off"); }, true, () => "p");
+        harness.check("overlay: group picking ignores canvas draw pins",
+          rejectsCanvas === undefined && picks.length === 0 && notInMode === undefined && toggledOff === undefined && picks.length === 0,
+          JSON.stringify({ picks: picks.length, results: [rejectsCanvas, notInMode, toggledOff] }));
+      } else {
+        harness.check("overlay: group picking ignores canvas draw pins", false, "groupPick missing");
+      }
+    }
+    {
+      const exits = extractFunction(overlay, "setGroupMode") ?? "";
+      const creates = exits.includes("groupPicks = []") || exits.includes("clearGroupPicks()");
+      harness.check("overlay: leaving group mode with no picks creates no pins",
+        creates && exits.includes("clearHighlight()"),
+        exits.slice(0, 120));
+    }
+  }
+
   harness.section("client: overlay hotkeys");
   {
     const parseHotkey = evaluateExpression(extractFunction(overlay, "parseHotkey"), "parseHotkey");

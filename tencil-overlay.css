@@ -105,6 +105,7 @@ kbd {
   border-radius: 4px;
   pointer-events: none;
 }
+.highlight.group-pick { border-style: dashed; border-width: 2px; border-color: var(--done); background: color-mix(in oklab, var(--done), white 85%); }
 .highlight-label {
   position: fixed; left: 0; top: 0;
   display: flex; gap: 6px; align-items: center;
