@@ -176,6 +176,7 @@ kbd {
 .pin-resolved { --pin: #7b7d7a; }
 .pin-resolved .pin-body { opacity: 0.8; }
 .pin-queued .pin-body { background: white; color: var(--accent); border: 2px dashed var(--accent); }
+.pin.lr-pin-stale .pin-body { opacity: 0.55; outline: 2px dashed #e5484d; outline-offset: 2px; }
 
 .pin-working .pin-body {
   isolation: isolate;

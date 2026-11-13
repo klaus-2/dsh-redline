@@ -80,6 +80,7 @@
       "resolved": "Resolve",
       "reopen": "Reopen",
       "del": "Delete",
+      "pinStale": "Target not found — pin is stale. Drag the marker to re-anchor.",
       "eyeTitle": "Show/hide pins",
       "statusTitle": "Live Review active",
       "pendingTitle": "Annotations waiting for your next prompt in the chat",
@@ -230,6 +231,7 @@
       "resolved": "✓ Resolvido",
       "reopen": "Reabrir",
       "del": "Excluir",
+      "pinStale": "Alvo não encontrado — pin obsoleto. Arraste o marcador para reancorar.",
       "eyeTitle": "Mostrar/ocultar pins",
       "statusTitle": "Live Review ativo",
       "pendingTitle": "Anotações aguardando seu próximo prompt no chat",
@@ -380,6 +382,7 @@
       "resolved": "标记已解决",
       "reopen": "重新打开",
       "del": "删除",
+      "pinStale": "未找到目标 — 图钉已失效。拖动标记以重新锚定。",
       "eyeTitle": "显示/隐藏图钉",
       "statusTitle": "Live Review 运行中",
       "pendingTitle": "标注将随你的下一条消息发送",
@@ -689,6 +692,7 @@
     .pin-bubble-meta { color: var(--n-500); font-size: 11px; word-break: break-all; margin-bottom: 4px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     .pin-bubble-changes { color: var(--n-600); font-size: 11px; margin-top: 4px; }
+    .pin-bubble-stale { color: var(--error); font-size: 11px; margin-top: 4px; }
     .pin-bubble-actions { display: flex; gap: 6px; padding: 6px 10px 10px; }
     .pin-bubble-actions button { all: unset; cursor: pointer; padding: 3px 10px; border-radius: 8px;
       font-size: 12px; background: var(--n-100); color: var(--n-950); }
@@ -1640,7 +1644,7 @@
         if (pin.status === "resolvido") continue;
         alive.add(pin.id);
         let node = pinNodes.get(pin.id)?.node;
-        const point = anchorPoint(pin) ?? { x: pin.rect.x, y: pin.rect.y };
+        const point = anchorPoint(pin) ?? (pin.stale === true ? null : { x: pin.rect.x, y: pin.rect.y });
         if (!node) {
           node = el("button", { class: "pin", title: pin.comment });
           node.append(el("span", { class: "pin-body" }, ""));
@@ -1653,8 +1657,8 @@
           absLayer.append(node);
           pinNodes.set(pin.id, { node });
         }
-        node.className = `pin pin-${pinVariant(pin)}${openPinId === pin.id ? " pin-open" : ""}`;
-        node.style.transform = `translate(${point.x}px, ${point.y}px)`;
+        node.className = `pin pin-${pinVariant(pin)}${pin.stale === true ? " lr-pin-stale" : ""}${openPinId === pin.id ? " pin-open" : ""}`;
+        if (point) node.style.transform = `translate(${point.x}px, ${point.y}px)`;
         const number = pins.filter((p) => p.status !== "resolvido").indexOf(pin) + 1;
         const glyph = pin.status === "resolvido" ? ICONS.check : String(number || "•");
         node.querySelector(".pin-body").innerHTML = `<span class="pin-glyph">${glyph}</span>`;
@@ -1674,7 +1678,13 @@
       const pin = pins.find((p) => p.id === id);
       if (!pin) continue;
       const point = anchorPoint(pin);
-      if (point) entry.node.style.transform = `translate(${point.x}px, ${point.y}px)`;
+      if (point) {
+        entry.node.style.transform = `translate(${point.x}px, ${point.y}px)`;
+        if (pin.stale === true) {
+          pin.stale = false;
+          entry.node.classList.remove("lr-pin-stale");
+        }
+      }
     }
     repositionDraft();
   }
@@ -1689,12 +1699,31 @@
       applyPanelPosition(composerNode, "composer");
     }
   }
+  function auditPinAnchors() {
+    for (const pin of pins) {
+      if (pin.tag === "canvas") continue;
+      const found = locate(pin.selector) !== null;
+      const node = pinNodes.get(pin.id)?.node;
+      if (found) {
+        if (pin.stale === true) {
+          pin.stale = false;
+          node?.classList.remove("lr-pin-stale");
+        }
+      } else {
+        pin.stale = true;
+        node?.classList.add("lr-pin-stale");
+      }
+    }
+  }
   window.addEventListener("scroll", repositionPins, { passive: true });
   window.addEventListener("resize", repositionPins);
   let mutationTimer = null;
   new MutationObserver(() => {
     clearTimeout(mutationTimer);
-    mutationTimer = setTimeout(repositionPins, 400);
+    mutationTimer = setTimeout(() => {
+      repositionPins();
+      auditPinAnchors();
+    }, 400);
   }).observe(document.body ?? document.documentElement, { childList: true, subtree: true, attributes: true });
 
 
@@ -1725,6 +1754,7 @@
         const point = insidePage({ x: endEvent.clientX, y: endEvent.clientY });
         const element = document.elementsFromPoint(point.x, point.y).find((n) => n !== host && n !== document.documentElement) ?? document.body;
         pin.selector = cssPath(element);
+        pin.stale = false;
         const rect = element.getBoundingClientRect();
         pin.offsets = { ox: point.x - rect.left, oy: point.y - rect.top };
         pin.rect = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
@@ -2133,7 +2163,7 @@
     });
     panel.append(
       el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, `${pins.filter((p) => p.status !== "resolvido").indexOf(pin) + 1} · ${quickLabel(locate(pin.selector) ?? pin.tag)}`)),
-      el("div", { class: "pin-bubble-body" }, el("div", { class: "pin-bubble-meta" }, `${pin.selector.slice(0, 90)}${pin.component ? ` · ${pin.component}` : ""}`), changesText !== "" ? el("div", { class: "pin-bubble-changes" }, changesText) : null, textChangeText !== "" ? el("div", { class: "pin-bubble-changes" }, textChangeText) : null),
+      el("div", { class: "pin-bubble-body" }, el("div", { class: "pin-bubble-meta" }, `${pin.selector.slice(0, 90)}${pin.component ? ` · ${pin.component}` : ""}`), pin.stale === true ? el("div", { class: "pin-bubble-stale" }, t("pinStale")) : null, changesText !== "" ? el("div", { class: "pin-bubble-changes" }, changesText) : null, textChangeText !== "" ? el("div", { class: "pin-bubble-changes" }, textChangeText) : null),
       el("div", { class: "prompt-input" }, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }), submit)),
       el(
         "div",

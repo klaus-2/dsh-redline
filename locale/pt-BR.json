@@ -21,6 +21,7 @@
   "resolved": "✓ Resolvido",
   "reopen": "Reabrir",
   "del": "Excluir",
+  "pinStale": "Alvo não encontrado — pin obsoleto. Arraste o marcador para reancorar.",
   "viewPending": "Ver as anotações pendentes",
   "sendNow": "Enviar as anotações ao agente agora",
   "sendBtn": "Enviar",

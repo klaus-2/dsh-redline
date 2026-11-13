@@ -754,6 +754,72 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("the overlay removes queued pins only by delivered id", poll !== undefined && poll.includes("data.deliveredIds") && poll.includes("gone.has(p.id)") && !poll.includes("deliveredAt"), poll === undefined ? "pollStatus missing" : "pollStatus no longer keys removal on delivered ids");
   }
 
+  harness.section("client: overlay pin re-anchoring");
+  {
+    const auditSource = extractFunction(overlay, "auditPinAnchors");
+    const audit = auditSource === undefined ? undefined : evaluateExpression(`(locate, pins, pinNodes) => {\n${auditSource}\nauditPinAnchors();\n}`, "auditPinAnchors");
+    const nodeWithClasses = () => {
+      const classes = new Set();
+      return { classes, classList: { add: (name) => classes.add(name), remove: (name) => classes.delete(name) } };
+    };
+    harness.check("the overlay keeps its anchor auditor", audit !== undefined);
+    {
+      const staleNode = nodeWithClasses();
+      const liveNode = nodeWithClasses();
+      const pins = [
+        { id: "gone", tag: "h1", selector: "#gone" },
+        { id: "here", tag: "h1", selector: "#here" }
+      ];
+      const pinNodes = new Map([["gone", { node: staleNode }], ["here", { node: liveNode }]]);
+      const locate = (selector) => (selector === "#here" ? { id: "here" } : null);
+      if (audit !== undefined) audit(locate, pins, pinNodes);
+      const renderer = extractFunction(overlay, "renderPins");
+      harness.check("overlay: the debounced observer path marks unlocatable pins stale instead of reusing the old rect",
+        audit !== undefined && pins[0].stale === true && staleNode.classes.has("lr-pin-stale") &&
+        pins[1].stale !== true && !liveNode.classes.has("lr-pin-stale") &&
+        renderer !== undefined && renderer.includes("pin.stale === true ? null :"),
+        JSON.stringify({ stale: pins.map((p) => p.stale), renderedFallback: renderer?.includes("?? { x: pin.rect.x") }));
+    }
+    {
+      const drawNode = nodeWithClasses();
+      const realNode = nodeWithClasses();
+      const pins = [
+        { id: "draw", tag: "canvas", selector: "canvas:drawing" },
+        { id: "real", tag: "h1", selector: "#real" }
+      ];
+      const pinNodes = new Map([["draw", { node: drawNode }], ["real", { node: realNode }]]);
+      if (audit !== undefined) audit(() => null, pins, pinNodes);
+      harness.check("overlay: canvas draw pins are exempt from stale classification",
+        audit !== undefined && pins[0].stale === undefined && drawNode.classes.size === 0 &&
+        pins[1].stale === true && realNode.classes.has("lr-pin-stale"),
+        JSON.stringify({ draw: pins[0].stale, real: pins[1].stale, drawClasses: [...drawNode.classes] }));
+    }
+    {
+      const reposition = extractFunction(overlay, "repositionPins");
+      const scrollLine = overlay.split("\n").find((line) => line.includes('addEventListener("scroll"') && line.includes("repositionPins")) ?? "";
+      const resizeLine = overlay.split("\n").find((line) => line.includes('addEventListener("resize"') && line.includes("repositionPins")) ?? "";
+      harness.check("overlay: the scroll and resize paths reposition without classifying stale",
+        reposition !== undefined && !reposition.includes("auditPinAnchors") &&
+        scrollLine.includes("repositionPins") && resizeLine.includes("repositionPins"),
+        JSON.stringify({ scroll: scrollLine.trim(), resize: resizeLine.trim() }));
+    }
+    {
+      const node = nodeWithClasses();
+      const pins = [{ id: "p", tag: "h1", selector: "#x" }];
+      const pinNodes = new Map([["p", { node }]]);
+      let element = null;
+      if (audit !== undefined) audit(() => element, pins, pinNodes);
+      const marked = pins[0].stale === true && node.classes.has("lr-pin-stale");
+      element = { id: "x" };
+      if (audit !== undefined) audit(() => element, pins, pinNodes);
+      const recovered = pins[0].stale === false && !node.classes.has("lr-pin-stale");
+      const dragClears = extractFunction(overlay, "wirePinDrag").includes("pin.stale = false");
+      harness.check("overlay: stale clears when the target is found again or the pin is re-anchored by drag",
+        audit !== undefined && marked && recovered && dragClears,
+        JSON.stringify({ marked, recovered, dragClears }));
+    }
+  }
+
   harness.section("client: overlay hotkeys");
   {
     const parseHotkey = evaluateExpression(extractFunction(overlay, "parseHotkey"), "parseHotkey");

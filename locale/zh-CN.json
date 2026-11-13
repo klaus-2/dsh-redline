@@ -21,6 +21,7 @@
   "resolved": "标记已解决",
   "reopen": "重新打开",
   "del": "删除",
+  "pinStale": "未找到目标 — 图钉已失效。拖动标记以重新锚定。",
   "viewPending": "查看待发送标注",
   "sendNow": "立即把标注发送给智能体",
   "sendBtn": "发送",
