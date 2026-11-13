@@ -19,6 +19,7 @@ const PROTECTED_ROUTES = [
   { path: "/.lr/drawings", method: "GET" },
   { path: "/.lr/pending", method: "GET" },
   { path: "/.lr/pending-pins", method: "GET" },
+  { path: "/.lr/report", method: "GET" },
   { path: "/.lr/client-cmd", method: "GET" },
   { path: "/.lr/proxy/abc", method: "GET" },
   { path: "/.lr/attachments/missing.jpg", method: "GET" },
@@ -578,6 +579,38 @@ export async function runHostSuite(harness, { pluginDir }) {
         projection.pins[0].screenshotPath === undefined && projection.pins[0].afterShotPath === undefined &&
         projection.pins[0].groupId === undefined && projection.pins[0].viewportWidth === undefined,
         JSON.stringify(projection.pins[0]));
+
+      const reportUnauth = await fetch(`${base}/.lr/report?sessionId=session-contract`);
+      harness.check("host: report route requires the shared secret", reportUnauth.status === 401, `status ${reportUnauth.status}`);
+      const reportMd = await (await fetch(`${base}/.lr/report?sessionId=session-contract`, { headers: auth })).text();
+      harness.check("host: report markdown includes the pending-scope header and the pin sections",
+        reportMd.includes("# Redline pending annotations report") && reportMd.includes("pending annotations only") &&
+        reportMd.includes("# Browser comments (Redline)") && reportMd.includes("## User Comment 1") &&
+        reportMd.includes("projecao") && reportMd.includes("Target selector: body h1"),
+        reportMd.slice(0, 300));
+      const reportJson = await (await fetch(`${base}/.lr/report?sessionId=session-contract&format=json`, { headers: auth })).json();
+      const reportJsonText = JSON.stringify(reportJson);
+      harness.check("host: report json returns structured pins without image data",
+        reportJson.ok === true && reportJson.count === 1 && reportJson.pins.length === 1 &&
+        reportJson.pins[0].selector === "body h1" && reportJson.pins[0].comment === "projecao" &&
+        reportJson.pins[0].screenshotPath !== null && reportJson.pins[0].afterShotPath !== null &&
+        reportJson.pins[0].groupId === "grp-proj" && reportJson.pins[0].viewportWidth === 768 &&
+        !reportJsonText.includes("data:image"),
+        reportJsonText.slice(0, 300));
+      await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: json(), body: JSON.stringify({ kind: "view", sessionId: "session-after-deliver" }) });
+      await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Entrega", pins: [{ id: "deliver-1", tag: "h1", selector: "#t", comment: "antes da entrega" }], screenshot: null }) });
+      const beforeDeliver = await (await fetch(`${base}/.lr/report?sessionId=session-after-deliver`, { headers: auth })).text();
+      pendingBySession.delete("session-after-deliver");
+      const afterDeliver = await (await fetch(`${base}/.lr/report?sessionId=session-after-deliver`, { headers: auth })).text();
+      harness.check("host: report covers pending annotations only and ignores delivered pins",
+        beforeDeliver.includes("antes da entrega") && !afterDeliver.includes("antes da entrega") && afterDeliver.includes("pending annotations only"),
+        JSON.stringify({ delivered: beforeDeliver.includes("antes da entrega"), after: afterDeliver.includes("antes da entrega") }));
+      await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: json(), body: JSON.stringify({ kind: "view", sessionId: "session-contract" }) });
+      const defaultFormat = await fetch(`${base}/.lr/report?sessionId=session-contract&format=`, { headers: auth });
+      const defaultFormatText = await defaultFormat.text();
+      harness.check("host: report defaults to markdown when format is absent",
+        defaultFormat.status === 200 && defaultFormatText.includes("# Redline pending annotations report") && !defaultFormatText.startsWith("{"),
+        defaultFormatText.slice(0, 120));
 
       await (await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [
         { id: "proj-2", tag: "h1", selector: "#t", comment: "after invalido", afterShot: "not a data url" },

@@ -2925,4 +2925,87 @@ export async function runClientSuite(harness, { pluginDir }) {
       harness.check("the row says why the copy did not start", reason.length > 0, JSON.stringify(after.tree).slice(0, 200));
     }
   }
+
+  harness.section("client: the pending card exports the report");
+  {
+    const fetchCalls = [];
+    let failing = false;
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const downloads = [];
+    const created = [];
+    const documentStub = {
+      createElement(tag) {
+        const node = { tag, href: "", download: "", click: () => downloads.push({ href: node.href, download: node.download }), style: {}, setAttribute() {} };
+        created.push(node);
+        return node;
+      },
+      documentElement: {},
+      head: { appendChild() {} },
+      body: { appendChild() {} },
+      readyState: "complete",
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener() {},
+      removeEventListener() {}
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      document: documentStub,
+      fetch: async (url, options) => {
+        const target = String(url);
+        if (target.includes("/.lr/report")) {
+          fetchCalls.push({ url: target, headers: options?.headers ?? {}, format: new URL(target).searchParams.get("format") });
+          if (failing) return jsonResponse({ ok: false }, 500);
+          return jsonResponse({ ok: true, count: 0 });
+        }
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/pending")) return jsonResponse({ ok: true, count: 2, snapshotId: "snap-9", pageTitle: "Demo", pins: [{ id: "p1", index: 1, tag: "h1", comment: "c", selector: "body h1", component: "", text: "", role: "" }] });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    await flush(4);
+    const card = client.slots.find((slot) => slot.spec.id === "dsh-redline" && slot.spec.name === "conversation.input.dock");
+    harness.check("the pending card registers in the dock", card !== undefined);
+    if (card !== undefined) {
+      const first = renderOnce(stub, card.component, {});
+      for (const effect of first.effects) effect();
+      await flush(4);
+      const open = renderOnce(stub, card.component, {});
+      const summary = findElements(open.tree, (element) => element.props?.className === "lr-summary");
+      if (summary.length === 1) {
+        summary[0].props.onClick();
+        await flush(2);
+      }
+      const expanded = renderOnce(stub, card.component, {});
+      const mdButton = findElements(expanded.tree, (element) => element.props?.className === "lr-report-md");
+      const jsonButton = findElements(expanded.tree, (element) => element.props?.className === "lr-report-json");
+      harness.eq("the card exposes the two report buttons", mdButton.length + jsonButton.length, 2);
+      if (mdButton.length === 1 && jsonButton.length === 1) {
+        await mdButton[0].props.onClick();
+        await jsonButton[0].props.onClick();
+        await flush(3);
+        const ok = fetchCalls.length === 2 && fetchCalls.every((call) => call.url.includes("/.lr/report?") && call.url.includes("format=") && call.headers["x-dsh-redline-secret"] === "a".repeat(64)) &&
+          fetchCalls.some((call) => call.format === "md") && fetchCalls.some((call) => call.format === "json") &&
+          downloads.length === 2 && downloads.every((entry) => String(entry.download).startsWith("redline-report-snap-9."));
+        harness.check("client: export buttons request the report with the secret header and the requested format", ok, JSON.stringify({ calls: fetchCalls, downloads }));
+        failing = true;
+        fetchCalls.length = 0;
+        downloads.length = 0;
+        await mdButton[0].props.onClick();
+        await flush(3);
+        const failed = renderOnce(stub, card.component, {});
+        const errorLine = findElements(failed.tree, (element) => element.props?.className === "lr-report-error");
+        harness.check("client: export failure renders an inline error instead of a broken download",
+          errorLine.length === 1 && typeof errorLine[0].props?.children === "string" && errorLine[0].props.children !== "reportFailed" && errorLine[0].props.children.includes("download failed") && downloads.length === 0,
+          JSON.stringify({ error: errorLine.length, text: errorLine[0]?.props?.children, downloads: downloads.length }));
+      }
+    }
+  }
 }
