@@ -1150,21 +1150,25 @@ export async function runClientSuite(harness, { pluginDir }) {
         JSON.stringify(created.map((pin) => ({ shot: pin.shot, rect: pin.rect }))));
     }
     {
-      const pick = pickSource === undefined ? undefined : evaluateExpression(`(Element, groupMode, target, groupPicks, captureCropFor, screenshotOnSend, cssPath) => {\n${pickSource}\nreturn groupPick(target);\n}`, "groupPick");
+      const pick = pickSource === undefined ? undefined : evaluateExpression(`(Element, modeBox, target, groupPicks, captureCropFor, screenshotOnSend, cssPath, groupPickMarker) => {\nconst readGroupMode = () => modeBox.value;\n${pickSource.replace(/groupMode/g, "readGroupMode()")}\nreturn groupPick(target);\n}`, "groupPick");
       if (pick !== undefined) {
+        const ElementClass = class Element {};
         const makeElement = (tagName) => {
-          const instance = new (class Element {})();
+          const instance = new ElementClass();
           instance.tagName = tagName;
           instance.localName = tagName.toLowerCase();
           instance.getBoundingClientRect = () => ({ left: 0, top: 0, width: 10, height: 10 });
           return instance;
         };
+        const marker = () => ({});
         const canvasTarget = makeElement("CANVAS");
         const picks = [];
+        const onMode = { value: true };
+        const offMode = { value: false };
         const capture = async () => "unused";
-        const rejectsCanvas = await pick(class Element {}, true, canvasTarget, picks, capture, true, () => "canvas:drawing");
-        const notInMode = await pick(class Element {}, false, makeElement("P"), picks, capture, true, () => "p");
-        const toggledOff = await pick(class Element {}, true, makeElement("P"), picks, async () => { throw new Error("capture raced with toggle-off"); }, true, () => "p");
+        const rejectsCanvas = await pick(ElementClass, onMode, canvasTarget, picks, capture, true, () => "canvas:drawing", marker);
+        const notInMode = await pick(ElementClass, offMode, makeElement("P"), picks, capture, true, () => "p", marker);
+        const toggledOff = await pick(ElementClass, onMode, makeElement("P"), picks, async () => { onMode.value = false; return "shot"; }, true, () => "p", marker);
         harness.check("overlay: group picking ignores canvas draw pins",
           rejectsCanvas === undefined && picks.length === 0 && notInMode === undefined && toggledOff === undefined && picks.length === 0,
           JSON.stringify({ picks: picks.length, results: [rejectsCanvas, notInMode, toggledOff] }));
