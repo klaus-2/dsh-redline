@@ -518,7 +518,10 @@ export function evaluateExpression(text, filename = "expression") {
 
 /** The source of a module-level function declaration, so a test can call it on its own. */
 export function extractFunction(source, name) {
-  const anchor = source.indexOf(`function ${name}(`);
+  const plain = source.indexOf(`function ${name}(`);
+  const withAsync = source.indexOf(`async function ${name}(`);
+  let anchor = plain;
+  if (withAsync !== -1 && (plain === -1 || withAsync < plain)) anchor = withAsync;
   if (anchor === -1) return undefined;
   return extractBlock(source, anchor);
 }

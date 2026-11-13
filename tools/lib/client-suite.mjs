@@ -820,6 +820,73 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
   }
 
+  harness.section("client: overlay before/after captures");
+  {
+    const captureSource = extractFunction(overlay, "captureBeforeAfter");
+    const runCapture = captureSource === undefined ? undefined : evaluateExpression(`(screenshotOnSend, captureCropFor, restoreAll, applyCommitted, adjustPatch, target, pin) => {\n${captureSource}\nreturn captureBeforeAfter(target, pin);\n}`, "captureBeforeAfter");
+    const captureTarget = { getBoundingClientRect: () => ({ left: 10, top: 20, width: 100, height: 50 }) };
+    harness.check("the overlay keeps its capture chain", runCapture !== undefined);
+    const makeStubs = () => {
+      const state = { order: [], rects: [], applyArgs: null };
+      return {
+        state,
+        capture: async (rect) => { state.order.push("capture"); state.rects.push(rect); return state.order.filter((step) => step === "capture").length === 1 ? "after-data" : "before-data"; },
+        restore: () => { state.order.push("restore"); },
+        apply: (patch, changes, textChange) => { state.order.push("apply"); state.applyArgs = [patch, changes, textChange]; }
+      };
+    };
+    {
+      const { state, capture, restore, apply } = makeStubs();
+      const pin = { changes: [{ prop: "color", before: "#000", after: "red" }], shot: null };
+      const pending = runCapture === undefined ? null : runCapture(true, capture, restore, apply, { id: "patch" }, captureTarget, pin);
+      await pending;
+      harness.check("overlay: confirm captures the after shot before restore and the before shot after restore",
+        pending !== null && state.order.join(",") === "capture,restore,capture,apply" &&
+        state.rects.length === 2 && state.rects[0] === state.rects[1] &&
+        pin.afterShot === "after-data" && pin.shot === "before-data" &&
+        state.applyArgs !== null && state.applyArgs[0]?.id === "patch" && state.applyArgs[1] === pin.changes,
+        JSON.stringify({ order: state.order, afterShot: pin.afterShot, shot: pin.shot }));
+    }
+    {
+      const { state, capture, restore, apply } = makeStubs();
+      const pin = { changes: [{ prop: "color", before: "#000", after: "red" }], shot: "old-shot" };
+      const pending = runCapture === undefined ? null : runCapture(false, capture, restore, apply, { id: "patch" }, captureTarget, pin);
+      await pending;
+      harness.check("overlay: confirm skips captures when screenshots are disabled",
+        pending !== null && state.order.length === 0 && pin.afterShot === undefined && pin.shot === "old-shot",
+        JSON.stringify({ order: state.order, shot: pin.shot }));
+    }
+    {
+      const { state, capture, restore, apply } = makeStubs();
+      const emptyPin = { changes: [], shot: "kept" };
+      const textOnlyPin = { changes: [], textChange: { before: "a", after: "b" }, shot: null };
+      const first = runCapture === undefined ? null : runCapture(true, capture, restore, apply, { id: "patch" }, captureTarget, emptyPin);
+      await first;
+      const before = state.order.length;
+      const second = runCapture === undefined ? null : runCapture(true, capture, restore, apply, { id: "patch" }, captureTarget, textOnlyPin);
+      await second;
+      harness.check("overlay: confirm skips captures when the adjustment has no changes and no text change",
+        first !== null && second !== null && before === 0 && emptyPin.shot === "kept" && emptyPin.afterShot === undefined &&
+        state.order.length > before && textOnlyPin.afterShot !== undefined && textOnlyPin.shot !== null,
+        JSON.stringify({ emptyOrder: state.order.slice(0, before), textOrder: state.order.slice(before) }));
+    }
+    {
+      const postSource = extractFunction(overlay, "postSnapshot");
+      let captured = null;
+      const bridgeSend = async (type, payload) => { captured = payload; return { ok: true }; };
+      const pins = [{ id: "x", tag: "h1", selector: "#x", comment: "c", changes: [], status: "queued", shot: "before-data", afterShot: "after-data", stale: true }];
+      if (postSource !== undefined) {
+        const post = evaluateExpression(`(bridgeSend, pins, PAGE_URL, document, setHint, updateToolbar, toast, t) => {\n${postSource}\nreturn postSnapshot();\n}`, "postSnapshot");
+        await post(bridgeSend, pins, "http://page/", { title: "T" }, () => {}, () => {}, () => {}, (key) => key);
+      }
+      const forwarded = captured?.pins?.[0];
+      harness.check("overlay: postSnapshot forwards afterShot on the pin payload",
+        forwarded !== undefined && forwarded.afterShot === "after-data" && forwarded.shot === "before-data" &&
+        !("stale" in forwarded) && forwarded.stale === undefined,
+        JSON.stringify(forwarded ?? captured));
+    }
+  }
+
   harness.section("client: overlay hotkeys");
   {
     const parseHotkey = evaluateExpression(extractFunction(overlay, "parseHotkey"), "parseHotkey");
