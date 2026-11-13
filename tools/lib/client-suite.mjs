@@ -887,6 +887,44 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
   }
 
+  harness.section("client: overlay css patch copy");
+  {
+    const buildSource = extractFunction(overlay, "buildCssPatch");
+    const buildCssPatch = buildSource === undefined ? undefined : evaluateExpression(buildSource, "buildCssPatch");
+    harness.check("the overlay keeps its css patch builder", buildCssPatch !== undefined);
+    harness.check("overlay: buildCssPatch renders the selector with one property per committed change",
+      buildCssPatch !== undefined &&
+      buildCssPatch({ selector: "body h1", changes: [{ prop: "color", before: "#000", after: "red" }, { prop: "border-radius", before: "0", after: "4px" }] }) === "body h1 { color: red; border-radius: 4px; }",
+      buildCssPatch === undefined ? "builder missing" : JSON.stringify(buildCssPatch({ selector: "body h1", changes: [{ prop: "color", before: "#000", after: "red" }] })));
+    harness.check("overlay: buildCssPatch ignores text changes and canvas pins",
+      buildCssPatch !== undefined &&
+      buildCssPatch({ selector: "body h1", changes: [], textChange: { before: "a", after: "b" } }) === "" &&
+      buildCssPatch({ tag: "canvas", selector: "canvas:drawing", changes: [{ prop: "color", before: "#000", after: "red" }] }) === "",
+      "canvas or text-only pins must produce no css");
+    harness.check("overlay: buildCssPatch keeps var() values verbatim",
+      buildCssPatch !== undefined &&
+      buildCssPatch({ selector: "body h1", changes: [{ prop: "color", before: "#000", after: "var(--brand)" }] }) === "body h1 { color: var(--brand); }",
+      buildCssPatch === undefined ? "builder missing" : JSON.stringify(buildCssPatch({ selector: "body h1", changes: [{ prop: "color", before: "#000", after: "var(--brand)" }] })));
+    {
+      const copySource = extractFunction(overlay, "copyCssPatch");
+      const renderer = extractFunction(overlay, "renderPinPanel");
+      let written = [];
+      let toasts = [];
+      const navigatorStub = { clipboard: { writeText: async (text) => { written.push(text); } } };
+      const copy = copySource === undefined ? undefined : evaluateExpression(`(navigator, toast, t, buildCssPatch, pin) => {\n${copySource}\ncopyCssPatch(pin);\n}`, "copyCssPatch");
+      if (copy !== undefined) copy(navigatorStub, (text) => toasts.push(text), (key) => key, buildCssPatch, { selector: "body h1", changes: [{ prop: "color", before: "#000", after: "red" }] });
+      let failingToasts = [];
+      const failingNavigator = { clipboard: { writeText: async () => { throw new Error("denied"); } } };
+      if (copy !== undefined) copy(failingNavigator, (text) => failingToasts.push(text), (key) => key, buildCssPatch, { selector: "body h1", changes: [{ prop: "color", before: "#000", after: "red" }] });
+      await flush();
+      harness.check("overlay: the popover copy button writes the patch via the clipboard",
+        copy !== undefined && renderer !== undefined && renderer.includes("pin.changes.length > 0") && renderer.includes("copyCssPatch(pin)") &&
+        JSON.stringify(written) === JSON.stringify(["body h1 { color: red; }"]) && JSON.stringify(toasts) === JSON.stringify(["cssCopied"]) &&
+        JSON.stringify(failingToasts) === JSON.stringify(["cssCopyFailed"]),
+        JSON.stringify({ written, toasts, failingToasts, conditional: renderer?.includes("pin.changes.length > 0") }));
+    }
+  }
+
   harness.section("client: overlay hotkeys");
   {
     const parseHotkey = evaluateExpression(extractFunction(overlay, "parseHotkey"), "parseHotkey");
