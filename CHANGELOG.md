@@ -26,12 +26,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arms its fallback timers for every document instead of only for the first
   one, and checks in the guest that the overlay actually landed before it
   calls the injection done.
+
+- **Proxied pages render with their styles, scripts and images.** A page
+  opened through `/p/<target>` has every subresource rewritten to
+  `/.lr/proxy/<target>`, and the auth gate refused all of them because it
+  accepted only the instance secret, which a browser never holds. The
+  page's own `lr_session` cookie was read after that gate, so a real browser
+  received a 200 HTML document and 401 for everything it references and
+  showed a white screen. The gate now accepts an established session for the
+  proxy prefix. A request with no cookie or a forged one is still refused,
+  and every route outside the proxy still requires the secret.
+  ([#1](https://github.com/klaus-2/dsh-redline/issues/1))
+
 - **A guest that cannot show the overlay stops working on it.** A failing
   injection was retried without end, which filled the host log with
   diagnostics and rewrote the status file twice a second for as long as the
   page stayed open. The client now counts the attempts it spends inside the
   guest, pauses once that budget is gone, and resumes on the next document, so
   a page that cannot carry the overlay costs a bounded amount of work.
+
+- **The suite fetches a proxied subresource the way a browser does.** The
+  proxy checks attached the instance secret to every request, so they stayed
+  green while every real browser was red. The proxy section now also fetches
+  a stylesheet and an image with only the page cookie, and asserts that no
+  credential, a forged cookie, and a cookie presented to a route outside the
+  proxy are all still refused.
+  ([#1](https://github.com/klaus-2/dsh-redline/issues/1))
 
 ## [1.2.1] - 2026-11-13
 
