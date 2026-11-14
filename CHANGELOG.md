@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The overlay appears again in the harness browser panel.** Since the dsh
+  0.2.2-rc.3 the browser panel creates its guest with the lease token in the
+  `src` attribute and navigates it with `loadURL()`, so the attribute keeps
+  saying `about:blank#<lease>` for the whole life of the guest. The client read
+  the page's url from that attribute and refused to inject the overlay into
+  every guest the panel renders. It now reads the guest's own url and falls
+  back to the attribute for the carriers that do not expose one, so the
+  overlay, the bridge and the pins come back in the panel while a guest that
+  has not navigated yet still waits for its page.
+- **The final live test now covers the client half.** The regression above
+  shipped because the served-path checks never exercised the client that
+  injects into webviews. The final test runs the real client against a stub
+  webview shaped like the harness guest, so a client that cannot inject into
+  the panel fails the release instead of shipping.
+
+### Changed
+
+- **The group mode reads like the rest of the overlay.** Picked elements keep
+  the solid accent outline instead of a washed dashed rectangle, and each pick
+  shows its order in a small badge so a multi-select is legible; the badge
+  moves inside the element when there is no room above it.
+- **The preview-width control is a button with a menu instead of a select.**
+  The button shows the active preset (or "Largura total") and turns accent
+  while a preset is applied; the menu lists the fixed presets and the zoom
+  steps, marks the active one, and follows the dropdown language the draw
+  tools already use.
+
 ## [1.2.0] - 2026-11-13
 
 This release expands the review toolkit: the inspector suggests the site's

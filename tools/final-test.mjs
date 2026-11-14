@@ -365,7 +365,88 @@ await withIsolatedHome(async (home) => {
       check("bridge: a rota direta com secret limpa o pendente", cleared.kind === "cleared", JSON.stringify(cleared).slice(0, 100));
     }
 
-    // ---- phase 2: live browser (skipped when playwright-cli is unavailable) ----
+    // ---- phase 2: the client half against the harness guest (no browser needed) ----
+    {
+      const vm = await import("node:vm");
+      const clientSource = readFileSync(fileURLToPath(new URL("../lib/client.js", import.meta.url)), "utf8")
+        .replace("const API_PORTS = [47477,", `const API_PORTS = [${lrPort},`);
+      const makeGuest = (guestUrl, attributeUrl) => {
+        const guest = { executed: [] };
+        guest.dataset = {};
+        guest.getAttribute = (name) => (name === "src" ? attributeUrl : null);
+        guest.getURL = () => guestUrl;
+        guest.addEventListener = () => {};
+        guest.executeJavaScript = async (code) => { guest.executed.push(code); return "[]"; };
+        return guest;
+      };
+      const runClient = (guest) => {
+        const windowStub = {
+          __ModuleLoader__: { load(spec) { windowStub.__loaded = spec; } },
+          localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+          setTimeout,
+          clearTimeout,
+          document: {
+            readyState: "complete",
+            querySelectorAll: (selector) => (typeof selector === "string" && selector.includes("webview") ? [guest] : []),
+            querySelector: () => null,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            createElement: () => ({ style: {}, dataset: {}, setAttribute() {}, appendChild() {}, remove() {} }),
+            head: { appendChild() {} },
+            body: { appendChild() {} },
+            documentElement: {},
+          },
+          navigator: { language: "pt-BR" },
+          console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+          fetch: async (url, options) => {
+            const target = String(url);
+            if (target.endsWith("/api/dsh-redline.secret")) return new Response(JSON.stringify({ ok: true, secret: auth["x-dsh-redline-secret"] }), { status: 200, headers: { "content-type": "application/json" } });
+            return fetch(url, options);
+          },
+        };
+        const sandbox = {
+          window: windowStub,
+          document: windowStub.document,
+          console: windowStub.console,
+          navigator: windowStub.navigator,
+          localStorage: windowStub.localStorage,
+          fetch: windowStub.fetch,
+          setTimeout,
+          clearTimeout,
+          setInterval,
+          clearInterval,
+          queueMicrotask,
+          AbortController,
+          AbortSignal,
+          URL,
+          URLSearchParams,
+          TextEncoder,
+          TextDecoder,
+          MutationObserver: class { observe() {} },
+          Element: class {},
+        };
+        vm.createContext(sandbox);
+        vm.runInContext(clientSource, sandbox, { filename: "client.js" });
+        const plugin = windowStub.__loaded.factory(() => ({ useState: () => [undefined, () => {}], useEffect: () => {}, useRef: () => ({ current: undefined }), useCallback: (fn) => fn, useMemo: () => undefined, createElement: () => ({}), memo: (fn) => fn, Fragment: "Fragment" }));
+        plugin.apply({ slots: { inject: () => [], register: () => ({ dispose() {} }) }, inject: () => [], effect: () => {}, commands: { register: () => {} }, connection: { fetch: { register: () => {} } }, remote: {}, agent: { id: "final-test" } });
+        return guest;
+      };
+      const waitInjected = (guest, timeoutMs) => new Promise((resolve) => {
+        const deadline = Date.now() + timeoutMs;
+        const poll = () => {
+          if (guest.executed.some((code) => code.includes("window.__LR__ = Object.assign"))) return resolve(true);
+          if (Date.now() > deadline) return resolve(false);
+          setTimeout(poll, 100);
+        };
+        poll();
+      });
+      const harnessGuest = runClient(makeGuest(targetUrl, "about:blank#lease-1"));
+      check("guest: o client injeta o overlay num guest cujo src é o token do lease (contrato dsh 0.2.2-rc.3)", await waitInjected(harnessGuest, 8000), `executed ${harnessGuest.executed.length} scripts`);
+      const idleGuest = runClient(makeGuest("about:blank#lease-2", "about:blank#lease-2"));
+      check("guest: o client NÃO injeta num guest que nunca navegou", (await waitInjected(idleGuest, 4000)) === false, `executed ${idleGuest.executed.length} scripts`);
+    }
+
+    // ---- phase 3: live browser (skipped when playwright-cli is unavailable) ----
     const probe = playwrightCli(["--version"], 60000);
     const browserAvailable = probe.status === 0 && /Version/.test(probe.output);
     if (!browserAvailable) {

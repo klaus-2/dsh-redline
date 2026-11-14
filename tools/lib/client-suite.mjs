@@ -608,6 +608,74 @@ export async function runClientSuite(harness, { pluginDir }) {
     assert.deepEqual(relayUnpurged.keys, Object.keys(relayPurgeSeed));
   }
 
+  harness.section("client: the guest url the harness browser actually exposes");
+  {
+    const overlaySource = readFileSync(path.join(pluginDir, "lib", "overlay.js"), "utf8");
+    const bridgeSource = readFileSync(path.join(pluginDir, "lib", "bridge.js"), "utf8");
+
+    const runGuest = async (guestUrl, attributeUrl) => {
+      const executed = [];
+      class FakeElement {}
+      const guest = new FakeElement();
+      guest.dataset = { liveReviewWired: undefined };
+      guest.getAttribute = (name) => (name === "src" ? attributeUrl : null);
+      guest.getURL = () => guestUrl;
+      guest.addEventListener = (type, handler) => {
+        if (type === "dom-ready") setTimeout(() => handler(), 0);
+      };
+      guest.executeJavaScript = async (code) => {
+        executed.push(code);
+        return "[]";
+      };
+      const documentStub = {
+        createElement: () => ({ style: {}, dataset: {}, setAttribute() {}, appendChild() {}, remove() {} }),
+        head: { appendChild() {} },
+        body: { appendChild() {} },
+        documentElement: {},
+        readyState: "complete",
+        querySelector: () => null,
+        querySelectorAll: (selector) => (typeof selector === "string" && selector.includes("webview") ? [guest] : []),
+        addEventListener() {},
+        removeEventListener() {}
+      };
+      const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+        react: createReactStub().React,
+        localStorage: makeLocalStorage(),
+        document: documentStub,
+        sandbox: { Element: FakeElement, MutationObserver: class { observe() {} } },
+        console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+        fetch: async (url, options) => {
+          const target = String(url);
+          if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+          if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+          if (target.endsWith("/.lr/overlay.js")) return new Response(overlaySource, { status: 200, headers: { "content-type": "text/javascript" } });
+          if (target.endsWith("/.lr/bridge.js")) return new Response(bridgeSource, { status: 200, headers: { "content-type": "text/javascript" } });
+          return jsonResponse({});
+        }
+      });
+      const client = fakeClientCtx({});
+      module.apply(client.ctx);
+      client.resolve();
+      await waitFor(() => executed.some((code) => code.includes("window.__LR__ = Object.assign")), 4000);
+      return executed;
+    };
+
+    const harnessGuest = await runGuest("https://review.example/page", "about:blank#lease-1");
+    harness.check("the client injects the overlay into a guest whose src is the lease token",
+      harnessGuest.some((code) => code.includes("window.__LR__ = Object.assign")),
+      `executed ${harnessGuest.length} scripts`);
+
+    const emptyGuest = await runGuest("about:blank#lease-2", "about:blank#lease-2");
+    harness.check("the client does not inject the overlay into a guest that never navigated",
+      !emptyGuest.some((code) => code.includes("window.__LR__ = Object.assign")),
+      `executed ${emptyGuest.length} scripts`);
+
+    const attributeGuest = await runGuest(undefined, "https://legacy.example/page");
+    harness.check("the client injects the overlay when only the src attribute names the page",
+      attributeGuest.some((code) => code.includes("window.__LR__ = Object.assign")),
+      `executed ${attributeGuest.length} scripts`);
+  }
+
   harness.section("client: overlay locales");
   {
     const locales = localeKeys(overlay);
@@ -1189,7 +1257,8 @@ export async function runClientSuite(harness, { pluginDir }) {
   {
     const applySource = extractFunction(overlay, "applyViewportPreset");
     harness.check("the overlay keeps its viewport preset helpers",
-      applySource !== undefined && overlay.includes("viewportPicker") && overlay.includes("lr-viewport-picker"));
+      applySource !== undefined && overlay.includes("viewportBtn") && overlay.includes("lr-viewport-btn") &&
+      overlay.includes("VIEWPORT_PRESETS") && overlay.includes("VIEWPORT_ZOOMS"));
     {
       const runs = [];
       const run = applySource === undefined ? undefined : evaluateExpression(`(document, widthOrNull, repositionPins, repositionDraft, draft, adjustPanel) => {\nlet viewportPresetWidth = null;\n${applySource}\napplyViewportPreset(widthOrNull);\nreturn viewportPresetWidth;\n}`, "applyViewportPreset");

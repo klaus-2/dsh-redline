@@ -1475,22 +1475,26 @@
   const pendingSpan = el("span", { class: "tool-label", style: "display:none", title: t("pendingTitle") }, t("pendingCount").replace("{n}", 0));
   const adjustBtn = el("button", { class: "tool", title: t("adjustTitle") + " (" + formatHotkey(hotkeyAdjust) + ")", html: ICONS.sliders }, el("span", { class: "tool-label" }, t("adjustTool")), el("kbd", {}, formatHotkey(hotkeyAdjust)));
   const groupBtn = el("button", { class: "tool", title: t("groupBtn"), html: ICONS.group }, el("span", { class: "tool-label" }, t("groupBtn")));
-  const viewportPicker = el(
-    "select",
-    { class: "tool lr-viewport-picker", title: t("viewportLabel"), "aria-label": t("viewportLabel") },
-    el("option", { value: "" }, t("viewportReset")),
-    el("option", { value: "375" }, "375"),
-    el("option", { value: "768" }, "768"),
-    el("option", { value: "1280" }, "1280")
-  );
-  viewportPicker.addEventListener("change", () => {
-    const value = viewportPicker.value;
-    applyViewportPreset(value === "" ? null : Number(value));
+  const viewportBtn = el("button", { class: "tool lr-viewport-btn", title: t("viewportLabel"), "aria-label": t("viewportLabel"), "aria-haspopup": "menu" }, el("span", { class: "tool-label lr-viewport-label" }, t("viewportReset")));
+  viewportBtn.addEventListener("click", () => {
+    const rows = [
+      { value: null, label: t("viewportReset") },
+      ...VIEWPORT_PRESETS.map((width) => ({ value: width, label: `${width}px` })),
+      ...VIEWPORT_ZOOMS.map((zoom) => ({ value: zoom, label: `${zoom}%` })),
+    ];
+    openDrawMenu(viewportBtn, rows, (value) => {
+      applyViewportPreset(value);
+      updateViewportBtn();
+    }, viewportPresetWidth);
   });
+  function updateViewportBtn() {
+    viewportBtn.querySelector(".lr-viewport-label").textContent = viewportPresetWidth === null ? t("viewportReset") : `${viewportPresetWidth}px`;
+    viewportBtn.classList.toggle("tool-active", viewportPresetWidth !== null);
+  }
   const eyeBtn = el("button", { class: "tool", title: "Mostrar/ocultar pins", html: ICONS.eye });
     drawBtn = el("button", { class: "tool", title: t("drawTitle") + " (" + formatHotkey(hotkeyDraw) + ")", html: ICONS_CANVAS.brush }, el("span", { class: "tool-label" }, t("drawTool")), el("kbd", {}, formatHotkey(hotkeyDraw)));
     drawBtn.addEventListener("click", () => toggleDraw());
-    toolbar.append(statusDot, divider, commentBtn, pendingSpan, adjustBtn, drawBtn, groupBtn, viewportPicker, eyeBtn);
+    toolbar.append(statusDot, divider, commentBtn, pendingSpan, adjustBtn, drawBtn, groupBtn, viewportBtn, eyeBtn);
   wrap.append(hint, toolbar);
   rootDiv.append(wrap);
 
@@ -1516,10 +1520,9 @@
     drawBtn.querySelector("kbd").textContent = kbd("draw");
     groupBtn.title = t("groupBtn");
     groupBtn.querySelector(".tool-label").textContent = t("groupBtn");
-    viewportPicker.title = t("viewportLabel");
-    viewportPicker.setAttribute("aria-label", t("viewportLabel"));
-    const resetOption = viewportPicker.querySelector('option[value=""]');
-    if (resetOption !== null) resetOption.textContent = t("viewportReset");
+    viewportBtn.title = t("viewportLabel");
+    viewportBtn.setAttribute("aria-label", t("viewportLabel"));
+    updateViewportBtn();
     eyeBtn.title = t("eyeTitle");
     statusDot.title = t("statusTitle");
     pendingSpan.title = t("pendingTitle");
@@ -2370,15 +2373,23 @@
     updateToolbar();
   }
   function clearGroupPicks() {
-    for (const pick of groupPicks) pick.marker?.remove();
+    for (const pick of groupPicks) { pick.marker?.remove(); pick.badge?.remove(); }
     groupPicks = [];
   }
-  function groupPickMarker(target) {
+  function groupPickMarker(target, index) {
     const box = target.getBoundingClientRect();
     const marker = el("div", { class: "highlight group-pick" });
     Object.assign(marker.style, { transform: `translate(${box.left}px, ${box.top}px)`, width: `${box.width}px`, height: `${box.height}px` });
-    fixedLayer.append(marker);
-    return marker;
+    const badge = el("div", { class: "highlight-label group-pick-badge" }, String(index));
+    const inside = box.top < 26;
+    Object.assign(badge.style, {
+      transform: inside
+        ? `translate(${box.left + 2}px, ${box.top + 2}px)`
+        : `translate(${box.left}px, ${box.top}px)`
+    });
+    badge.classList.toggle("group-pick-badge-inside", inside);
+    fixedLayer.append(marker, badge);
+    return { marker, badge };
   }
   async function groupPick(target) {
     if (!groupMode) return;
@@ -2393,8 +2404,10 @@
       rect: { x: rect.left, y: rect.top, w: rect.width, h: rect.height },
       offsets: { ox: rect.width / 2, oy: rect.height / 2 },
       shot,
-      marker: groupPickMarker(target)
+      marker: null,
+      badge: null
     };
+    ({ marker: pick.marker, badge: pick.badge } = groupPickMarker(target, groupPicks.length + 1));
     groupPicks.push(pick);
   }
   function finalizeGroup() {
@@ -2474,6 +2487,8 @@
   }
 
   let viewportPresetWidth = null;
+  const VIEWPORT_PRESETS = [375, 768, 1280];
+  const VIEWPORT_ZOOMS = [50, 75, 100, 125, 150, 200];
   function applyViewportPreset(widthOrNull) {
     viewportPresetWidth = widthOrNull;
     const rootStyle = document.documentElement.style;
