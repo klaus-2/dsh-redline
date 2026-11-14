@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { withIsolatedHome, freePort } from "./lib/harness.mjs";
+import { withIsolatedHome, freePort, createMountModel } from "./lib/harness.mjs";
 
 let failures = 0;
 function check(name, cond, detail = "") {
@@ -71,13 +71,15 @@ console.log(JSON.stringify({ ok: true, lrPort: lr.port, targetPort: TARGET_PORT 
   const overlaySource = readFileSync(join(pluginDir, "lib", "overlay.js"), "utf8");
   const bridgeSource = readFileSync(join(pluginDir, "lib", "bridge.js"), "utf8");
 
+  const harnessMountModel = createMountModel();
   const harnessWebview = {
     dataset: {},
     getAttribute: (name) => (name === "src" ? "about:blank#lease-abc" : null),
     getURL: () => pageUrl,
     executeJavaScript: async (code) => {
       harnessWebview.executed.push(code);
-      return "[]";
+      const answered = harnessMountModel.answer(code);
+      return answered === undefined ? "[]" : answered;
     },
     executed: [],
     addEventListener: () => {}
@@ -162,11 +164,12 @@ console.log(JSON.stringify({ ok: true, lrPort: lr.port, targetPort: TARGET_PORT 
     injected !== undefined && injected.indexOf("__LR_BRIDGE__") < injected.indexOf("__LR_LOADED__"),
     (injected ?? "").slice(0, 120));
 
+  const emptyMountModel = createMountModel();
   const emptyWebview = {
     dataset: {},
     getAttribute: (name) => (name === "src" ? "about:blank#lease-empty" : null),
     getURL: () => "about:blank#lease-empty",
-    executeJavaScript: async (code) => { emptyWebview.executed.push(code); return "[]"; },
+    executeJavaScript: async (code) => { emptyWebview.executed.push(code); const answered = emptyMountModel.answer(code); return answered === undefined ? "[]" : answered; },
     executed: [],
     addEventListener: () => {}
   };

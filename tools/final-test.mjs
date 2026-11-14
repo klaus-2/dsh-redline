@@ -30,7 +30,7 @@ import { readdirSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { withIsolatedHome, freePort } from "./lib/harness.mjs";
+import { withIsolatedHome, freePort, createMountModel } from "./lib/harness.mjs";
 
 let failures = 0;
 function check(name, cond, detail = "") {
@@ -368,15 +368,19 @@ await withIsolatedHome(async (home) => {
     // ---- phase 2: the client half against the harness guest (no browser needed) ----
     {
       const vm = await import("node:vm");
+      class GuestElement {}
       const clientSource = readFileSync(fileURLToPath(new URL("../lib/client.js", import.meta.url)), "utf8")
         .replace("const API_PORTS = [47477,", `const API_PORTS = [${lrPort},`);
       const makeGuest = (guestUrl, attributeUrl) => {
-        const guest = { executed: [] };
+        const guest = new GuestElement();
+        const mountModel = createMountModel();
+        guest.executed = [];
+        guest.listeners = {};
         guest.dataset = {};
         guest.getAttribute = (name) => (name === "src" ? attributeUrl : null);
         guest.getURL = () => guestUrl;
-        guest.addEventListener = () => {};
-        guest.executeJavaScript = async (code) => { guest.executed.push(code); return "[]"; };
+        guest.addEventListener = (type, handler) => { guest.listeners[type] = handler; };
+        guest.executeJavaScript = async (code) => { guest.executed.push(code); const answered = mountModel.answer(code); return answered === undefined ? "[]" : answered; };
         return guest;
       };
       const runClient = (guest) => {
@@ -423,7 +427,7 @@ await withIsolatedHome(async (home) => {
           TextEncoder,
           TextDecoder,
           MutationObserver: class { observe() {} },
-          Element: class {},
+          Element: GuestElement,
         };
         vm.createContext(sandbox);
         vm.runInContext(clientSource, sandbox, { filename: "client.js" });
@@ -442,6 +446,12 @@ await withIsolatedHome(async (home) => {
       });
       const harnessGuest = runClient(makeGuest(targetUrl, "about:blank#lease-1"));
       check("guest: o client injeta o overlay num guest cujo src é o token do lease (contrato dsh 0.2.2-rc.3)", await waitInjected(harnessGuest, 8000), `executed ${harnessGuest.executed.length} scripts`);
+      const beforeReload = harnessGuest.executed.filter((code) => code.includes("window.__LR__ = Object.assign")).length;
+      harnessGuest.listeners["did-start-loading"]?.();
+      harnessGuest.listeners["dom-ready"]?.();
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      const afterReload = harnessGuest.executed.filter((code) => code.includes("window.__LR__ = Object.assign")).length;
+      check("guest: o client re-injeta o overlay depois de F5 no mesmo webview", afterReload > beforeReload, `before=${beforeReload} after=${afterReload}`);
       const idleGuest = runClient(makeGuest("about:blank#lease-2", "about:blank#lease-2"));
       check("guest: o client NÃO injeta num guest que nunca navegou", (await waitInjected(idleGuest, 4000)) === false, `executed ${idleGuest.executed.length} scripts`);
     }

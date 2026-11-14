@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import { collectCallArguments, createReactStub, evaluateExpression, evaluateObjectLiteral, extractArrowConst, extractFunction, extractObjectLiteral, fakeClientCtx, findElements, flush, jsonResponse, loadClientModule, makeLocalStorage, renderOnce, runCleanups, storageShim, waitFor } from "./harness.mjs";
+import { collectCallArguments, createMountModel, createReactStub, evaluateExpression, evaluateObjectLiteral, extractArrowConst, extractFunction, extractObjectLiteral, fakeClientCtx, findElements, flush, jsonResponse, loadClientModule, makeLocalStorage, renderOnce, runCleanups, storageShim, waitFor } from "./harness.mjs";
 
 // The bridge relay runs in the page, not in the app: it is loaded in its own
 // sandbox so the suite can drive both transports without a browser.
@@ -162,7 +162,7 @@ export async function runClientSuite(harness, { pluginDir }) {
         calls, intervals, stub, section, effects: rendered.effects,
         started: () => observed,
         probes: () => calls.filter((call) => call.url.endsWith("/.lr/health")),
-        privateCalls: () => calls.filter((call) => call.url.includes("/.lr/") && !call.url.endsWith("/.lr/health")),
+        privateCalls: () => calls.filter((call) => call.url.includes("/.lr/") && !call.url.endsWith("/.lr/health") && !call.url.includes("/.lr/client-ping")),
         secretCalls: () => calls.filter((call) => call.url === "/api/dsh-redline.secret")
       };
     };
@@ -446,8 +446,10 @@ export async function runClientSuite(harness, { pluginDir }) {
       fetch: async () => { throw new Error("the guest never talks to the network by itself"); }
     };
     vm.createContext(pageSandbox);
+    const pageMountModel = createMountModel();
     fakeWebview.executeJavaScript = async (code) => {
       executed.push(code);
+      if (code.includes("lrMountState")) return pageMountModel.answer(code);
       if (code.includes("window.__LR__ = Object.assign")) {
         try {
           vm.runInContext(code, pageSandbox, { filename: "injected.js" });
@@ -455,6 +457,7 @@ export async function runClientSuite(harness, { pluginDir }) {
           // The overlay needs a DOM this shim does not have; the relay runs
           // before it and is what the round trip needs.
         }
+        pageMountModel.answer(code);
         return null;
       }
       return vm.runInContext(code, pageSandbox, { filename: "guest.js" });
@@ -615,6 +618,7 @@ export async function runClientSuite(harness, { pluginDir }) {
 
     const runGuest = async (guestUrl, attributeUrl) => {
       const executed = [];
+      const mountModel = createMountModel();
       class FakeElement {}
       const guest = new FakeElement();
       guest.dataset = { liveReviewWired: undefined };
@@ -625,7 +629,8 @@ export async function runClientSuite(harness, { pluginDir }) {
       };
       guest.executeJavaScript = async (code) => {
         executed.push(code);
-        return "[]";
+        const answered = mountModel.answer(code);
+        return answered === undefined ? "[]" : answered;
       };
       const documentStub = {
         createElement: () => ({ style: {}, dataset: {}, setAttribute() {}, appendChild() {}, remove() {} }),
@@ -674,6 +679,158 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("the client injects the overlay when only the src attribute names the page",
       attributeGuest.some((code) => code.includes("window.__LR__ = Object.assign")),
       `executed ${attributeGuest.length} scripts`);
+
+    let domReadyCb = null;
+    let didStartLoadingCb = null;
+    const reloadExecuted = [];
+    const reloadMountModel = createMountModel();
+    class ReloadElement {}
+    const reloadGuest = new ReloadElement();
+    reloadGuest.dataset = { liveReviewWired: undefined };
+    reloadGuest.getAttribute = (name) => (name === "src" ? "about:blank#lease-reload" : null);
+    reloadGuest.getURL = () => "https://review.example/reload-page";
+    reloadGuest.addEventListener = (type, handler) => {
+      if (type === "dom-ready") domReadyCb = handler;
+      if (type === "did-start-loading") didStartLoadingCb = handler;
+    };
+    reloadGuest.executeJavaScript = async (code) => {
+      reloadExecuted.push(code);
+      const answered = reloadMountModel.answer(code);
+      return answered === undefined ? "[]" : answered;
+    };
+    const reloadDoc = {
+      createElement: () => ({ style: {}, dataset: {}, setAttribute() {}, appendChild() {}, remove() {} }),
+      head: { appendChild() {} },
+      body: { appendChild() {} },
+      documentElement: {},
+      readyState: "complete",
+      querySelector: () => null,
+      querySelectorAll: (selector) => (typeof selector === "string" && selector.includes("webview") ? [reloadGuest] : []),
+      addEventListener() {},
+      removeEventListener() {}
+    };
+    const { module: reloadMod } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: createReactStub().React,
+      localStorage: makeLocalStorage(),
+      document: reloadDoc,
+      sandbox: { Element: ReloadElement, MutationObserver: class { observe() {} } },
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url) => {
+        const target = String(url);
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: 47477 });
+        if (target.endsWith("/.lr/overlay.js")) return new Response(overlaySource, { status: 200, headers: { "content-type": "text/javascript" } });
+        if (target.endsWith("/.lr/bridge.js")) return new Response(bridgeSource, { status: 200, headers: { "content-type": "text/javascript" } });
+        return jsonResponse({});
+      }
+    });
+    const reloadClient = fakeClientCtx({});
+    reloadMod.apply(reloadClient.ctx);
+    reloadClient.resolve();
+    domReadyCb?.();
+    await waitFor(() => reloadExecuted.length > 0, 4000);
+    const initialInjections = reloadExecuted.length;
+
+    didStartLoadingCb?.();
+    domReadyCb?.();
+    await waitFor(() => reloadExecuted.length > initialInjections, 4000);
+    harness.check("the client re-injects the overlay into a guest after a reload (F5)",
+      reloadExecuted.length > initialInjections,
+      `before=${initialInjections} after=${reloadExecuted.length}`);
+  }
+
+  harness.section("client: injection verification and recovery");
+  {
+    const overlaySource = readFileSync(path.join(pluginDir, "lib", "overlay.js"), "utf8");
+    const bridgeSource = readFileSync(path.join(pluginDir, "lib", "bridge.js"), "utf8");
+    const buildVerified = (modelOptions = {}) => {
+      const executed = [];
+      const intervals = [];
+      const listeners = {};
+      const mountModel = createMountModel(modelOptions);
+      class VerifiedElement {}
+      const guest = new VerifiedElement();
+      guest.dataset = { liveReviewWired: undefined };
+      guest.getAttribute = (name) => (name === "src" ? "about:blank#lease-verify" : null);
+      guest.getURL = () => "https://review.example/verify-page";
+      guest.addEventListener = (type, handler) => { listeners[type] = handler; };
+      guest.executeJavaScript = async (code) => {
+        executed.push(code);
+        const answered = mountModel.answer(code);
+        return answered === undefined ? "[]" : answered;
+      };
+      const documentStub = {
+        createElement: () => ({ style: {}, dataset: {}, setAttribute() {}, appendChild() {}, remove() {} }),
+        head: { appendChild() {} },
+        body: { appendChild() {} },
+        documentElement: {},
+        readyState: "complete",
+        querySelector: () => null,
+        querySelectorAll: (selector) => (typeof selector === "string" && selector.includes("webview") ? [guest] : []),
+        addEventListener() {},
+        removeEventListener() {}
+      };
+      const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+        react: createReactStub().React,
+        localStorage: makeLocalStorage(),
+        document: documentStub,
+        sandbox: {
+          Element: VerifiedElement,
+          MutationObserver: class { observe() {} },
+          setInterval: (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; },
+          clearInterval() {}
+        },
+        console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+        fetch: async (url) => {
+          const target = String(url);
+          if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+          if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: 47477 });
+          if (target.endsWith("/.lr/overlay.js")) return new Response(overlaySource, { status: 200, headers: { "content-type": "text/javascript" } });
+          if (target.endsWith("/.lr/bridge.js")) return new Response(bridgeSource, { status: 200, headers: { "content-type": "text/javascript" } });
+          return jsonResponse({});
+        }
+      });
+      const client = fakeClientCtx({});
+      module.apply(client.ctx);
+      client.resolve();
+      return { executed, intervals, listeners, guest, mountModel };
+    };
+    const injections = (run) => run.executed.filter((code) => code.includes("window.__LR__ = Object.assign")).length;
+    const probes = (run) => run.executed.filter((code) => code.includes("lrMountState")).length;
+
+    const repaired = buildVerified({ mountAfterRun: 1 });
+    await waitFor(() => injections(repaired) >= 2, 5000);
+    harness.check("the client repairs a guest whose bundle ran without mounting the overlay",
+      injections(repaired) >= 2 && probes(repaired) >= 2,
+      `injections=${injections(repaired)} probes=${probes(repaired)}`);
+
+    const steady = buildVerified();
+    await waitFor(() => injections(steady) >= 1, 4000);
+    const steadyBefore = injections(steady);
+    for (const interval of steady.intervals) await interval.fn();
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    harness.check("the pump does not re-inject a guest that is already injected",
+      injections(steady) === steadyBefore,
+      `before=${steadyBefore} after=${injections(steady)}`);
+
+    const broken = buildVerified({ mountAfterRun: Number.POSITIVE_INFINITY });
+    await waitFor(() => injections(broken) >= 12, 12000);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const brokenAtBudget = injections(broken);
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    harness.check("a guest whose overlay never mounts stops at the attempt budget",
+      injections(broken) === brokenAtBudget && brokenAtBudget <= 14,
+      `at=${brokenAtBudget} then=${injections(broken)} probes=${probes(broken)}`);
+
+    const lost = buildVerified();
+    await waitFor(() => injections(lost) >= 1, 4000);
+    const beforeRecovery = injections(lost);
+    lost.listeners["did-start-loading"]?.();
+    for (const interval of lost.intervals) await interval.fn();
+    await waitFor(() => injections(lost) > beforeRecovery, 4000);
+    harness.check("the bridge pump re-injects a guest whose document changed without dom-ready",
+      injections(lost) > beforeRecovery,
+      `before=${beforeRecovery} after=${injections(lost)}`);
   }
 
   harness.section("client: overlay locales");

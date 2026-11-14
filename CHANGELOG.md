@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Client operations carry high-resolution timestamps.** The client stamps
+  every lifecycle event with `HH:mm:ss.SSS` and reports the elapsed time of
+  each injection split between fetching the sources and running the bundle in
+  the guest. The lines stay in the console and in `window.__LR_LOGS__`, and
+  the host keeps a rolling buffer of them that `GET /.lr/status` returns under
+  `trace`, so a slow start can be measured from outside the app.
+
+### Fixed
+
+- **The overlay survives page reloads and F5 in the harness browser.** A reload
+  rebuilds the guest document while the `<webview>` element stays the same, so
+  the client kept marking that element as already injected and never attached
+  the overlay again. The client now resets its injection state on
+  `did-start-loading`, `dom-ready`, `did-navigate` and `did-navigate-in-page`,
+  arms its fallback timers for every document instead of only for the first
+  one, and checks in the guest that the overlay actually landed before it
+  calls the injection done.
+- **A guest that cannot show the overlay stops working on it.** A failing
+  injection was retried without end, which filled the host log with
+  diagnostics and rewrote the status file twice a second for as long as the
+  page stayed open. The client now counts the attempts it spends inside the
+  guest, pauses once that budget is gone, and resumes on the next document, so
+  a page that cannot carry the overlay costs a bounded amount of work.
+
 ## [1.2.1] - 2026-11-13
 
 _The overlay and the bridge come back in the harness browser panel after the dsh restarts with the updated plugin._

@@ -652,3 +652,21 @@ export function jsonResponse(body, status = 200) {
     headers: { "content-type": "application/json; charset=utf-8" }
   });
 }
+
+export function createMountModel(options = {}) {
+  const model = { loaded: false, mounted: false, runs: 0 };
+  model.answer = (code) => {
+    if (code.includes("lrMountState")) {
+      if (model.mounted) return "present";
+      return model.loaded ? "loaded" : "absent";
+    }
+    if (code.includes("window.__LR__ = Object.assign")) {
+      model.loaded = true;
+      model.runs += 1;
+      model.mounted = options.mountAfterRun === undefined ? true : model.runs > options.mountAfterRun;
+      return true;
+    }
+    return undefined;
+  };
+  return model;
+}
