@@ -748,6 +748,31 @@ export async function runHostSuite(harness, { pluginDir }) {
       const css = await (await fetch(`${base}/.lr/proxy/${enc(`http://127.0.0.1:${targetPort}/style.css`)}`, { headers: auth })).text();
       harness.includes("a CSS url is rewritten", css, `/.lr/proxy/${enc(`http://127.0.0.1:${targetPort}/bg.png`)}`);
 
+      const cssUrl = `${base}/.lr/proxy/${enc(`http://127.0.0.1:${targetPort}/style.css`)}`;
+      const cssByCookie = await fetch(cssUrl, { headers: { cookie } });
+      const cssByCookieBody = await cssByCookie.text();
+      harness.check("a proxied stylesheet answers a request carrying only the page cookie",
+        cssByCookie.status === 200 &&
+        (cssByCookie.headers.get("content-type") ?? "").includes("text/css") &&
+        cssByCookieBody.includes(`/.lr/proxy/${enc(`http://127.0.0.1:${targetPort}/bg.png`)}`),
+        `status=${cssByCookie.status} contentType=${cssByCookie.headers.get("content-type")}`);
+      const imageByCookie = await fetch(`${base}/.lr/proxy/${enc(`http://127.0.0.1:${targetPort}/img.png`)}`, { headers: { cookie } });
+      const imageBytes = Buffer.from(await imageByCookie.arrayBuffer());
+      harness.check("a proxied image answers a request carrying only the page cookie",
+        imageByCookie.status === 200 &&
+        (imageByCookie.headers.get("content-type") ?? "").includes("image/png") &&
+        imageBytes.equals(Buffer.from([0x89, 0x50])),
+        `status=${imageByCookie.status} contentType=${imageByCookie.headers.get("content-type")} bytes=${imageBytes.length}`);
+      const cssWithoutCredential = await fetch(cssUrl);
+      harness.check("a proxied subresource still refuses a request with no credential",
+        cssWithoutCredential.status === 401, `status=${cssWithoutCredential.status}`);
+      const cssWithForgedCookie = await fetch(cssUrl, { headers: { cookie: "lr_session=00000000-0000-0000-0000-000000000000" } });
+      harness.check("a proxied subresource refuses a forged session cookie",
+        cssWithForgedCookie.status === 401, `status=${cssWithForgedCookie.status}`);
+      const statusByCookie = await fetch(`${base}/.lr/status`, { headers: { cookie } });
+      harness.check("the page cookie does not open a route outside the proxy",
+        statusByCookie.status === 401, `status=${statusByCookie.status}`);
+
       const fallthrough = await fetch(`${base}/about`, { headers: { cookie } });
       const fallthroughHtml = await fallthrough.text();
       harness.check("the fallthrough proxies the target", fallthrough.status === 200 && fallthroughHtml.includes("Sobre"));
