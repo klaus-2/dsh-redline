@@ -896,6 +896,7 @@
   let drawTyping = null;
   let drawSel = null;
   let drawDrag = null;
+  let drawResize = null;
   let drawCanvas = null;
   let drawCtx = null;
   let drawBar = null;
@@ -989,6 +990,53 @@
     return { x: Math.min(item.x, item.x2), y: Math.min(item.y, item.y2), w: Math.abs(item.x2 - item.x), h: Math.abs(item.y2 - item.y) };
   }
 
+  function itemHandles(item) {
+    const h = [];
+    const size = 8;
+    const half = size / 2;
+    const b = itemBBox(item);
+    if (item.type === "rect" || item.type === "ellipse") {
+      h.push({ id: "nw", x: b.x, y: b.y });
+      h.push({ id: "ne", x: b.x + b.w, y: b.y });
+      h.push({ id: "sw", x: b.x, y: b.y + b.h });
+      h.push({ id: "se", x: b.x + b.w, y: b.y + b.h });
+      h.push({ id: "n", x: b.x + b.w / 2, y: b.y });
+      h.push({ id: "s", x: b.x + b.w / 2, y: b.y + b.h });
+      h.push({ id: "w", x: b.x, y: b.y + b.h / 2 });
+      h.push({ id: "e", x: b.x + b.w, y: b.y + b.h / 2 });
+    } else if (item.type === "line" || item.type === "arrow") {
+      h.push({ id: "p1", x: item.x, y: item.y });
+      let mx = (item.x + item.x2) / 2, my = (item.y + item.y2) / 2;
+      if (item.curved && item.cx !== undefined) {
+        mx = (item.x + 2 * item.cx + item.x2) / 4;
+        my = (item.y + 2 * item.cy + item.y2) / 4;
+      }
+      h.push({ id: "mid", x: mx, y: my });
+      h.push({ id: "p2", x: item.x2, y: item.y2 });
+    } else if (item.type === "text" || item.type === "step") {
+      h.push({ id: "move", x: b.x + b.w / 2, y: b.y + b.h / 2, move: true });
+    } else if (item.type === "path") {
+    }
+    return h.map((p) => ({ ...p, x0: p.x - half, y0: p.y - half, x1: p.x + half, y1: p.y + half, size }));
+  }
+
+  function hitTestHandle(item, x, y) {
+    for (const h of itemHandles(item)) {
+      if (x >= h.x0 && x <= h.x1 && y >= h.y0 && y <= h.y1) return h;
+    }
+    return null;
+  }
+
+  function resizeHandleCursor(id) {
+    if (!id) return "default";
+    if (id === "p1" || id === "p2" || id === "mid" || id === "move") return "move";
+    if (id === "n" || id === "s") return "ns-resize";
+    if (id === "e" || id === "w") return "ew-resize";
+    if (id === "nw" || id === "se") return "nwse-resize";
+    if (id === "ne" || id === "sw") return "nesw-resize";
+    return "pointer";
+  }
+
   function moveDrawItem(item, dx, dy) {
     if (item.type === "path") {
       for (const pt of item.points) { pt.x += dx; pt.y += dy; }
@@ -999,6 +1047,7 @@
     item.y += dy;
     item.x2 += dx;
     item.y2 += dy;
+    if (item.curved && item.cx !== undefined) { item.cx += dx; item.cy += dy; }
   }
 
   function drawHit(item, x, y) {
@@ -1051,14 +1100,26 @@
       ctx.beginPath();
       ctx.ellipse(cx, cy, Math.abs(x2 - item.x) / 2, Math.abs(y2 - item.y) / 2, 0, 0, Math.PI * 2);
       ctx.stroke();
-    } else if (item.type === "arrow" || item.type === "line") {
+    } else if (item.type === "line" || item.type === "arrow") {
       const x2 = previewTo ? previewTo.x : item.x2, y2 = previewTo ? previewTo.y : item.y2;
-      ctx.beginPath();
-      ctx.moveTo(item.x, item.y);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
+      if (item.curved && item.cx !== undefined) {
+        ctx.beginPath();
+        ctx.moveTo(item.x, item.y);
+        ctx.quadraticCurveTo(item.cx, item.cy, x2, y2);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(item.x, item.y);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
       if (item.type === "arrow") {
-        const angle = Math.atan2(y2 - item.y, x2 - item.x);
+        let angle;
+        if (item.curved && item.cx !== undefined) {
+          angle = Math.atan2(y2 - item.cy, x2 - item.cx);
+        } else {
+          angle = Math.atan2(y2 - item.y, x2 - item.x);
+        }
         const head = 12;
         ctx.beginPath();
         ctx.moveTo(x2, y2);
@@ -1100,12 +1161,15 @@
       drawCtx.fillRect(drawTyping.x + tw + 1, drawTyping.y, 1.5, 14);
     }
     if (drawSel !== null && drawItems.includes(drawSel)) {
-      const b = itemBBox(drawSel);
       drawCtx.save();
+      drawCtx.setLineDash([]);
+      drawCtx.fillStyle = "#ffffff";
       drawCtx.strokeStyle = "#3b82f6";
-      drawCtx.lineWidth = 1;
-      drawCtx.setLineDash([4, 3]);
-      drawCtx.strokeRect(b.x - 5, b.y - 5, b.w + 10, b.h + 10);
+      drawCtx.lineWidth = 1.5;
+      for (const h of itemHandles(drawSel)) {
+        drawCtx.fillRect(h.x - h.size / 2, h.y - h.size / 2, h.size, h.size);
+        drawCtx.strokeRect(h.x - h.size / 2, h.y - h.size / 2, h.size, h.size);
+      }
       drawCtx.restore();
     }
   }
@@ -1170,7 +1234,11 @@
   }
 
   function closeDrawMenu() {
-    if (drawMenu !== null) { drawMenu.remove(); drawMenu = null; }
+    if (drawMenu !== null) {
+      try { drawMenu.__lrCleanup?.(); } catch {}
+      drawMenu.remove();
+      drawMenu = null;
+    }
   }
 
   function openDrawMenu(anchor, rows, onPick, current) {
@@ -1182,15 +1250,40 @@
       if (row.color !== undefined) { const dot = el("span", { class: "lr-dcolor" }); dot.style.background = row.color; parts.push(dot); }
       if (row.width !== undefined) { const demo = el("span", { class: "lr-dwdemo" }); demo.style.borderBottomWidth = `${row.width}px`; parts.push(demo); }
       const item = el("button", { class: "lr-ditem", type: "button" }, ...parts, el("span", {}, row.label));
-      if (row.value === current) item.setAttribute("data-on", "");
+      const active = typeof current === "function" ? current(row) : (row.key !== undefined ? row.key === current : row.value === current);
+      if (active) item.setAttribute("data-on", "");
       item.addEventListener("click", () => { closeDrawMenu(); onPick(row.value); });
       drawMenu.append(item);
     }
     fixedLayer.append(drawMenu);
     drawMenu.toggleAttribute("data-on", true);
-    const r = anchor.getBoundingClientRect();
-    drawMenu.style.left = `${Math.max(8, Math.min(r.right + 8, window.innerWidth - drawMenu.offsetWidth - 8))}px`;
-    drawMenu.style.top = `${Math.max(8, Math.min(r.top - 4, window.innerHeight - drawMenu.offsetHeight - 8))}px`;
+    const place = () => {
+      if (drawMenu === null || !drawMenu.isConnected) return;
+      const r = anchor.getBoundingClientRect();
+      const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+      const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+      const mw = drawMenu.offsetWidth || 160;
+      const mh = drawMenu.offsetHeight || 200;
+      let left = r.right + 8;
+      if (left + mw + 8 > vw) left = r.left - mw - 8;
+      left = Math.max(8, Math.min(left, Math.max(8, vw - mw - 8)));
+      let top = r.top - 4;
+      if (top + mh + 8 > vh) top = vh - mh - 8;
+      if (top < 8) top = 8;
+      drawMenu.style.left = `${left}px`;
+      drawMenu.style.top = `${top}px`;
+      drawMenu.style.maxHeight = `${Math.max(120, vh - 16)}px`;
+      drawMenu.style.overflowY = "auto";
+    };
+    place();
+    requestAnimationFrame(place);
+    const onReflow = () => place();
+    window.addEventListener("resize", onReflow);
+    window.addEventListener("scroll", onReflow, true);
+    drawMenu.__lrCleanup = () => {
+      window.removeEventListener("resize", onReflow);
+      window.removeEventListener("scroll", onReflow, true);
+    };
   }
 
   function openShapesMenu(anchor) {
@@ -1337,6 +1430,16 @@
     const x = e.clientX, y = e.clientY;
     if (drawTool !== "text" && drawTyping !== null) commitDrawTyping();
     if (drawTool === null) {
+      if (drawSel !== null && drawItems.includes(drawSel)) {
+        const handle = hitTestHandle(drawSel, x, y);
+        if (handle) {
+          drawCanvas.setPointerCapture?.(e.pointerId);
+          snapshotDraw();
+          drawResize = { item: drawSel, handle: handle.id, x, y, orig: cloneItems([drawSel])[0] };
+          redrawDrawings();
+          return;
+        }
+      }
       drawCanvas.setPointerCapture?.(e.pointerId);
       drawSel = hitTestDraw(x, y);
       drawDrag = drawSel !== null ? { x, y, moved: false } : null;
@@ -1358,9 +1461,41 @@
     else drawLive = { item: { type: drawTool, color: drawColor, w: drawWidth, x, y, x2: x, y2: y }, to: { x, y } };
   }
 
+  function applyResize(item, orig, handleId, x, y) {
+    const dx = x - drawResize.x, dy = y - drawResize.y;
+    if (item.type === "rect" || item.type === "ellipse") {
+      let nx = orig.x, ny = orig.y, nx2 = orig.x2, ny2 = orig.y2;
+      if (handleId.includes("e")) nx2 = orig.x2 + dx;
+      if (handleId.includes("w")) nx = orig.x + dx;
+      if (handleId.includes("s")) ny2 = orig.y2 + dy;
+      if (handleId.includes("n")) ny = orig.y + dy;
+      if (nx > nx2) { const t = nx; nx = nx2; nx2 = t; }
+      if (ny > ny2) { const t = ny; ny = ny2; ny2 = t; }
+      item.x = nx; item.y = ny; item.x2 = nx2; item.y2 = ny2;
+    } else if (item.type === "line" || item.type === "arrow") {
+      if (handleId === "p1") { item.x = orig.x + dx; item.y = orig.y + dy; }
+      else if (handleId === "p2") { item.x2 = orig.x2 + dx; item.y2 = orig.y2 + dy; }
+      else if (handleId === "mid") {
+        const baseMx = (orig.x + orig.x2) / 2, baseMy = (orig.y + orig.y2) / 2;
+        const onMx = baseMx + dx, onMy = baseMy + dy;
+        item.cx = 2 * onMx - (item.x + item.x2) / 2;
+        item.cy = 2 * onMy - (item.y + item.y2) / 2;
+        item.curved = true;
+      }
+    } else if ((item.type === "text" || item.type === "step") && handleId === "move") {
+      item.x = orig.x + dx;
+      item.y = orig.y + dy;
+    }
+  }
+
   function onCanvasPointerMove(e) {
+    if (drawResize !== null) {
+      applyResize(drawResize.item, drawResize.orig, drawResize.handle, e.clientX, e.clientY);
+      redrawDrawings();
+      return;
+    }
     if (drawDrag !== null) {
-      if (!drawDrag.moved) { snapshotDraw(); drawDrag.moved = true; }
+      if (!drawDrag.moved) { drawDrag.moved = true; }
       moveDrawItem(drawSel, e.clientX - drawDrag.x, e.clientY - drawDrag.y);
       drawDrag.x = e.clientX;
       drawDrag.y = e.clientY;
@@ -1368,6 +1503,10 @@
       return;
     }
     if (drawLive === null) {
+      if (drawTool === null && drawMode && drawSel !== null && drawItems.includes(drawSel)) {
+        const h = hitTestHandle(drawSel, e.clientX, e.clientY);
+        if (h) { drawCanvas.style.cursor = resizeHandleCursor(h.id); return; }
+      }
       if (drawTool === null && drawMode) drawCanvas.style.cursor = hitTestDraw(e.clientX, e.clientY) !== null ? "move" : "default";
       return;
     }
@@ -1378,6 +1517,12 @@
   }
 
   function onCanvasPointerUp() {
+    if (drawResize !== null) {
+      drawResize = null;
+      saveDrawings();
+      updateDrawBarState();
+      return;
+    }
     if (drawDrag !== null) {
       const moved = drawDrag.moved;
       drawDrag = null;
@@ -1393,6 +1538,9 @@
     if (to !== null) { item.x2 = to.x; item.y2 = to.y; }
     snapshotDraw();
     drawItems.push(item);
+    drawSel = item;
+    drawTool = null;
+    syncDrawTools();
     saveDrawings();
     redrawDrawings();
     updateDrawBarState();
@@ -1475,21 +1623,32 @@
   const pendingSpan = el("span", { class: "tool-label", style: "display:none", title: t("pendingTitle") }, t("pendingCount").replace("{n}", 0));
   const adjustBtn = el("button", { class: "tool", title: t("adjustTitle") + " (" + formatHotkey(hotkeyAdjust) + ")", html: ICONS.sliders }, el("span", { class: "tool-label" }, t("adjustTool")), el("kbd", {}, formatHotkey(hotkeyAdjust)));
   const groupBtn = el("button", { class: "tool", title: t("groupBtn"), html: ICONS.group }, el("span", { class: "tool-label" }, t("groupBtn")));
-  const viewportBtn = el("button", { class: "tool lr-viewport-btn", title: t("viewportLabel"), "aria-label": t("viewportLabel"), "aria-haspopup": "menu" }, el("span", { class: "tool-label lr-viewport-label" }, t("viewportReset")));
+  const viewportBtn = el("button", { class: "tool lr-viewport-btn", title: t("viewportLabel"), "aria-label": t("viewportLabel"), "aria-haspopup": "menu" }, el("span", { class: "tool-label lr-viewport-label" }, "100%"));
   viewportBtn.addEventListener("click", () => {
     const rows = [
-      { value: null, label: t("viewportReset") },
-      ...VIEWPORT_PRESETS.map((width) => ({ value: width, label: `${width}px` })),
-      ...VIEWPORT_ZOOMS.map((zoom) => ({ value: zoom, label: `${zoom}%` })),
+      { value: { kind: "reset" }, label: "100%" },
+      ...VIEWPORT_PRESETS.map((px) => ({ value: { kind: "width", px }, label: `${px}px` })),
+      ...VIEWPORT_ZOOMS.map((pct) => ({ value: { kind: "zoom", pct }, label: `${pct}%` })),
     ];
     openDrawMenu(viewportBtn, rows, (value) => {
-      applyViewportPreset(value);
-      updateViewportBtn();
-    }, viewportPresetWidth);
+      if (!value || value.kind === "reset") applyViewportState({ w: null, z: 100 });
+      else if (value.kind === "width") applyViewportState({ w: value.px, z: 100 });
+      else if (value.kind === "zoom") applyViewportState({ w: vpWidth, z: value.pct });
+    }, (row) => {
+      if (!row || !row.value) return vpIsDefault();
+      if (row.value.kind === "reset") return vpIsDefault();
+      if (row.value.kind === "width") return vpWidth === row.value.px && vpZoom === 100;
+      if (row.value.kind === "zoom") return vpZoom === row.value.pct;
+      return false;
+    });
   });
   function updateViewportBtn() {
-    viewportBtn.querySelector(".lr-viewport-label").textContent = viewportPresetWidth === null ? t("viewportReset") : `${viewportPresetWidth}px`;
-    viewportBtn.classList.toggle("tool-active", viewportPresetWidth !== null);
+    let label = "100%";
+    if (vpWidth !== null && vpZoom !== 100) label = `${vpWidth}px · ${vpZoom}%`;
+    else if (vpWidth !== null) label = `${vpWidth}px`;
+    else if (vpZoom !== 100) label = `${vpZoom}%`;
+    viewportBtn.querySelector(".lr-viewport-label").textContent = label;
+    viewportBtn.classList.toggle("tool-active", !vpIsDefault());
   }
   const eyeBtn = el("button", { class: "tool", title: "Mostrar/ocultar pins", html: ICONS.eye });
     drawBtn = el("button", { class: "tool", title: t("drawTitle") + " (" + formatHotkey(hotkeyDraw) + ")", html: ICONS_CANVAS.brush }, el("span", { class: "tool-label" }, t("drawTool")), el("kbd", {}, formatHotkey(hotkeyDraw)));
@@ -2486,29 +2645,111 @@
     renderGroupComposer();
   }
 
-  let viewportPresetWidth = null;
+  let vpWidth = null;
+  let vpZoom = 100;
   const VIEWPORT_PRESETS = [375, 768, 1280];
-  const VIEWPORT_ZOOMS = [50, 75, 100, 125, 150, 200];
-  function applyViewportPreset(widthOrNull) {
-    viewportPresetWidth = widthOrNull;
-    const rootStyle = document.documentElement.style;
-    if (widthOrNull === null) {
+  const VIEWPORT_ZOOMS = [50, 75, 125, 150, 200];
+  function vpIsDefault() { return vpWidth === null && vpZoom === 100; }
+  function vpPayload() { return { w: vpWidth, z: vpZoom }; }
+  function normVpW(v) {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return (Number.isFinite(n) && n > 0) ? n : null;
+  }
+  function parseVpPayload(raw) {
+    if (raw === null || raw === undefined || raw === "") return { w: null, z: 100 };
+    if (typeof raw === "object") {
+      const w = normVpW(raw.w);
+      const zRaw = (raw.z === null || raw.z === undefined || raw.z === "") ? 100 : Number(raw.z);
+      const z = (Number.isFinite(zRaw) && VIEWPORT_ZOOMS.includes(zRaw)) ? zRaw : 100;
+      return { w, z };
+    }
+    if (typeof raw === "string") {
+      const s = raw.trim();
+      if (s === "") return { w: null, z: 100 };
+      try {
+        const o = JSON.parse(s);
+        if (o && typeof o === "object") return parseVpPayload(o);
+      } catch {}
+      const n = Number(s);
+      if (Number.isFinite(n) && n > 0) return { w: n, z: 100 };
+    }
+    if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) return { w: raw, z: 100 };
+    return { w: null, z: 100 };
+  }
+  function applyViewportState(next, opts = {}) {
+    const w = normVpW(next && next.w);
+    const zRaw = (next && next.z !== null && next.z !== undefined && next.z !== "") ? Number(next.z) : 100;
+    const z = (Number.isFinite(zRaw) && VIEWPORT_ZOOMS.includes(zRaw)) ? zRaw : 100;
+    vpWidth = w;
+    vpZoom = z;
+    const target = document.body || document.documentElement;
+    try {
+      const hs = document.documentElement.style;
+      hs.removeProperty("max-width"); hs.removeProperty("margin-left"); hs.removeProperty("margin-right"); hs.removeProperty("zoom");
+    } catch {}
+    const rootStyle = target.style;
+    if (w === null) {
       rootStyle.removeProperty("max-width");
       rootStyle.removeProperty("margin-left");
       rootStyle.removeProperty("margin-right");
     } else {
-      rootStyle.setProperty("max-width", `${widthOrNull}px`);
-      rootStyle.setProperty("margin-left", "auto");
-      rootStyle.setProperty("margin-right", "auto");
+      rootStyle.setProperty("max-width", `${w}px`, "important");
+      rootStyle.setProperty("margin-left", "auto", "important");
+      rootStyle.setProperty("margin-right", "auto", "important");
     }
+    if (z === 100) rootStyle.removeProperty("zoom");
+    else rootStyle.setProperty("zoom", String(z / 100), "important");
+    host.setAttribute("data-lr-viewport", vpIsDefault() ? "" : JSON.stringify(vpPayload()));
     repositionPins();
     if (draft !== null || adjustPanel !== null) {
       repositionDraft();
       if (adjustPanel !== null) applyPanelPosition(adjustPanel, "adjust");
     }
+    updateViewportBtn();
+    closeDrawMenu();
+    if (opts.push !== false) pushGuestViewport();
   }
   function activeViewportWidth() {
-    return viewportPresetWidth;
+    return vpWidth;
+  }
+
+  const viewportBus = { token: 0 };
+  function syncViewportFromGuest(message) {
+    const next = parseVpPayload(message?.width ?? message?.state ?? message);
+    if (vpWidth !== next.w || vpZoom !== next.z) {
+      applyViewportState(next, { push: false });
+    } else {
+      host.setAttribute("data-lr-viewport", vpIsDefault() ? "" : JSON.stringify(vpPayload()));
+    }
+  }
+  window.addEventListener("message", (event) => {
+    const data = event?.data;
+    if (!data || typeof data !== "object" || data.source !== "dsh-redline") return;
+    if (data.type === "viewport-set") syncViewportFromGuest(data);
+    if (data.type === "viewport-read") {
+      const payload = vpIsDefault() ? null : vpPayload();
+      try { event.source?.postMessage({ source: "dsh-redline", type: "viewport", width: payload, token: data.token }, "*"); } catch {}
+    }
+  });
+  function pushGuestViewport() {
+    const payload = vpIsDefault() ? null : vpPayload();
+    window.postMessage({ source: "dsh-redline", type: "viewport-set", width: payload, token: ++viewportBus.token }, "*");
+  }
+  function pullGuestViewport() {
+    return new Promise((resolve) => {
+      const token = ++viewportBus.token;
+      const done = (value) => { window.removeEventListener("message", handler); resolve(value); };
+      const timeout = setTimeout(() => done(null), 2000);
+      const handler = (event) => {
+        const data = event?.data;
+        if (!data || data.source !== "dsh-redline" || data.type !== "viewport" || data.token !== token) return;
+        clearTimeout(timeout);
+        done(data.width ?? null);
+      };
+      window.addEventListener("message", handler);
+      window.postMessage({ source: "dsh-redline", type: "viewport-read", token }, "*");
+    });
   }
 
   function a11yAuditSection(target) {
@@ -3645,6 +3886,10 @@
     setupDrawCanvas();
     renderPins();
     applyOverlayLanguage();
+    void pullGuestViewport().then((raw) => {
+      const next = parseVpPayload(raw);
+      if (next.w !== vpWidth || next.z !== vpZoom) applyViewportState(next, { push: false });
+    }).catch(() => {});
     if (pins.length > 0) toast(t("restoredPins").replace("{n}", pins.length));
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startup);
