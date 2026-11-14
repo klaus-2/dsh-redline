@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-11-14
+
+### Added
+
+- **Drawn lines and arrows can be curved and reshaped after they are placed.** Selecting a line or arrow shows handles at its ends and a midpoint handle that bends the stroke, and the midpoint stays on the curve while it is dragged. Rectangles, ellipses, text and step markers show handles to move or resize them, and a new shape is selected as soon as it is drawn so it can be adjusted immediately.
+  ([`c6560d5`](https://github.com/klaus-2/dsh-redline/commit/c6560d5))
+
+### Fixed
+
+- **Viewport width presets reset the zoom to 100%.** Picking 375 px, 768 px or 1280 px after a zoom step no longer keeps the previous zoom, so the page renders at the chosen width without an unexpected scale.
+  ([`c6560d5`](https://github.com/klaus-2/dsh-redline/commit/c6560d5))
+- **The viewport menu stays on screen and closes when the viewport changes.** The menu is clamped inside the window, repositions on resize and scroll, and closes when a viewport option is applied, so it does not remain open off screen at larger zoom levels.
+  ([`c6560d5`](https://github.com/klaus-2/dsh-redline/commit/c6560d5))
+- **Viewport presets and zoom apply to pages opened outside the harness browser panel.** The overlay applies the width and zoom to the page body, so the preview changes on proxied pages when the host cannot resize the guest frame.
+  ([`c6560d5`](https://github.com/klaus-2/dsh-redline/commit/c6560d5))
+
 ## [1.2.2] - 2026-11-14
 
 _The overlay comes back after a reload in the harness browser panel, and the pages served through the local preview render again._

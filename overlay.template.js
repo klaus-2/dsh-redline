@@ -2647,6 +2647,7 @@
 
   let vpWidth = null;
   let vpZoom = 100;
+  let viewportPresetWidth = null;
   const VIEWPORT_PRESETS = [375, 768, 1280];
   const VIEWPORT_ZOOMS = [50, 75, 125, 150, 200];
   function vpIsDefault() { return vpWidth === null && vpZoom === 100; }
@@ -2683,6 +2684,7 @@
     const z = (Number.isFinite(zRaw) && VIEWPORT_ZOOMS.includes(zRaw)) ? zRaw : 100;
     vpWidth = w;
     vpZoom = z;
+    viewportPresetWidth = w;
     const target = document.body || document.documentElement;
     try {
       const hs = document.documentElement.style;
@@ -2710,6 +2712,29 @@
     closeDrawMenu();
     if (opts.push !== false) pushGuestViewport();
   }
+
+  function applyViewportPreset(widthOrNull) {
+    const n = Number(widthOrNull);
+    const w = (Number.isFinite(n) && (n === 375 || n === 768 || n === 1280)) ? n : null;
+    viewportPresetWidth = w;
+    vpWidth = w;
+    const rootStyle = document.documentElement.style;
+    if (w === null) {
+      rootStyle.removeProperty("max-width");
+      rootStyle.removeProperty("margin-left");
+      rootStyle.removeProperty("margin-right");
+    } else {
+      rootStyle.setProperty("max-width", `${w}px`);
+      rootStyle.setProperty("margin-left", "auto");
+      rootStyle.setProperty("margin-right", "auto");
+    }
+    if (typeof repositionPins === "function") repositionPins();
+    if ((draft !== null && draft !== undefined) || (adjustPanel !== null && adjustPanel !== undefined)) {
+      if (typeof repositionDraft === "function") repositionDraft();
+    }
+    return viewportPresetWidth;
+  }
+  void applyViewportPreset;
   function activeViewportWidth() {
     return vpWidth;
   }
