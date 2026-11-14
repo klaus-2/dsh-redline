@@ -13,3 +13,4 @@ docs/RESEARCH.md
 docs/capture.md
 .npmrc
 .agents/
+/.playwright-cli
