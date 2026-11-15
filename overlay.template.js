@@ -2269,15 +2269,18 @@
   let placeComposerDefault = null;
 
   async function decodePastedImage(file) {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-    bitmap.close?.();
-    return dataUrl;
+    let bitmap = null;
+    try {
+      bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL("image/jpeg", 0.8);
+    } finally {
+      bitmap?.close?.();
+    }
   }
 
   function acceptPastedImage(dataUrl) {
@@ -2354,9 +2357,13 @@
       if (file === null) return;
       e.preventDefault();
       void (async () => {
+        let dataUrl = null;
         try {
-          acceptPastedImage(await decodePastedImage(file));
-        } catch {}
+          dataUrl = await decodePastedImage(file);
+        } catch (error) {
+          reportDiag(`paste decode: ${String(error).slice(0, 120)}`);
+        }
+        if (dataUrl !== null) acceptPastedImage(dataUrl);
       })();
     });
     textarea.addEventListener("keydown", (e) => {

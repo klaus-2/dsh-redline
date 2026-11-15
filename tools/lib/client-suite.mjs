@@ -1331,6 +1331,15 @@ export async function runClientSuite(harness, { pluginDir }) {
         JSON.stringify(state.toasts) === JSON.stringify(["pasteTooLarge"]),
         JSON.stringify({ open, replaced, rejected, closed, state }));
     }
+    {
+      const pasteSpan = pasteAt === -1 ? "" : draftSource.slice(pasteAt, pasteAt + 1200);
+      const decodeSource = extractFunction(overlay, "decodePastedImage");
+      harness.check("overlay: a failed paste decode reports to the host diag and skips the attach",
+        pasteAt !== -1 && pasteSpan.includes("catch (error)") && pasteSpan.includes("reportDiag(") &&
+        pasteSpan.indexOf("if (dataUrl !== null) acceptPastedImage(") > pasteSpan.indexOf("catch (error)") &&
+        decodeSource !== undefined && /finally\s*\{[^}]*\.close/.test(decodeSource),
+        JSON.stringify({ span: pasteSpan.length, hasDecode: decodeSource !== undefined }));
+    }
   }
 
   harness.section("client: overlay draft discard");
