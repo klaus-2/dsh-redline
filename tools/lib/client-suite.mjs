@@ -137,6 +137,16 @@ export async function runClientSuite(harness, { pluginDir }) {
       run === undefined ? "isIconMarkup missing" : JSON.stringify(run));
   }
 
+  harness.section("client: overlay paint order");
+  {
+    const popoverZ = Number(/\.popover, \.toolbar-wrap \{ z-index: (\d+)/.exec(overlay)?.[1] ?? 0);
+    const absZ = Number(/absLayer\.style\.cssText = "[^"]*z-index:(\d+)/.exec(overlay)?.[1] ?? 0);
+    const fixedZ = Number(/fixedLayer\.style\.cssText = "[^"]*z-index:(\d+)/.exec(overlay)?.[1] ?? 0);
+    harness.check("overlay: popovers paint above the pin and fixed layers",
+      popoverZ > absZ && popoverZ > fixedZ && absZ > 0 && fixedZ > 0,
+      JSON.stringify({ popoverZ, absZ, fixedZ }));
+  }
+
   harness.section("client: host identification before authentication");
   {
     const secret = "regression-placeholder-secret";
