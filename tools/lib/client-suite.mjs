@@ -1292,6 +1292,32 @@ export async function runClientSuite(harness, { pluginDir }) {
         closeSource.includes("adjustUndoStack = []") && closeSource.includes("adjustRedoStack = []"),
         JSON.stringify({ guardAt, undoAt, keydownAt, clears: closeSource.includes("adjustUndoStack = []") }));
     }
+    {
+      const resetSource = extractFunction(overlay, "adjustReset");
+      const resetRun = resetSource === undefined
+        ? undefined
+        : evaluateExpression(`() => {
+      let adjustTarget = null;
+      let adjustTargetSelector = "";
+      const adjustLedger = new Map();
+      const adjustPatch = { computedBaselines: new Map([["color", "10px"]]) };
+      const adjustValues = new Map([["color", "12px"]]);
+      const adjustInvalid = new Set(["color"]);
+      let adjustRedoStack = [{ kind: "prop", prop: "color", value: "12px" }];
+      const restored = [];
+      const restoreStyle = (patch, prop) => restored.push(prop);
+      const previews = [];
+      const previewStyle = () => {};
+      const rerenderAdjustRows = () => {};
+      ${resetSource}
+      adjustReset("color");
+      return { redo: adjustRedoStack.length, value: adjustValues.get("color"), invalid: adjustInvalid.size, restored };
+    }`, "adjustReset")();
+      harness.check("overlay: a manual property reset clears the redo tail and restores the baseline",
+        resetRun !== undefined && resetRun.redo === 0 && resetRun.value === "10px" && resetRun.invalid === 0 &&
+        JSON.stringify(resetRun.restored) === JSON.stringify(["color"]),
+        JSON.stringify(resetRun));
+    }
   }
 
   harness.section("client: overlay composer paste");

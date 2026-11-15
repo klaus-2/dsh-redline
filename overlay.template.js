@@ -3269,6 +3269,7 @@
     else if (adjustPatch !== null) previewStyle(adjustPatch, prop, value);
     adjustValues.set(prop, value);
     adjustInvalid.delete(prop);
+    adjustRedoStack = [];
     rerenderAdjustRows();
   }
   function adjustUpdateText(next) {
