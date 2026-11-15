@@ -27,6 +27,7 @@ const REQUIRED_OVERLAY_SYMBOLS = [
   "function renderPins",
   "function mountShadow",
   "function discardDraft",
+  "function revealSelector",
   "function setHint",
   "function postSnapshot",
   "function openAdjustPanel",
@@ -1241,13 +1242,15 @@ export async function runClientSuite(harness, { pluginDir }) {
       const previews = [];
       const previewStyle = (patch, prop, value) => previews.push({ prop, value });
       const rerenderAdjustRows = () => {};
-      const applyAdjustText = () => {};
+      const textApplies = [];
+      const applyAdjustText = (next) => { textApplies.push(next); adjustText = next; };
       const isSafeValue = () => true;
       ${extractFunction(overlay, "adjustUpdateProperty")}
       ${extractFunction(overlay, "applyAdjustEntry")}
       ${extractFunction(overlay, "adjustUndo")}
       ${extractFunction(overlay, "adjustRedo")}
-      return { adjustUpdateProperty, adjustUndo, adjustRedo, stacks: () => ({ undo: adjustUndoStack, redo: adjustRedoStack, value: adjustValues.get("color"), resets, previews }) };
+      ${extractFunction(overlay, "adjustUpdateText")}
+      return { adjustUpdateProperty, adjustUpdateText, adjustUndo, adjustRedo, stacks: () => ({ undo: [...adjustUndoStack], redo: [...adjustRedoStack], value: adjustValues.get("color"), text: adjustText, textApplies: [...textApplies], resets: [...resets], previews: [...previews] }) };
     }`, "adjust-undo-redo");
     {
       const run = makeRun();
@@ -1281,6 +1284,24 @@ export async function runClientSuite(harness, { pluginDir }) {
       harness.check("overlay: a fresh edit clears the redo stack",
         before.redo.length === 0 && after.redo.length === 0 && after.value === "14px" && after.undo.length === 1 && after.previews.length === 2,
         JSON.stringify({ before, after }));
+    }
+    {
+      const run = makeRun();
+      run.adjustUpdateText("A");
+      run.adjustUpdateText("B");
+      run.adjustUndo();
+      const mid = run.stacks();
+      run.adjustRedo();
+      const after = run.stacks();
+      run.adjustUpdateText("C");
+      const fresh = run.stacks();
+      harness.check("overlay: text edits swap stepwise through undo and redo",
+        mid.text === "A" && JSON.stringify(mid.redo) === JSON.stringify([{ kind: "text", prop: null, value: "B" }]) &&
+        after.text === "B" && after.redo.length === 0 &&
+        JSON.stringify(after.undo) === JSON.stringify([{ kind: "text", prop: null, value: "" }, { kind: "text", prop: null, value: "A" }]) &&
+        JSON.stringify(after.textApplies) === JSON.stringify(["A", "B", "A", "B"]) &&
+        fresh.text === "C" && fresh.redo.length === 0,
+        JSON.stringify({ mid, after, fresh }));
     }
     {
       const guardAt = overlay.indexOf('if (tag === "INPUT" || tag === "TEXTAREA" || from?.isContentEditable === true) return;');
@@ -1389,6 +1410,14 @@ export async function runClientSuite(harness, { pluginDir }) {
 
   harness.section("client: overlay locate reveal");
   {
+    const busStart = overlay.indexOf('window.addEventListener("message"');
+    const busLocateAt = busStart === -1 ? -1 : overlay.indexOf('if (data.type === "locate") revealSelector(data.selector);', busStart);
+    const busSpan = busStart === -1 || busLocateAt === -1 ? "" : overlay.slice(busStart, busLocateAt);
+    const guardEnd = busSpan.indexOf('data.source !== "dsh-redline"');
+    harness.check("overlay: the page message bus dispatches locate to reveal the selector",
+      busStart !== -1 && busLocateAt > busStart && guardEnd !== -1 &&
+      !busSpan.slice(guardEnd).includes('addEventListener("message"'),
+      JSON.stringify({ busStart, busLocateAt, guardEnd }));
     const revealSource = extractFunction(overlay, "revealSelector");
     const revealFn = revealSource === undefined ? undefined : evaluateExpression(`(locate, showHighlight, clearHighlight, setTimeout, clearTimeout, revealTimer) => {\n${revealSource}\nreturn revealSelector;\n}`, "revealSelector");
     {
