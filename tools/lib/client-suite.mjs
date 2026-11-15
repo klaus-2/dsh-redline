@@ -3176,6 +3176,7 @@ export async function runClientSuite(harness, { pluginDir }) {
         definition.match({ type: "user/message", data: { id: "m4", source: { kind: "dsh-redline" }, surfaceOp: "append" } }) === null
         && definition.match({ type: "user/message", surfaceOp: "append", data: { id: "m4", source: { kind: "dsh-redline" } } }) !== null);
       harness.check("the definition builds a view node for the matched event", (() => {
+        definition.match({ type: "user/message", surfaceOp: "append", seq: 5, data: { id: "m0", source: { kind: "user" } } });
         const event = { type: "user/message", surfaceOp: "append", seq: 7, data: { id: "m1", source: { kind: "dsh-redline", form: "snapshot", pageTitle: "Demo", pins: [{ tag: "h1", selector: "body h1", comment: "make it bigger", screenshotPath: "1700000000-abcd1234.png" }] } } };
         const match = { event, role: "start", location: { kind: "unresolved" } };
         const context = { key: "test-key", kind: definition.kind, id: "m1", matches: [match], start: match, state: undefined, current: new Map() };
@@ -3184,10 +3185,21 @@ export async function runClientSuite(harness, { pluginDir }) {
         definition.update(context, match);
         const node = definition.buildViewNode(context);
         return node !== null && node !== undefined
-          && node.kind === definition.kind && node.target === "chat" && node.anchorSeq === 7
+          && node.kind === definition.kind && node.target === "chat" && node.anchorSeq === 4.5
+          && node.groupTree === "exchange"
           && node.visibility === "visible" && typeof node.key === "string" && node.key !== ""
           && Array.isArray(node.data.pins) && node.data.pins[0]?.comment === "make it bigger";
       })(), "buildViewNode did not produce the expected node");
+      harness.check("the card anchors before the user message it belongs to", (() => {
+        definition.match({ type: "user/message", surfaceOp: "append", seq: 40, data: { id: "m-user", source: { kind: "user" } } });
+        const event = { type: "user/message", surfaceOp: "append", seq: 42, data: { id: "m-card", source: { kind: "dsh-redline", pins: [] } } };
+        const match = { event, role: "start", location: { kind: "step", turn: { turn: 1 }, step: { turn: 1, step: 1 } } };
+        const context = { key: "placement-key", kind: definition.kind, id: "m-card", matches: [match], start: match, state: undefined, current: new Map() };
+        context.state = definition.start(context, match, { previous: () => undefined });
+        definition.update(context, match);
+        const node = definition.buildViewNode(context);
+        return node !== null && node !== undefined && node.anchorSeq === 39.5 && node.groupTree === "exchange";
+      })(), "the card did not anchor above the user message");
     }
 
     const slotEntry = clientApi.injected.find((entry) => entry.name === "conversation.chat.node");
