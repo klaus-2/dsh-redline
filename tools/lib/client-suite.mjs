@@ -157,6 +157,17 @@ export async function runClientSuite(harness, { pluginDir }) {
       JSON.stringify({ cancelRule: cancelRule.slice(0, 90), cancelHover: cancelHover.slice(0, 60) }));
   }
 
+  harness.section("client: overlay inspector row wrapping");
+  {
+    const rowRule = /\.lr-row \{[^}]*\}/.exec(overlay)?.[0] ?? "";
+    const tokenRule = /\.lr-token-row \{[^}]*\}/.exec(overlay)?.[0] ?? "";
+    const wideRule = /\.lr-row-wide \.lr-token-row \{[^}]*\}/.exec(overlay)?.[0] ?? "";
+    harness.check("overlay: token suggestions wrap below the control instead of overflowing the panel",
+      rowRule.includes("flex-wrap: wrap") && tokenRule.includes("flex: 1 1 100%") &&
+      tokenRule.includes("min-width: 0") && wideRule.includes("flex: initial"),
+      JSON.stringify({ rowRule: rowRule.slice(0, 80), tokenRule: tokenRule.slice(0, 110), wideRule: wideRule.slice(0, 50) }));
+  }
+
   harness.section("client: host identification before authentication");
   {
     const secret = "regression-placeholder-secret";
