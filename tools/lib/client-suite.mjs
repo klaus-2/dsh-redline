@@ -26,6 +26,7 @@ const REQUIRED_OVERLAY_SYMBOLS = [
   "function savePins",
   "function renderPins",
   "function mountShadow",
+  "function discardDraft",
   "function setHint",
   "function postSnapshot",
   "function openAdjustPanel",
@@ -1330,6 +1331,25 @@ export async function runClientSuite(harness, { pluginDir }) {
         JSON.stringify(state.toasts) === JSON.stringify(["pasteTooLarge"]),
         JSON.stringify({ open, replaced, rejected, closed, state }));
     }
+  }
+
+  harness.section("client: overlay draft discard");
+  {
+    const discardSource = extractFunction(overlay, "discardDraft");
+    const run = discardSource === undefined
+      ? undefined
+      : evaluateExpression(`(renderDraft) => {
+      let draft = { label: "x" };
+      let pastedShot = "data:image/jpeg;base64,AAAA";
+      ${discardSource}
+      discardDraft();
+      return { draft, pastedShot };
+    }`, "discardDraft")(() => {});
+    const nullCount = [...overlay.matchAll(/draft = null/g)].length;
+    harness.check("overlay: every draft discard clears the pasted shot",
+      run !== undefined && run.pastedShot === null && run.draft === null &&
+      nullCount === 2 && overlay.includes("let draft = null;"),
+      JSON.stringify({ run, nullCount }));
   }
 
   harness.section("client: overlay locate reveal");
