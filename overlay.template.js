@@ -640,6 +640,7 @@
   let hotkeyComment = parseHotkey(SETTINGS.keys?.comment) ?? parseHotkey("c");
   let hotkeyAdjust = parseHotkey(SETTINGS.keys?.adjust) ?? parseHotkey("v");
   let hotkeyDraw = parseHotkey(SETTINGS.keys?.draw) ?? parseHotkey("d");
+  let hotkeyHidePins = parseHotkey(SETTINGS.keys?.hidePins) ?? parseHotkey("h");
   const t = (key) => UI_LOCALES[UI_LANG][key] ?? UI_LOCALES.en[key] ?? key;
   let mode = null;
   let hovered = null;
@@ -1729,9 +1730,11 @@
     const comment = parseHotkey(next.keys.comment);
     const adjust = parseHotkey(next.keys.adjust);
     const draw = parseHotkey(next.keys.draw);
+    const hidePins = parseHotkey(next.keys.hidePins);
     if (comment !== undefined && formatHotkey(comment) !== formatHotkey(hotkeyComment)) { hotkeyComment = comment; changed = true; }
     if (adjust !== undefined && formatHotkey(adjust) !== formatHotkey(hotkeyAdjust)) { hotkeyAdjust = adjust; changed = true; }
     if (draw !== undefined && formatHotkey(draw) !== formatHotkey(hotkeyDraw)) { hotkeyDraw = draw; changed = true; }
+    if (hidePins !== undefined && formatHotkey(hidePins) !== formatHotkey(hotkeyHidePins)) { hotkeyHidePins = hidePins; changed = true; }
     if (!changed) return;
     applyOverlayLanguage();
   }
@@ -1745,6 +1748,20 @@
     pendingSpan.style.display = pending > 0 ? "" : "none";
     eyeBtn.innerHTML = hidden ? ICONS.eyeOff : ICONS.eye;
     absLayer.style.display = hidden ? "none" : "";
+  }
+
+  function setHidden(next) {
+    hidden = next;
+    if (hidden) {
+      openPinId = null;
+      pinPanelNode?.remove();
+      pinPanelNode = null;
+      draft = null;
+      renderDraft();
+      if (groupComposerNode !== null) setGroupMode(false);
+    }
+    updateToolbar();
+    renderPins();
   }
 
 
@@ -1840,6 +1857,7 @@
       if (hotkeyMatches(event, hotkeyComment)) { if (drawMode) toggleDraw(false); setMode(mode === "picking" ? null : "picking"); }
       else if (hotkeyMatches(event, hotkeyAdjust)) { if (drawMode) toggleDraw(false); setMode(mode === "adjust" ? null : "adjust"); }
       else if (hotkeyMatches(event, hotkeyDraw)) toggleDraw();
+      else if (hotkeyMatches(event, hotkeyHidePins)) setHidden(!hidden);
       if (event.key === "Escape") {
         if (drawMode) { toggleDraw(false); return; }
         if (groupMode) { setGroupMode(false); return; }
@@ -1888,8 +1906,7 @@
     setGroupMode(!groupMode);
   });
   eyeBtn.addEventListener("click", () => {
-    hidden = !hidden;
-    updateToolbar();
+    setHidden(!hidden);
   });
 
 

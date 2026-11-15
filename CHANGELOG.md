@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   element and falling back to the pinned snapshot when the element is gone.
 - The pin popover gains a Copy selector button that writes the pin's CSS
   selector to the clipboard, with success and failure toasts.
+- The `H` hotkey shows or hides the pins: markers, the pin popover and the
+  comment composer disappear, the toolbar stays as the restore affordance. The
+  key is the new `keys.hidePins` setting (default `h`), re-armed on every
+  settings poll, and the visibility does not persist across reloads.
 
 ## [1.3.0] - 2026-11-15
 

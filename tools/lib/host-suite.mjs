@@ -280,13 +280,13 @@ export async function runHostSuite(harness, { pluginDir }) {
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "pt", keys: { comment: "x", adjust: "z" }, screenshot: false, cropPad: 96 }) });
       const body = await response.json();
-      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d" }, screenshot: false, cropPad: 96 });
+      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 96 });
     }
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "klingon", keys: { comment: "xx", adjust: "!" }, screenshot: "yes", cropPad: 5 }) });
       const body = await response.json();
       harness.eq("an invalid language is ignored", body.settings.lang, "pt");
-      harness.eq("an invalid shortcut is ignored", body.settings.keys, { comment: "x", adjust: "z", draw: "d" });
+      harness.eq("an invalid shortcut is ignored", body.settings.keys, { comment: "x", adjust: "z", draw: "d", hidePins: "h" });
       harness.eq("a non-boolean screenshot is ignored", body.settings.screenshot, false);
       harness.eq("the crop padding is clamped", body.settings.cropPad, 16);
       const high = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ cropPad: 9999 }) })).json();
@@ -298,7 +298,7 @@ export async function runHostSuite(harness, { pluginDir }) {
       const port2 = server2.port ?? server2.address().port;
       const response = await fetch(`http://127.0.0.1:${port2}/.lr/settings`, { headers: { [secretHeader]: secret } });
       const body = await response.json();
-      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d" }, screenshot: false, cropPad: 200 });
+      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200 });
       server2.close();
     }
 
@@ -389,14 +389,25 @@ export async function runHostSuite(harness, { pluginDir }) {
       const drawKey = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "q", adjust: "w", draw: "e" } }) })).json();
       harness.eq("the draw key is configurable", drawKey.settings.keys.draw, "e");
       const restored = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "c", adjust: "v", draw: "d" } }) })).json();
-      harness.eq("the defaults can be restored", restored.settings.keys, { comment: "c", adjust: "v", draw: "d" });
+      harness.eq("the defaults can be restored", restored.settings.keys, { comment: "c", adjust: "v", draw: "d", hidePins: "h" });
 
       // A settings file that already holds a collision (the host used to allow it) must not lock
       // every later change. The panel always sends the three keys, so the request body carries
       // them all — that is the shape that must keep working. The legacy state is written to disk
       // below, where the host is started against it.
       const legacyKeys = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "c", adjust: "v", draw: "d" } }) })).json();
-      harness.eq("the defaults can be restored after a refusal", legacyKeys.settings.keys, { comment: "c", adjust: "v", draw: "d" });
+      harness.eq("the defaults can be restored after a refusal", legacyKeys.settings.keys, { comment: "c", adjust: "v", draw: "d", hidePins: "h" });
+
+      const hidePinsDefault = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
+      harness.check("host: the defaults carry the hide-pins key", hidePinsDefault.settings.keys.hidePins === "h", JSON.stringify(hidePinsDefault.settings.keys));
+      const invalidHidePins = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { hidePins: "!!" } }) })).json();
+      harness.check("host: an invalid hide-pins hotkey falls back to the default", invalidHidePins.ok === true && invalidHidePins.settings.keys.hidePins === "h", JSON.stringify(invalidHidePins.settings?.keys));
+      const panelMerge = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "pt", keys: { comment: "c", adjust: "v", draw: "d", hidePins: "j" }, screenshot: false, cropPad: 200 }) })).json();
+      harness.check("host: the panel merge preserves the hide-pins key", panelMerge.ok === true && panelMerge.settings.keys.hidePins === "j", JSON.stringify(panelMerge.settings?.keys));
+      const hidePinsDuplicate = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "j" } }) });
+      const hidePinsDuplicateBody = await hidePinsDuplicate.json();
+      harness.check("host: a duplicate-key request naming the hide-pins key is refused", hidePinsDuplicate.status === 400 && hidePinsDuplicateBody.error === "duplicate-key" && JSON.stringify(hidePinsDuplicateBody.keys) === JSON.stringify(["comment", "hidePins"]), JSON.stringify(hidePinsDuplicateBody));
+      await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ keys: { comment: "c", adjust: "v", draw: "d", hidePins: "h" } }) })).json();
     }
 
     harness.section("host: drawings");
@@ -1181,5 +1192,15 @@ export async function runHostSuite(harness, { pluginDir }) {
     const afterCreated = await (await fetch(`${third.base}/.lr/settings`, { headers: auth })).json();
     harness.eq("the new collision was not stored", afterCreated.settings.keys.comment, "v");
     third.server.close();
+
+    writeFileSync(path.join(settingsDir, "settings.json"), JSON.stringify({ lang: "en", keys: { comment: "c", adjust: "v", draw: "d", hidePins: "v" }, screenshot: true, cropPad: 72 }));
+    const fourth = await start("legacy-hide-pins");
+    const repairedPins = await (await fetch(`${fourth.base}/.lr/settings`, { headers: auth })).json();
+    const rewrittenPins = JSON.parse(readFileSync(path.join(settingsDir, "settings.json"), "utf8"));
+    harness.check("host: the hide-pins key participates in collision repair",
+      repairedPins.settings.keys.hidePins !== "v" && repairedPins.settings.keys.adjust === "v" && repairedPins.settings.keys.comment === "c" &&
+      rewrittenPins.keys?.hidePins === repairedPins.settings.keys.hidePins && rewrittenPins.keys?.hidePins !== "v",
+      JSON.stringify({ loaded: repairedPins.settings.keys, file: rewrittenPins.keys }));
+    fourth.server.close();
   });
 }

@@ -79,6 +79,7 @@ dsh plugin --profile web add ./dsh-redline
 | `C` | Comment mode — pick an element, write what should change |
 | `V` | Adjust mode — pick an element, open the live style inspector |
 | `D` | Free canvas — draw over the page, send it with the screenshot |
+| `H` | Show or hide the pins — markers, popovers and the comment composer disappear, the toolbar stays |
 | `Esc` | Cancel the current mode, popover or preview |
 | `Enter` | Save the annotation from the popover |
 
@@ -106,8 +107,9 @@ Pages running in the harness browser can submit annotations by design — that i
 
 The plugin starts a loopback server (`127.0.0.1:47477`, falling back to the next 20 ports) that serves the overlay, the screenshot attachments and the annotation intake.
 
-The three mode keys are the only setting: open the plugin settings and change the comment, adjust or
-canvas key. A shortcut can carry modifiers (`Ctrl+Shift+A`), the modifiers must match exactly, and
+The four mode keys (comment, adjust, canvas, hide-pins) are the only shortcut setting: open the plugin settings and change the comment, adjust or
+canvas key — the hide-pins key is preserved on every save and can be edited directly in
+`~/.dsh/redline/settings.json`. A shortcut can carry modifiers (`Ctrl+Shift+A`), the modifiers must match exactly, and
 two modes cannot share one shortcut.
 
 ## How it works

@@ -79,6 +79,7 @@ dsh plugin --profile web add ./dsh-redline
 | `C` | Modo comentário — escolha um elemento, escreva o que deve mudar |
 | `V` | Modo ajuste — escolha um elemento, abra o inspetor de estilos ao vivo |
 | `D` | Canvas livre — desenhe sobre a página e envie junto com a captura |
+| `H` | Mostra ou oculta os pins — marcadores, popovers e o composer de comentários somem, a toolbar fica |
 | `Esc` | Cancela o modo atual, o popover ou o preview |
 | `Enter` | Salva a anotação do popover |
 
@@ -108,7 +109,7 @@ Páginas rodando no navegador do harness podem enviar anotações por design —
 
 O plugin inicia um servidor loopback (`127.0.0.1:47477`, caindo para as próximas 20 portas) que serve o overlay, os anexos de screenshot e a coleta de anotações.
 
-As três teclas de modo são a única configuração: abra as configurações do plugin e troque a tecla de comentário, de ajuste ou de canvas. Um atalho pode ter modificadores (`Ctrl+Shift+A`), os modificadores precisam bater exatamente, e dois modos não podem compartilhar um atalho.
+As quatro teclas de modo (comentário, ajuste, canvas, ocultar pins) são a única configuração de atalho: abra as configurações do plugin e troque a tecla de comentário, de ajuste ou de canvas — a tecla de ocultar pins é preservada a cada salvamento e pode ser editada diretamente em `~/.dsh/redline/settings.json`. Um atalho pode ter modificadores (`Ctrl+Shift+A`), os modificadores precisam bater exatamente, e dois modos não podem compartilhar um atalho.
 
 ## Como funciona
 

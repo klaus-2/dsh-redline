@@ -1575,12 +1575,13 @@ export async function runClientSuite(harness, { pluginDir }) {
     // trusted: the overlay only talks to the origin it was served from.
     const apiBase = /const API_BASE = \(\(\) => \{([\s\S]*?)\}\)\(\);/.exec(overlaySource)?.[1] ?? "";
     harness.check("the overlay does not take the host the page names", apiBase.includes("if (scriptOrigin !== null) return scriptOrigin;"), apiBase.slice(0, 160));
-    const handler = /if \(hotkeyMatches\(event, hotkeyComment\)\)[\s\S]*?else if \(hotkeyMatches\(event, hotkeyDraw\)\)[^\n]*/.exec(overlaySource)?.[0] ?? "";
+    const handler = /if \(hotkeyMatches\(event, hotkeyComment\)\)[\s\S]*?else if \(hotkeyMatches\(event, hotkeyHidePins\)\)[^\n]*/.exec(overlaySource)?.[0] ?? "";
     harness.check("the overlay's key handler asks the matcher", handler.includes("hotkeyMatches(event, hotkeyComment)") && handler.includes("hotkeyMatches(event, hotkeyAdjust)") && handler.includes("hotkeyMatches(event, hotkeyDraw)"), handler.slice(0, 120));
-    // One key arms one mode: the three checks are chained, not independent.
-    const chained = handler.match(/hotkeyMatches\(event, hotkey(Comment|Adjust|Draw)\)/g) ?? [];
-    harness.eq("the three hotkeys are checked in a chain", chained.length, 3);
-    harness.check("one key arms one mode", (handler.match(/\belse if\b/g) ?? []).length === 2, handler.slice(0, 120));
+    // One key arms one mode: the mode checks are chained, not independent.
+    const chained = handler.match(/hotkeyMatches\(event, hotkey(Comment|Adjust|Draw|HidePins)\)/g) ?? [];
+    harness.eq("the mode hotkeys are checked in a chain", chained.length, 4);
+    harness.check("one key arms one mode", (handler.match(/\belse if\b/g) ?? []).length === 3, handler.slice(0, 120));
+    harness.check("overlay: the keydown chain arms the hide-pins toggle", handler.includes("hotkeyMatches(event, hotkeyHidePins)") && handler.includes("setHidden(!hidden)"), handler.slice(-160));
     harness.check("the handler does not compare the key on its own", !/event\.key === key(Comment|Adjust|Draw)/.test(overlaySource), "a raw event.key comparison would ignore the modifiers");
 
     // The toolbar shows the key that is configured: the kbd of each button carries it.
@@ -1597,6 +1598,7 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("applySettings applies the comment key", applySettings.includes("hotkeyComment = comment"), applySettings.slice(0, 200));
     harness.check("applySettings applies the adjust key", applySettings.includes("hotkeyAdjust = adjust"), applySettings.slice(0, 200));
     harness.check("applySettings applies the canvas key", applySettings.includes("hotkeyDraw = draw"), applySettings.slice(0, 200));
+    harness.check("applySettings applies the hide-pins key", applySettings.includes("hotkeyHidePins = hidePins"), applySettings.slice(0, 200));
   }
 
   harness.section("client: the shortcut capture");
