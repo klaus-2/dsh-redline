@@ -26,6 +26,8 @@
   "copyCss": "Copy CSS",
   "cssCopied": "CSS copied to clipboard",
   "cssCopyFailed": "Could not copy CSS",
+  "copySelector": "Copy selector",
+  "selectorCopied": "Selector copied",
   "tokenSuggestions": "Design tokens",
   "a11yTitle": "Accessibility",
   "a11yContrast": "Text contrast",

@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The pin popover shows the target's dimensions (W×H px), live from the
   element and falling back to the pinned snapshot when the element is gone.
+- The pin popover gains a Copy selector button that writes the pin's CSS
+  selector to the clipboard, with success and failure toasts.
 
 ## [1.3.0] - 2026-11-15
 

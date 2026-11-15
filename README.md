@@ -45,6 +45,7 @@ For each pin, one block in a single snapshot:
 - Live style inspector with rollback: drag-to-scrub numbers, color pickers, presets, linked box-model and radius edits, shadow and transform composers, per-row reset
 - Design-token suggestions in the inspector: the page's own `var(--token)` is offered when its resolved value matches the value being edited
 - CSS patch export: the committed adjustments render as a copyable `selector { prop: value; }` rule in the overlay and as a `Requested CSS:` block in the agent context
+- Copy selector button in the pin popover: puts the pin's CSS selector on the clipboard verbatim
 - Stale pin re-anchoring: when the target element leaves the DOM the pin is flagged and the popover warns, and dragging the marker re-binds it
 - Pin popover shows the target's live dimensions (W×H px), falling back to the pinned snapshot when the element is gone
 - Before/after screenshots per adjusted pin: the after crop is captured live, then the page is restored and the before crop is captured from the same frame

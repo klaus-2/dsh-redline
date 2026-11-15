@@ -26,6 +26,8 @@
   "copyCss": "复制 CSS",
   "cssCopied": "CSS 已复制到剪贴板",
   "cssCopyFailed": "无法复制 CSS",
+  "copySelector": "复制选择器",
+  "selectorCopied": "选择器已复制",
   "tokenSuggestions": "设计令牌",
   "a11yTitle": "无障碍",
   "a11yContrast": "文字对比度",

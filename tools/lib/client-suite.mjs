@@ -1170,6 +1170,29 @@ export async function runClientSuite(harness, { pluginDir }) {
       JSON.stringify({ bodyStart, metaAt, dimsAt, actionsAt }));
   }
 
+  harness.section("client: overlay copy selector button");
+  {
+    const copySource = extractFunction(overlay, "copySelectorText");
+    const panel = extractFunction(overlay, "renderPinPanel");
+    const copy = copySource === undefined ? undefined : evaluateExpression(`(navigator, toast, t, pin) => {\n${copySource}\ncopySelectorText(pin);\n}`, "copySelectorText");
+    let written = [];
+    let toasts = [];
+    let failingToasts = [];
+    const navigatorStub = { clipboard: { writeText: async (text) => { written.push(text); } } };
+    const failingNavigator = { clipboard: { writeText: async () => { throw new Error("denied"); } } };
+    if (copy !== undefined) copy(navigatorStub, (text) => toasts.push(text), (key) => key, { selector: "#target > .card" });
+    if (copy !== undefined) copy(failingNavigator, (text) => failingToasts.push(text), (key) => key, { selector: "#target > .card" });
+    if (copy !== undefined) copy({ clipboard: undefined }, (text) => failingToasts.push(text), (key) => key, { selector: "#target > .card" });
+    await flush();
+    harness.check("overlay: the popover copy-selector button writes the pin selector via the clipboard",
+      copy !== undefined && panel !== undefined && panel.includes("copySelectorText(pin)") && panel.includes('t("copySelector")') &&
+      JSON.stringify(written) === JSON.stringify(["#target > .card"]) && JSON.stringify(toasts) === JSON.stringify(["selectorCopied"]),
+      JSON.stringify({ written, toasts, wired: panel?.includes("copySelectorText(pin)") }));
+    harness.check("overlay: the copy-selector failure path toasts instead of throwing",
+      copy !== undefined && JSON.stringify(failingToasts) === JSON.stringify(["cssCopyFailed", "cssCopyFailed"]),
+      JSON.stringify({ failingToasts }));
+  }
+
   harness.section("client: overlay token suggestions");
   {
     const fakeEl = (tag, attrs = {}, ...children) => {
