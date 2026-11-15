@@ -41,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not resolve, which left the panel fully transparent over the page. It now
   uses the same background as the dock capsule, and the settings selects
   follow suit.
+- The inspector header no longer inflates into a giant pill when the inspected
+  element is an `svg`: the tag label was being parsed as icon markup, creating
+  an empty default-sized svg inside the chip. Strings are now parsed as icons
+  only when they come from the icon table verbatim.
 
 ## [1.3.0] - 2026-11-15
 

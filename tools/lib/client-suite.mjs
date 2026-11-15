@@ -120,6 +120,23 @@ export async function runClientSuite(harness, { pluginDir }) {
       detailsRule.slice(0, 120));
   }
 
+  harness.section("client: overlay el icon classification");
+  {
+    const isIcon = extractFunction(overlay, "isIconMarkup");
+    const run = isIcon === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`(ICON_MARKUP) => {
+      ${isIcon}
+      return JSON.stringify({ real: isIconMarkup("<svg>ICON</svg>"), labelSvg: isIconMarkup("<svg>"), hostile: isIconMarkup("<svg onload=1>"), text: isIconMarkup("plain"), nullish: isIconMarkup(null) });
+    }`, "isIconMarkup")(new Set(["<svg>ICON</svg>"])));
+    const elStart = overlay.indexOf("function el(tag");
+    const elBody = elStart === -1 ? "" : overlay.slice(elStart, overlay.indexOf("node.append(child)", elStart));
+    harness.check("overlay: el parses only icon-table strings as markup and keeps every other string as text",
+      run !== undefined && run.real === true && run.labelSvg === false && run.hostile === false &&
+      run.text === false && run.nullish === false && elBody.includes("isIconMarkup(child)"),
+      run === undefined ? "isIconMarkup missing" : JSON.stringify(run));
+  }
+
   harness.section("client: host identification before authentication");
   {
     const secret = "regression-placeholder-secret";
