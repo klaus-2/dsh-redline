@@ -3223,6 +3223,30 @@ export async function runClientSuite(harness, { pluginDir }) {
       harness.check("the card asks for the crop with the secret header",
         cropCall !== undefined && cropCall.headers["x-dsh-redline-secret"] === "a".repeat(64),
         JSON.stringify(fetchCalls));
+
+      fetchCalls.length = 0;
+      const withViewport = renderOnce(stub, registeredSlot.component, { node: { data: { pins: [], pageTitle: "Demo", screenshotPath: "1700000000-viewport.jpg", sections: [] } } });
+      const viewportMissing = findByText(withViewport.tree, "(attachment unavailable)");
+      harness.check("the card does not mark the viewport unavailable before the fetch resolves", viewportMissing.length === 0, JSON.stringify(viewportMissing.length));
+      for (const effect of withViewport.effects) effect();
+      await flush(4);
+      const viewportCall = fetchCalls.find((call) => call.url.includes("/.lr/attachments/1700000000-viewport.jpg"));
+      harness.check("the card fetches the viewport with the secret header",
+        viewportCall !== undefined && viewportCall.headers["x-dsh-redline-secret"] === "a".repeat(64),
+        JSON.stringify(fetchCalls));
+      const withoutViewport = renderOnce(stub, registeredSlot.component, { node: { data: { pins: [], pageTitle: "Demo", screenshotPath: "", sections: [] } } });
+      const noViewportImg = findElements(withoutViewport.tree, (element) => element.props?.className === "lr-node-img");
+      const viewportNameInSource = /viewportName = typeof data\.screenshotPath[^;]*replace\(\/\[\^A-Za-z0-9\._-\]\/g, ""\)/.test(clientSource);
+      harness.check("the card skips the viewport when the source has none", noViewportImg.length === 0, JSON.stringify(noViewportImg.length));
+      harness.check("the viewport name is sanitized to the attachment charset before any fetch", viewportNameInSource,
+        "viewportName sanitize expression missing");
+      fetchCalls.length = 0;
+      const withHostileViewport = renderOnce(stub, registeredSlot.component, { node: { data: { pins: [], pageTitle: "Demo", screenshotPath: "../outside.png", sections: [] } } });
+      for (const effect of withHostileViewport.effects) effect();
+      await flush(4);
+      const hostileUrls = fetchCalls.map((call) => call.url);
+      harness.check("a hostile viewport value fetches only its sanitized basename", hostileUrls.length === 1 && hostileUrls[0]?.endsWith("/.lr/attachments/outside.png") && !hostileUrls[0]?.includes(".."),
+        JSON.stringify(hostileUrls));
     }
 
     const removedSymbols = ["data-chat-anchor-key", "dsh-recall-stack", "lr-card-map-v1", "applyCardsToDom", "buildCardElement", "lr-attached", "cardStore"];

@@ -990,6 +990,23 @@ export async function runHostSuite(harness, { pluginDir }) {
         && followups[0].source.pageTitle === "Alvo",
         JSON.stringify({ pins: followups[0]?.source?.pins, sections: followups[0]?.source?.sections?.length, pageTitle: followups[0]?.source?.pageTitle }));
 
+      const shotDir = path.join(home, ".dsh", "attachments", "live-review");
+      const shotCountBefore = existsSync(shotDir) ? readdirSync(shotDir).length : 0;
+      const viewportAnnotations = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "v1", tag: "h1", selector: "body h1", text: "Alvo", comment: "com viewport", changes: [] }], screenshot: SHOT }) });
+      const shotFiles = existsSync(shotDir) ? readdirSync(shotDir) : [];
+      const shotName = shotFiles.length > shotCountBefore ? shotFiles[shotFiles.length - 1] : "";
+      harness.check("the viewport screenshot is stored for delivery", viewportAnnotations.ok === true && shotName !== "", JSON.stringify({ ok: viewportAnnotations.ok, files: shotFiles.length }));
+      if (shotName !== "") {
+        const viewportDecision = await preStep(
+          { agent: { id: "session-1" }, messages: [{ id: "m2", source: { kind: "user", rpcId: "rpc-2" } }], signal: undefined },
+          async () => ({ kind: "enter", messages: [{ id: "m2", source: { kind: "user" } }] })
+        );
+        const viewportAnnotation = (viewportDecision.messages ?? []).find((message) => message.source?.kind === "dsh-redline");
+        const deliveredName = viewportAnnotation?.source?.screenshotPath ?? "";
+        harness.check("the annotation source carries the viewport basename", deliveredName === shotName, JSON.stringify({ expected: shotName, got: deliveredName }));
+        harness.check("the viewport basename is sanitized", !deliveredName.includes("/") && !deliveredName.includes("\\") && !deliveredName.startsWith(".."), JSON.stringify({ name: deliveredName }));
+      }
+
       const attachmentDir = path.join(home, ".dsh", "attachments", "live-review");
       const shotData = Buffer.from(SHOT.split(",")[1], "base64");
       for (const [kind, candidate] of [
