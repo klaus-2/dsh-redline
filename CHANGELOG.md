@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-15
+
+This release moves the annotation card into the conversation. The chat renders
+it in the turn of the message the annotations belong to, the row that repeated
+the same annotations next to that message is gone, and the annotations reach
+the conversation the composer is showing.
+
+_The new card placement shows up after the dsh restarts with the updated
+plugin: the chat renders the card from the client half of the plugin._
+
+### Added
+
+- **The annotation card is rendered by the chat itself.** The card appears in
+  the turn of the message the annotations belong to, with the comment, the
+  target and the crop of every marked element, and the plugin no longer draws a
+  card above the composer by patching the chat DOM. The row the chat added on
+  its own, repeating the same annotations next to the message, is gone.
+  ([`de9af5f`](https://github.com/klaus-2/dsh-redline/commit/de9af5f))
+
+### Fixed
+
+- **The card sits above the message it belongs to.** It used to render below
+  the user bubble, inside the "Análise concluída" block of the turn.
+  ([`afa24af`](https://github.com/klaus-2/dsh-redline/commit/afa24af))
+
+- **The annotations reach the conversation the composer is showing.** The
+  pending card used to target the last session the turn tail happened to
+  report, and a fresh chat never renders one, so the annotations went to the
+  global pending path instead of the open conversation.
+  ([`63435dd`](https://github.com/klaus-2/dsh-redline/commit/63435dd))
+
+- **The crops wait for the host to identify itself.** The card asked for the
+  images before the host confirmed its identity and threw the first answer
+  away, so a crop could stay missing. The card waits for the identification now
+  and shows the image when the host answers.
+  ([`4434bf4`](https://github.com/klaus-2/dsh-redline/commit/4434bf4))
+
+- **A long section text reaches the card whole.** A section can be longer than
+  the limit the client applied, so the disclosure was cut without a word; the
+  bound belongs to the host's context budget.
+  ([`3d17860`](https://github.com/klaus-2/dsh-redline/commit/3d17860))
+
+- **The in-app update only goes through the host plugin manager.** The plugin's
+  own install route could land a copy while the profile kept the dependency the
+  manager refuses, and every later update stayed stuck on the old version. The
+  route is gone: the panel asks the host's plugin manager and, when there is
+  none or it refuses the bundle, it says to update from npm by hand.
+  ([`7385972`](https://github.com/klaus-2/dsh-redline/commit/7385972))
+
 ## [1.2.3] - 2026-11-14
 
 ### Added
