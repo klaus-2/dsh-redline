@@ -3131,11 +3131,14 @@ export async function runClientSuite(harness, { pluginDir }) {
         return jsonResponse({});
       }
     });
+    const disposers = [];
     const uiConversation = {
       events: {
         register(definition) {
           registeredDefinitions.push(definition);
-          return () => {};
+          const dispose = () => {};
+          disposers.push(dispose);
+          return dispose;
         }
       }
     };
@@ -3150,6 +3153,8 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("the client declares the conversation service",
       Array.isArray(module.inject) && module.inject.includes("uiConversation") && module.inject.includes("slots"),
       JSON.stringify(module.inject));
+
+    harness.check("the definition registration keeps its disposer in an effect", clientApi.effects.some((entry) => typeof entry.fn === "function" && entry.label === "dsh-redline: chat node definition"), JSON.stringify(clientApi.effects.map((entry) => entry.label)));
 
     const definition = registeredDefinitions[0];
     harness.check("the client registers one chat node definition", registeredDefinitions.length === 1 && definition !== undefined, `count=${registeredDefinitions.length}`);
