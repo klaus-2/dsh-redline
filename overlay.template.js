@@ -57,6 +57,7 @@
     group: Icon(16, '<rect x="3" y="3" width="7" height="7" rx="1.5"/>', '<rect x="14" y="3" width="7" height="7" rx="1.5"/>', '<rect x="3" y="14" width="7" height="7" rx="1.5"/>', '<path d="M17.5 14v7M14 17.5h7"/>'),
     code: Icon(12, '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>')
   };
+  const ICON_MARKUP = new Set(Object.values(ICONS));
 
 
   let pins = loadPins();
@@ -72,6 +73,8 @@
       "sendTitle": "Save annotation (Enter)",
       "shotOn": "Screenshot attached",
       "composerClose": "Close and cancel the comment",
+      "pasteTooLarge": "Image too large (max 4 MB)",
+      "pasteRemove": "Remove attached image",
       "panelDrag": "Drag to move · double-click to reset",
       "attachesTo": "attaches to the session chat",
       "savedHint": "Saved — use Send on the card above the composer to dispatch",
@@ -82,9 +85,12 @@
       "reopen": "Reopen",
       "del": "Delete",
       "pinStale": "Target not found — pin is stale. Drag the marker to re-anchor.",
+      "pinDimensions": "Dimensions",
       "copyCss": "Copy CSS",
       "cssCopied": "CSS copied to clipboard",
       "cssCopyFailed": "Could not copy CSS",
+      "copySelector": "Copy selector",
+      "selectorCopied": "Selector copied",
       "tokenSuggestions": "Design tokens",
       "a11yTitle": "Accessibility",
       "a11yContrast": "Text contrast",
@@ -127,6 +133,8 @@
     "drawStep": "Step",
     "drawUndo": "Undo",
     "drawRedo": "Redo",
+    "adjustUndo": "Undo",
+    "adjustRedo": "Redo",
     "drawSend": "Add to chat",
     "drawColor": "Color",
     "drawWidth": "Thickness",
@@ -243,6 +251,8 @@
       "sendTitle": "Guardar anotação (Enter)",
       "shotOn": "Screenshot anexada",
       "composerClose": "Fechar e cancelar o comentário",
+      "pasteTooLarge": "Imagem grande demais (máx. 4 MB)",
+      "pasteRemove": "Remover imagem anexada",
       "panelDrag": "Arraste para mover · duplo clique para voltar ao padrão",
       "attachesTo": "anexa ao chat da sessão",
       "savedHint": "Guardada — use Enviar no card acima do composer para despachar",
@@ -253,9 +263,12 @@
       "reopen": "Reabrir",
       "del": "Excluir",
       "pinStale": "Alvo não encontrado — pin obsoleto. Arraste o marcador para reancorar.",
+      "pinDimensions": "Dimensões",
       "copyCss": "Copiar CSS",
       "cssCopied": "CSS copiado para a área de transferência",
       "cssCopyFailed": "Não foi possível copiar o CSS",
+      "copySelector": "Copiar seletor",
+      "selectorCopied": "Seletor copiado",
       "tokenSuggestions": "Tokens de design",
       "a11yTitle": "Acessibilidade",
       "a11yContrast": "Contraste do texto",
@@ -298,6 +311,8 @@
     "drawStep": "Passo",
     "drawUndo": "Desfazer",
     "drawRedo": "Refazer",
+    "adjustUndo": "Desfazer",
+    "adjustRedo": "Refazer",
     "drawSend": "Adicionar ao chat",
     "drawColor": "Cor",
     "drawWidth": "Espessura",
@@ -414,6 +429,8 @@
       "sendTitle": "保存标注 (Enter)",
       "shotOn": "已附加截图",
       "composerClose": "关闭并取消评论",
+      "pasteTooLarge": "图片过大（上限 4 MB）",
+      "pasteRemove": "移除附加图片",
       "panelDrag": "拖动移动 · 双击恢复默认位置",
       "attachesTo": "附加到会话聊天",
       "savedHint": "已保存 — 使用 composer 上方卡片的发送按钮派发",
@@ -424,9 +441,12 @@
       "reopen": "重新打开",
       "del": "删除",
       "pinStale": "未找到目标 — 图钉已失效。拖动标记以重新锚定。",
+      "pinDimensions": "尺寸",
       "copyCss": "复制 CSS",
       "cssCopied": "CSS 已复制到剪贴板",
       "cssCopyFailed": "无法复制 CSS",
+      "copySelector": "复制选择器",
+      "selectorCopied": "选择器已复制",
       "tokenSuggestions": "设计令牌",
       "a11yTitle": "无障碍",
       "a11yContrast": "文字对比度",
@@ -469,6 +489,8 @@
     "drawStep": "步骤",
     "drawUndo": "撤销",
     "drawRedo": "重做",
+    "adjustUndo": "撤销",
+    "adjustRedo": "重做",
     "drawSend": "添加到聊天",
     "drawColor": "颜色",
     "drawWidth": "粗细",
@@ -631,10 +653,14 @@
   let hotkeyComment = parseHotkey(SETTINGS.keys?.comment) ?? parseHotkey("c");
   let hotkeyAdjust = parseHotkey(SETTINGS.keys?.adjust) ?? parseHotkey("v");
   let hotkeyDraw = parseHotkey(SETTINGS.keys?.draw) ?? parseHotkey("d");
+  let hotkeyHidePins = parseHotkey(SETTINGS.keys?.hidePins) ?? parseHotkey("h");
   const t = (key) => UI_LOCALES[UI_LANG][key] ?? UI_LOCALES.en[key] ?? key;
   let mode = null;
   let hovered = null;
   let draft = null;
+  let pastedShot = null;
+  let pasteChipNode = null;
+  let pasteThumbNode = null;
   let openPinId = null;
   let screenshotOnSend = SETTINGS.screenshot === false ? false : true;
   let html2canvasReady = null;
@@ -742,7 +768,7 @@
   const host = document.createElement("div");
   host.id = "dsh-redline-host";
   const shadow = host.attachShadow({ mode: "open" });
-  const rootDiv = el("div", { class: "root dark" });
+  const rootDiv = el("div", { class: themeRootClass(SETTINGS.theme) });
   const styleEl = document.createElement("style");
   styleEl.textContent = TENCIL_CSS + `
     .lr-close { all: unset; cursor: pointer; margin-left: auto; width: 20px; height: 20px;
@@ -782,7 +808,7 @@
     .lr-sec-chev { color: var(--n-500); font-size: 10px; transition: transform .15s; }
     .lr-sec[data-open] .lr-sec-chev { transform: rotate(180deg); }
     .lr-sec-body { display: flex; flex-direction: column; gap: 6px; padding: 2px 0 8px; }
-    .lr-row { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+    .lr-row { display: flex; align-items: center; gap: 8px; min-height: 28px; flex-wrap: wrap; }
     .lr-row-wide { flex-direction: column; align-items: stretch; gap: 4px; }
     .lr-row-label { flex: none; width: 88px; font-size: 11px; color: var(--n-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .lr-row-static { display: block; }
@@ -791,7 +817,8 @@
     .lr-row-wide .lr-row-ctl { justify-content: flex-start; }
     .lr-reset { all: unset; cursor: pointer; flex: none; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 6px; color: var(--accent); font-size: 13px; }
     .lr-reset:hover { background: var(--n-200); }
-    .lr-token-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+    .lr-token-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-width: 0; flex: 1 1 100%; }
+    .lr-row-wide .lr-token-row { flex: initial; }
     .lr-token-label { flex: none; font-size: 10px; color: var(--n-500); }
     .lr-token-chip { all: unset; cursor: pointer; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 7px; border-radius: 8px; background: var(--n-100); color: var(--accent); font-size: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     .lr-token-chip:hover { background: var(--n-200); }
@@ -832,15 +859,18 @@
     .lr-effect-label { flex: none; width: 70px; font-size: 11px; color: var(--n-400); }
     .lr-rawhint { font-size: 10px; color: var(--n-500); }
     .lr-footer { display: flex; gap: 8px; padding: 8px 10px 10px; border-top: 1px solid var(--n-100); }
-    .lr-cancel { all: unset; cursor: pointer; flex: 1; height: 30px; border-radius: 10px; background: var(--n-100); color: var(--n-200); font-size: 12px; display: grid; place-items: center; }
-    .lr-cancel:hover { background: var(--n-200); color: var(--n-100); }
+    .lr-cancel { all: unset; cursor: pointer; flex: 1; height: 30px; border-radius: 10px; background: var(--n-100); color: var(--n-700); font-size: 12px; display: grid; place-items: center; }
+    .lr-cancel:hover { background: var(--n-200); color: var(--n-950); }
     .lr-confirm { all: unset; cursor: pointer; flex: 1; height: 30px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; display: grid; place-items: center; }
     .lr-confirm:hover { filter: brightness(1.1); }
     .lr-confirm[data-disabled] { opacity: .45; pointer-events: none; }
+    .lr-undo, .lr-redo { all: unset; cursor: pointer; flex: none; height: 24px; padding: 0 9px; border-radius: 8px; background: var(--n-100); color: var(--n-700); font-size: 11px; display: grid; place-items: center; }
+    .lr-undo:hover, .lr-redo:hover { background: var(--n-200); color: var(--n-950); }
+    .lr-undo[data-disabled], .lr-redo[data-disabled] { opacity: .45; pointer-events: none; }
 .lr-draw-canvas { position: fixed; inset: 0; pointer-events: none; touch-action: none; z-index: 2147483590; }
 .lr-draw-canvas[data-on] { pointer-events: auto; cursor: crosshair; }
 .lr-draw-canvas[data-tool="none"] { cursor: default; }
-.popover, .toolbar-wrap { z-index: 2147483592; }
+.popover, .toolbar-wrap { z-index: 2147483601; }
 .lr-drawbar { position: fixed; left: 14px; top: 50%; transform: translateY(-50%); display: none; flex-direction: column; align-items: center; gap: 2px; background: var(--n-100); border: 1px solid var(--line); border-radius: 12px; padding: 6px; box-shadow: var(--shadow); z-index: 2147483601; }
 .lr-drawbar[data-on] { display: flex; }
 .lr-dicon { display: inline-flex; width: 14px; height: 14px; }
@@ -1567,6 +1597,12 @@
     installKeyShield();
   }
 
+  function themeRootClass(theme) {
+    if (theme === "light") return "root";
+    if (theme === "contrast") return "root dark contrast";
+    return "root dark";
+  }
+
 
 
 
@@ -1591,6 +1627,9 @@
     }
   }
 
+  function isIconMarkup(child) {
+    return typeof child === "string" && ICON_MARKUP.has(child);
+  }
   function el(tag, attrs = {}, ...children) {
     const node = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs)) {
@@ -1601,7 +1640,7 @@
     }
     for (const child of children) {
       if (child === null || child === undefined) continue;
-      if (typeof child === "string" && child.startsWith("<svg")) {
+      if (isIconMarkup(child)) {
         const icon = document.createElement("span");
         icon.style.display = "inline-flex";
         icon.innerHTML = child;
@@ -1715,14 +1754,17 @@
       if (typeof next.screenshot === "boolean") screenshotOnSend = next.screenshot;
       if (Number.isFinite(Number(next.cropPad))) CROP_PAD = Math.max(16, Math.min(200, Math.round(Number(next.cropPad))));
     }
+    rootDiv.className = themeRootClass(next.theme);
     if (next.keys === null || typeof next.keys !== "object") return;
     let changed = false;
     const comment = parseHotkey(next.keys.comment);
     const adjust = parseHotkey(next.keys.adjust);
     const draw = parseHotkey(next.keys.draw);
+    const hidePins = parseHotkey(next.keys.hidePins);
     if (comment !== undefined && formatHotkey(comment) !== formatHotkey(hotkeyComment)) { hotkeyComment = comment; changed = true; }
     if (adjust !== undefined && formatHotkey(adjust) !== formatHotkey(hotkeyAdjust)) { hotkeyAdjust = adjust; changed = true; }
     if (draw !== undefined && formatHotkey(draw) !== formatHotkey(hotkeyDraw)) { hotkeyDraw = draw; changed = true; }
+    if (hidePins !== undefined && formatHotkey(hidePins) !== formatHotkey(hotkeyHidePins)) { hotkeyHidePins = hidePins; changed = true; }
     if (!changed) return;
     applyOverlayLanguage();
   }
@@ -1736,6 +1778,19 @@
     pendingSpan.style.display = pending > 0 ? "" : "none";
     eyeBtn.innerHTML = hidden ? ICONS.eyeOff : ICONS.eye;
     absLayer.style.display = hidden ? "none" : "";
+  }
+
+  function setHidden(next) {
+    hidden = next;
+    if (hidden) {
+      openPinId = null;
+      pinPanelNode?.remove();
+      pinPanelNode = null;
+      discardDraft();
+      if (groupComposerNode !== null) setGroupMode(false);
+    }
+    updateToolbar();
+    renderPins();
   }
 
 
@@ -1763,6 +1818,16 @@
     );
     highlightLabel.style.transform = `translate(${Math.max(4, box.left)}px, ${below ? box.bottom + 6 : box.top - 26}px)`;
     fixedLayer.append(highlightEl, highlightLabel);
+  }
+
+  let revealTimer = null;
+  function revealSelector(selector) {
+    const target = locate(selector);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    showHighlight(target);
+    if (revealTimer !== null) clearTimeout(revealTimer);
+    revealTimer = setTimeout(() => { clearHighlight(); revealTimer = null; }, 2000);
   }
 
   document.addEventListener(
@@ -1808,6 +1873,17 @@
       const from = event.composedPath?.()[0] ?? event.target;
       const tag = from?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || from?.isContentEditable === true) return;
+      if (adjustPanel !== null && (event.ctrlKey || event.metaKey) && !event.altKey) {
+        const undoKey = event.key.toLowerCase();
+        const undoShortcut = undoKey === "z" && !event.shiftKey;
+        const redoShortcut = (undoKey === "z" && event.shiftKey) || undoKey === "y";
+        if (undoShortcut || redoShortcut) {
+          event.preventDefault();
+          if (redoShortcut) adjustRedo();
+          else adjustUndo();
+          return;
+        }
+      }
       if (drawMode && drawTyping === null && drawSel !== null && (event.key === "Delete" || event.key === "Backspace")) {
         event.preventDefault();
         snapshotDraw();
@@ -1831,6 +1907,7 @@
       if (hotkeyMatches(event, hotkeyComment)) { if (drawMode) toggleDraw(false); setMode(mode === "picking" ? null : "picking"); }
       else if (hotkeyMatches(event, hotkeyAdjust)) { if (drawMode) toggleDraw(false); setMode(mode === "adjust" ? null : "adjust"); }
       else if (hotkeyMatches(event, hotkeyDraw)) toggleDraw();
+      else if (hotkeyMatches(event, hotkeyHidePins)) setHidden(!hidden);
       if (event.key === "Escape") {
         if (drawMode) { toggleDraw(false); return; }
         if (groupMode) { setGroupMode(false); return; }
@@ -1839,8 +1916,7 @@
           return;
         }
         if (draft !== null) {
-          draft = null;
-          renderDraft();
+          discardDraft();
         } else if (mode !== null) setMode(null);
       }
       if (event.key === "Enter" && groupMode && groupComposerNode === null) {
@@ -1879,8 +1955,7 @@
     setGroupMode(!groupMode);
   });
   eyeBtn.addEventListener("click", () => {
-    hidden = !hidden;
-    updateToolbar();
+    setHidden(!hidden);
   });
 
 
@@ -1901,6 +1976,15 @@
     const ox = Math.min(Math.max(0, pin.offsets?.ox ?? rect.width / 2), rect.width);
     const oy = Math.min(Math.max(0, pin.offsets?.oy ?? rect.height / 2), rect.height);
     return { x: rect.left + ox, y: rect.top + oy };
+  }
+
+  function pinDimensions(pin) {
+    const el2 = locate(pin.selector);
+    if (el2) {
+      const r = el2.getBoundingClientRect();
+      return `${Math.round(r.width)}×${Math.round(r.height)}`;
+    }
+    return `${Math.round(pin.rect.w)}×${Math.round(pin.rect.h)}`;
   }
 
   function draftPoint() {
@@ -2189,6 +2273,46 @@
   let composerNode = null;
   let placeComposerDefault = null;
 
+  async function decodePastedImage(file) {
+    let bitmap = null;
+    try {
+      bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL("image/jpeg", 0.8);
+    } finally {
+      bitmap?.close?.();
+    }
+  }
+
+  function acceptPastedImage(dataUrl) {
+    if (draft === null) return false;
+    if (typeof dataUrl !== "string" || dataUrl === "") return false;
+    if (dataUrl.length > 4 * 1024 * 1024) {
+      toast(t("pasteTooLarge"), 3200);
+      return false;
+    }
+    pastedShot = dataUrl;
+    if (pasteThumbNode !== null) pasteThumbNode.src = dataUrl;
+    if (pasteChipNode !== null) pasteChipNode.style.display = "";
+    return true;
+  }
+
+  function clearPastedShot() {
+    pastedShot = null;
+    if (pasteThumbNode !== null) pasteThumbNode.removeAttribute("src");
+    if (pasteChipNode !== null) pasteChipNode.style.display = "none";
+  }
+
+  function discardDraft() {
+    pastedShot = null;
+    draft = null;
+    renderDraft();
+  }
+
   function renderDraft() {
     draftNode?.remove();
     composerNode?.remove();
@@ -2220,15 +2344,40 @@
       screenshotOnSend = !screenshotOnSend;
       shotToggle.classList.toggle("toggle-on", screenshotOnSend);
     });
+    pasteChipNode = el("div", { class: "paste-chip" });
+    pasteThumbNode = el("img", { class: "paste-thumb", alt: "" });
+    pasteChipNode.append(pasteThumbNode, el("button", { class: "lr-close paste-remove", title: t("pasteRemove"), type: "button", onclick: () => clearPastedShot() }, "✕"));
+    pasteChipNode.style.display = "none";
     submit.addEventListener("click", () => submitDraft());
+    textarea.addEventListener("paste", (e) => {
+      const items = e.clipboardData?.items;
+      if (items === undefined || items === null) return;
+      let file = null;
+      for (const item of items) {
+        if (typeof item?.type === "string" && item.type.startsWith("image/")) {
+          file = item.getAsFile();
+          break;
+        }
+      }
+      if (file === null) return;
+      e.preventDefault();
+      void (async () => {
+        let dataUrl = null;
+        try {
+          dataUrl = await decodePastedImage(file);
+        } catch (error) {
+          reportDiag(`paste decode: ${String(error).slice(0, 120)}`);
+        }
+        if (dataUrl !== null) acceptPastedImage(dataUrl);
+      })();
+    });
     textarea.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         submitDraft();
       }
       if (e.key === "Escape") {
-        draft = null;
-        renderDraft();
+        discardDraft();
       }
     });
     composerNode.append(
@@ -2237,9 +2386,9 @@
         { class: "composer-target" },
         el("span", { class: "chip" }, ICONS.code, `${draft.label}`),
         el("span", { class: "composer-provider" }, el("span", { class: "composer-provider-label" }, t("attachesTo"))),
-        el("button", { class: "lr-close", title: t("composerClose"), onclick: () => { draft = null; renderDraft(); } }, "✕")
+        el("button", { class: "lr-close", title: t("composerClose"), onclick: discardDraft }, "✕")
       ),
-      el("div", { class: "prompt-input" }, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }, shotToggle), submit))
+      el("div", { class: "prompt-input" }, pasteChipNode, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }, shotToggle), submit))
     );
     fixedLayer.append(composerNode);
     applyPanelPosition(composerNode, "composer");
@@ -2248,6 +2397,7 @@
   }
 
   function openDraft(target, event) {
+    pastedShot = null;
     const rect = target.getBoundingClientRect();
     draft = {
       anchorEl: target,
@@ -2287,10 +2437,10 @@
       at: Date.now()
     };
     if (viewportPresetWidth !== null) pin.viewportWidth = viewportPresetWidth;
+    if (pastedShot !== null) pin.pastedShot = pastedShot;
     pins.push(pin);
     savePins();
-    draft = null;
-    renderDraft();
+    discardDraft();
     renderPins();
     await postSnapshot();
   }
@@ -2314,6 +2464,7 @@
         rect: p.rect,
         shot: p.shot ?? null,
         afterShot: p.afterShot ?? null,
+        pastedShot: p.pastedShot ?? null,
         groupId: p.groupId ?? null,
         viewportWidth: p.viewportWidth ?? null
       }))
@@ -2433,6 +2584,11 @@
     if (write && typeof write.then === "function") write.then(() => toast(t("cssCopied"))).catch(() => toast(t("cssCopyFailed")));
     else toast(t("cssCopyFailed"));
   }
+  function copySelectorText(pin) {
+    const write = navigator.clipboard?.writeText(pin.selector);
+    if (write && typeof write.then === "function") write.then(() => toast(t("selectorCopied"), 3200)).catch(() => toast(t("cssCopyFailed"), 3200));
+    else toast(t("cssCopyFailed"), 3200);
+  }
   const A11Y_SEMANTIC_TAGS = new Set(["button", "input", "select", "textarea", "img", "h1", "h2", "h3", "h4", "h5", "h6", "nav", "main", "header", "footer", "ul", "ol", "table"]);
   const A11Y_ROW_LABELS = { contrast: "a11yContrast", name: "a11yAccessibleName", imgAlt: "a11yImgAlt", role: "a11yRole", targetSize: "a11yTargetSize" };
   const A11Y_STATUS_KEYS = { pass: "a11yPass", fail: "a11yFail", warn: "a11yWarn", unknown: "a11yUnknown", "n/a": "a11yNotApplicable" };
@@ -2519,7 +2675,7 @@
     if (on) {
       setMode(null);
       if (drawMode) toggleDraw(false);
-      if (draft !== null) { draft = null; renderDraft(); }
+      if (draft !== null) discardDraft();
       closePanels();
       setHint(t("groupHint"));
     } else {
@@ -2756,6 +2912,7 @@
       const payload = vpIsDefault() ? null : vpPayload();
       try { event.source?.postMessage({ source: "dsh-redline", type: "viewport", width: payload, token: data.token }, "*"); } catch {}
     }
+    if (data.type === "locate") revealSelector(data.selector);
   });
   function pushGuestViewport() {
     const payload = vpIsDefault() ? null : vpPayload();
@@ -2811,13 +2968,14 @@
     const auditTarget = locate(pin.selector);
     panel.append(
       el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, `${pins.filter((p) => p.status !== "resolvido").indexOf(pin) + 1} · ${quickLabel(locate(pin.selector) ?? pin.tag)}`)),
-      el("div", { class: "pin-bubble-body" }, el("div", { class: "pin-bubble-meta" }, `${pin.selector.slice(0, 90)}${pin.component ? ` · ${pin.component}` : ""}`), pin.stale === true ? el("div", { class: "pin-bubble-stale" }, t("pinStale")) : null, changesText !== "" ? el("div", { class: "pin-bubble-changes" }, changesText) : null, textChangeText !== "" ? el("div", { class: "pin-bubble-changes" }, textChangeText) : null),
+      el("div", { class: "pin-bubble-body" }, el("div", { class: "pin-bubble-meta" }, `${pin.selector.slice(0, 90)}${pin.component ? ` · ${pin.component}` : ""}`), el("div", { class: "pin-bubble-meta" }, `${t("pinDimensions")}: ${pinDimensions(pin)} px`), pin.stale === true ? el("div", { class: "pin-bubble-stale" }, t("pinStale")) : null, changesText !== "" ? el("div", { class: "pin-bubble-changes" }, changesText) : null, textChangeText !== "" ? el("div", { class: "pin-bubble-changes" }, textChangeText) : null),
       auditTarget === null || pin.tag === "canvas" ? null : a11yAuditSection(auditTarget),
       el("div", { class: "prompt-input" }, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }), submit)),
       el(
         "div",
         { class: "pin-bubble-actions" },
         pin.changes.length > 0 ? el("button", { onclick: () => copyCssPatch(pin) }, t("copyCss")) : null,
+        el("button", { onclick: () => copySelectorText(pin) }, t("copySelector")),
         el("button", {
           onclick: () => {
             pin.status = pin.status === "resolvido" ? "queued" : "resolvido";
@@ -3070,6 +3228,8 @@
   let adjustInvalid = new Set();
   let adjustLedger = new Map();
   const adjustSeen = { flex: false, layout: false, positioned: false };
+  let adjustUndoStack = [];
+  let adjustRedoStack = [];
 
   function adjustBaseline(prop) {
     const ledger = adjustTarget !== null ? adjustLedger.get(adjustTargetSelector) : undefined;
@@ -3099,10 +3259,14 @@
     }
     adjustInvalid.delete(prop);
     if (adjustPatch !== null) previewStyle(adjustPatch, prop, next);
+    if (next !== adjustValues.get(prop)) {
+      adjustUndoStack.push({ kind: "prop", prop, value: adjustBaseline(prop) });
+      adjustRedoStack = [];
+    }
     adjustValues.set(prop, next);
     rerenderAdjustRows();
   }
-  function adjustReset(prop) {
+  function restoreAdjustBaseline(prop) {
     const ledger = adjustTarget !== null ? adjustLedger.get(adjustTargetSelector) : undefined;
     const before = ledger?.props?.get(prop);
     const value = before !== undefined ? before : (adjustPatch?.computedBaselines.get(prop) ?? "");
@@ -3112,12 +3276,51 @@
     adjustInvalid.delete(prop);
     rerenderAdjustRows();
   }
+  function adjustReset(prop) {
+    restoreAdjustBaseline(prop);
+    adjustRedoStack = [];
+  }
   function adjustUpdateText(next) {
+    if (adjustText !== next) {
+      adjustUndoStack.push({ kind: "text", prop: null, value: adjustText });
+      adjustRedoStack = [];
+    }
+    applyAdjustText(next);
+  }
+  function applyAdjustText(next) {
     adjustText = next;
     if (adjustPatch === null || adjustPatch.originalText === null) return;
     if (next === adjustPatch.originalText.value) restoreText(adjustPatch);
     else adjustPatch.originalText.node.data = next;
     rerenderAdjustRows();
+  }
+  function applyAdjustEntry(entry) {
+    if (entry.kind === "text") {
+      applyAdjustText(entry.value);
+      return;
+    }
+    if (entry.value !== adjustBaseline(entry.prop)) {
+      adjustInvalid.delete(entry.prop);
+      if (adjustPatch !== null) previewStyle(adjustPatch, entry.prop, entry.value);
+      adjustValues.set(entry.prop, entry.value);
+      rerenderAdjustRows();
+      return;
+    }
+    restoreAdjustBaseline(entry.prop);
+  }
+  function adjustUndo() {
+    const entry = adjustUndoStack.pop();
+    if (entry === undefined) return;
+    if (entry.kind === "text") adjustRedoStack.push({ kind: "text", prop: null, value: adjustText });
+    else adjustRedoStack.push({ kind: "prop", prop: entry.prop, value: adjustValues.get(entry.prop) ?? "" });
+    applyAdjustEntry(entry);
+  }
+  function adjustRedo() {
+    const entry = adjustRedoStack.pop();
+    if (entry === undefined) return;
+    if (entry.kind === "text") adjustUndoStack.push({ kind: "text", prop: null, value: adjustText });
+    else adjustUndoStack.push({ kind: "prop", prop: entry.prop, value: adjustValues.get(entry.prop) ?? "" });
+    applyAdjustEntry(entry);
   }
 
 
@@ -3491,6 +3694,8 @@
   function rerenderAdjustRows() {
     for (const fn of adjustRerender) { try { fn(); } catch {} }
     if (adjustConfirmBtn !== null) adjustConfirmBtn.toggleAttribute("data-disabled", !adjustCanConfirm());
+    if (adjustUndoBtn !== null) adjustUndoBtn.toggleAttribute("data-disabled", adjustUndoStack.length === 0);
+    if (adjustRedoBtn !== null) adjustRedoBtn.toggleAttribute("data-disabled", adjustRedoStack.length === 0);
   }
   function adjustCanConfirm() {
     const comment = adjustCommentInput?.value?.trim() ?? "";
@@ -3603,6 +3808,8 @@
 
   let adjustCommentInput = null;
   let adjustConfirmBtn = null;
+  let adjustUndoBtn = null;
+  let adjustRedoBtn = null;
   let adjustTargetSelector = "";
 
   function closeAdjustPanel(restore) {
@@ -3615,6 +3822,10 @@
     adjustRerender = [];
     adjustCommentInput = null;
     adjustConfirmBtn = null;
+    adjustUndoBtn = null;
+    adjustRedoBtn = null;
+    adjustUndoStack = [];
+    adjustRedoStack = [];
   }
 
   function openAdjustPanel(target) {
@@ -3644,7 +3855,9 @@
 
     const rect = adjustTarget.getBoundingClientRect();
     const panel = el("div", { class: "popover composer lr-insp" });
-    const targetLine = el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, `<${adjustTarget.localName}>`), el("span", { class: "lr-insp-sub" }, adjustTargetSelector.slice(0, 60)), el("button", { class: "lr-close", title: t("panelClose"), onclick: () => closeAdjustPanel(true) }, "✕"));
+    adjustUndoBtn = el("button", { class: "lr-undo", type: "button", title: t("adjustUndo"), onclick: () => adjustUndo() }, t("adjustUndo"));
+    adjustRedoBtn = el("button", { class: "lr-redo", type: "button", title: t("adjustRedo"), onclick: () => adjustRedo() }, t("adjustRedo"));
+    const targetLine = el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, `<${adjustTarget.localName}>`), el("span", { class: "lr-insp-sub" }, adjustTargetSelector.slice(0, 60)), adjustUndoBtn, adjustRedoBtn, el("button", { class: "lr-close", title: t("panelClose"), onclick: () => closeAdjustPanel(true) }, "✕"));
     panel.append(targetLine);
     adjustCommentInput = el("textarea", { class: "lr-comment", placeholder: t("commentOptional"), rows: "2" });
     adjustCommentInput.value = existing?.comment === "Ajuste visual" ? "" : (existing?.comment ?? "");
@@ -3863,8 +4076,7 @@
         pins = pins.filter((p) => !(p.status === "queued" && gone.has(p.id)));
         if (pins.length !== before) {
           savePins();
-          draft = null;
-          renderDraft();
+          discardDraft();
           closePanels();
           clearHighlight();
           toast(t("deliveredToast"), 3200);

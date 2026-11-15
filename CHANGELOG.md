@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The pin popover shows the target's dimensions (W×H px), live from the
+  element and falling back to the pinned snapshot when the element is gone.
+- The pin popover gains a Copy selector button that writes the pin's CSS
+  selector to the clipboard, with success and failure toasts.
+- The `H` hotkey shows or hides the pins: markers, the pin popover and the
+  comment composer disappear, the toolbar stays as the restore affordance. The
+  key is the new `keys.hidePins` setting (default `h`), re-armed on every
+  settings poll, and the visibility does not persist across reloads.
+- The overlay gains light and high-contrast themes, persisted as the new
+  `theme` setting (default `dark`). The choice applies on every settings poll
+  without a reload; the high-contrast theme keeps the dark palette with
+  stronger borders, outlines on interactive elements and brighter text.
+- Undo and redo for the inspector adjustments: while the panel is open, every
+  property and text edit is undoable (Ctrl+Z or the panel buttons) and
+  redoable (Ctrl+Shift+Z / Ctrl+Y); the stacks clear on confirm, cancel or
+  close. Committed pin changes keep their per-property reset.
+- Clicking a pin in the chat card locates its element on the page: the guest
+  scrolls to it smoothly and the existing highlight box shows it for about two
+  seconds. A pin whose element is gone does nothing.
+- Paste an image into the comment composer: the image is downscaled to at most
+  1600px (JPEG), shown as a removable preview chip, saved like the other crops,
+  rendered under the pin in the chat card, and surfaced to the agent as a
+  "User-provided image" context line. One image per comment; anything above
+  4 MB after downscale is refused with a toast.
+
+### Fixed
+
+- The pending-annotations details panel in the chat dock paints its background
+  again: it depended on a design-system variable the conversation subtree does
+  not resolve, which left the panel fully transparent over the page. It now
+  uses the same background as the dock capsule, and the settings selects
+  follow suit.
+- The inspector header no longer inflates into a giant pill when the inspected
+  element is an `svg`: the tag label was being parsed as icon markup, creating
+  an empty default-sized svg inside the chip. Strings are now parsed as icons
+  only when they come from the icon table verbatim.
+- Popovers (the adjust panel and the pin popover) paint above the pin markers
+  again: the pin layer out-ranked them, so markers floated over the panel
+  wherever the page had pins near it.
+- The inspector footer's Cancel button keeps readable text in the dark theme:
+  the label used the surface token as its color on the surface background.
+- The inspector's token suggestions wrap onto their own line below the color
+  control instead of squeezing it off the panel edge.
+
 ## [1.3.1] - 2026-11-15
 
 ### Changed

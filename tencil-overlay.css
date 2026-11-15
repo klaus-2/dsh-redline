@@ -74,6 +74,26 @@
   color-scheme: dark;
 }
 
+.root.contrast {
+  --n-500: hsl(96 4% 72%);
+  --n-600: hsl(105 4% 84%);
+  --n-700: hsl(100 4% 90%);
+  --n-900: hsl(120 2% 97%);
+  --n-950: hsl(120 4% 100%);
+  --surface: hsl(90 4% 6%);
+  --line: hsl(100 6% 55%);
+  --shadow: 0 0 0 2px rgba(255, 255, 255, 0.28), 0 16px 40px -8px rgba(0, 0, 0, 0.8);
+  color-scheme: dark;
+}
+
+.root.contrast button,
+.root.contrast input,
+.root.contrast select,
+.root.contrast textarea {
+  outline: 1px solid var(--line);
+  outline-offset: -1px;
+}
+
 * { scrollbar-width: thin; scrollbar-color: var(--n-200) transparent; }
 
 @supports selector(::-webkit-scrollbar) {
@@ -401,6 +421,9 @@ kbd {
 .prompt-input textarea:disabled { opacity: 0.6; }
 .prompt-actions { display: flex; align-items: center; justify-content: space-between; }
 .prompt-extras { display: flex; gap: 4px; }
+.paste-chip { display: flex; align-items: center; gap: 6px; padding: 8px 8px 0; }
+.paste-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); flex: none; }
+.paste-remove { flex: none; }
 .send {
   width: 26px; height: 26px; border-radius: 999px;
   display: grid; place-items: center;

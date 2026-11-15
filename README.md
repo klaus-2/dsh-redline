@@ -45,7 +45,13 @@ For each pin, one block in a single snapshot:
 - Live style inspector with rollback: drag-to-scrub numbers, color pickers, presets, linked box-model and radius edits, shadow and transform composers, per-row reset
 - Design-token suggestions in the inspector: the page's own `var(--token)` is offered when its resolved value matches the value being edited
 - CSS patch export: the committed adjustments render as a copyable `selector { prop: value; }` rule in the overlay and as a `Requested CSS:` block in the agent context
+- Copy selector button in the pin popover: puts the pin's CSS selector on the clipboard verbatim
 - Stale pin re-anchoring: when the target element leaves the DOM the pin is flagged and the popover warns, and dragging the marker re-binds it
+- Pin popover shows the target's live dimensions (W×H px), falling back to the pinned snapshot when the element is gone
+- Overlay themes: dark (default), light and a high-contrast variant, chosen in the plugin settings and persisted
+- Inspector undo/redo: Ctrl+Z / Ctrl+Shift+Z (or the panel buttons) step the uncommitted adjustments and text back and forward while the panel is open
+- Clicking a pin in the chat card scrolls the page to its element and highlights it for a moment
+- Paste an image into the comment composer: it is downscaled (max 1600px, JPEG), shown as a removable chip, and delivered with the pin for the agent to read
 - Before/after screenshots per adjusted pin: the after crop is captured live, then the page is restored and the before crop is captured from the same frame
 - Group comments: toolbar group mode collects N elements and posts one comment copied to every member pin (page-scoped — groups cannot span pages)
 - Responsive preview presets: constrain the page to 375/768/1280 px or reset to full width; pins created under a preset record its width (note: `100vw` units and `position: fixed` navbars do not respect the constraint)
@@ -77,6 +83,7 @@ dsh plugin --profile web add ./dsh-redline
 | `C` | Comment mode — pick an element, write what should change |
 | `V` | Adjust mode — pick an element, open the live style inspector |
 | `D` | Free canvas — draw over the page, send it with the screenshot |
+| `H` | Show or hide the pins — markers, popovers and the comment composer disappear, the toolbar stays |
 | `Esc` | Cancel the current mode, popover or preview |
 | `Enter` | Save the annotation from the popover |
 
@@ -104,9 +111,13 @@ Pages running in the harness browser can submit annotations by design — that i
 
 The plugin starts a loopback server (`127.0.0.1:47477`, falling back to the next 20 ports) that serves the overlay, the screenshot attachments and the annotation intake.
 
-The three mode keys are the only setting: open the plugin settings and change the comment, adjust or
-canvas key. A shortcut can carry modifiers (`Ctrl+Shift+A`), the modifiers must match exactly, and
+The four mode keys (comment, adjust, canvas, hide-pins) are the only shortcut setting: open the plugin settings and change the comment, adjust or
+canvas key — the hide-pins key is preserved on every save and can be edited directly in
+`~/.dsh/redline/settings.json`. A shortcut can carry modifiers (`Ctrl+Shift+A`), the modifiers must match exactly, and
 two modes cannot share one shortcut.
+
+The overlay theme is a setting too: dark (the default), light, or a high-contrast variant of the dark
+palette. It applies on the page immediately and survives reloads and restarts.
 
 ## How it works
 

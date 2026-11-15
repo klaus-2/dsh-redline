@@ -26,6 +26,8 @@ const REQUIRED_OVERLAY_SYMBOLS = [
   "function savePins",
   "function renderPins",
   "function mountShadow",
+  "function discardDraft",
+  "function revealSelector",
   "function setHint",
   "function postSnapshot",
   "function openAdjustPanel",
@@ -107,6 +109,63 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("the overlay submits the annotations through the bridge", overlay.includes('bridgeSend("annotations.submit"'));
     harness.check("the overlay reads the state through the bridge", overlay.includes('bridgeSend("state.get"'));
     harness.check("the overlay saves the drawings through the bridge", overlay.includes('bridgeSend("drawings.save"'));
+  }
+
+  harness.section("client: the dock surfaces resolve a background");
+  harness.excludes("the dock and settings no longer use the unresolved bg-base variable", client, "--dsw-alias-bg-base");
+  {
+    const detailsRule = /\.lr-details\s*\{[^}]*\}/.exec(client)?.[0] ?? "";
+    harness.check("the dock details panel paints with the capsule background",
+      detailsRule !== "" && detailsRule.includes("background: var(--dsw-specific-tip, #f7f8fa)"),
+      detailsRule.slice(0, 120));
+  }
+
+  harness.section("client: overlay el icon classification");
+  {
+    const isIcon = extractFunction(overlay, "isIconMarkup");
+    const run = isIcon === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`(ICON_MARKUP) => {
+      ${isIcon}
+      return JSON.stringify({ real: isIconMarkup("<svg>ICON</svg>"), labelSvg: isIconMarkup("<svg>"), hostile: isIconMarkup("<svg onload=1>"), text: isIconMarkup("plain"), nullish: isIconMarkup(null) });
+    }`, "isIconMarkup")(new Set(["<svg>ICON</svg>"])));
+    const elStart = overlay.indexOf("function el(tag");
+    const elBody = elStart === -1 ? "" : overlay.slice(elStart, overlay.indexOf("node.append(child)", elStart));
+    harness.check("overlay: el parses only icon-table strings as markup and keeps every other string as text",
+      run !== undefined && run.real === true && run.labelSvg === false && run.hostile === false &&
+      run.text === false && run.nullish === false && elBody.includes("isIconMarkup(child)"),
+      run === undefined ? "isIconMarkup missing" : JSON.stringify(run));
+  }
+
+  harness.section("client: overlay paint order");
+  {
+    const popoverZ = Number(/\.popover, \.toolbar-wrap \{ z-index: (\d+)/.exec(overlay)?.[1] ?? 0);
+    const absZ = Number(/absLayer\.style\.cssText = "[^"]*z-index:(\d+)/.exec(overlay)?.[1] ?? 0);
+    const fixedZ = Number(/fixedLayer\.style\.cssText = "[^"]*z-index:(\d+)/.exec(overlay)?.[1] ?? 0);
+    harness.check("overlay: popovers paint above the pin and fixed layers",
+      popoverZ > absZ && popoverZ > fixedZ && absZ > 0 && fixedZ > 0,
+      JSON.stringify({ popoverZ, absZ, fixedZ }));
+  }
+
+  harness.section("client: overlay footer button contrast");
+  {
+    const cancelRule = /\.lr-cancel \{[^}]*\}/.exec(overlay)?.[0] ?? "";
+    const cancelHover = /\.lr-cancel:hover \{[^}]*\}/.exec(overlay)?.[0] ?? "";
+    harness.check("overlay: the cancel button keeps readable text in the dark palette",
+      cancelRule.includes("background: var(--n-100)") && cancelRule.includes("color: var(--n-700)") &&
+      cancelHover.includes("color: var(--n-950)"),
+      JSON.stringify({ cancelRule: cancelRule.slice(0, 90), cancelHover: cancelHover.slice(0, 60) }));
+  }
+
+  harness.section("client: overlay inspector row wrapping");
+  {
+    const rowRule = /\.lr-row \{[^}]*\}/.exec(overlay)?.[0] ?? "";
+    const tokenRule = /\.lr-token-row \{[^}]*\}/.exec(overlay)?.[0] ?? "";
+    const wideRule = /\.lr-row-wide \.lr-token-row \{[^}]*\}/.exec(overlay)?.[0] ?? "";
+    harness.check("overlay: token suggestions wrap below the control instead of overflowing the panel",
+      rowRule.includes("flex-wrap: wrap") && tokenRule.includes("flex: 1 1 100%") &&
+      tokenRule.includes("min-width: 0") && wideRule.includes("flex: initial"),
+      JSON.stringify({ rowRule: rowRule.slice(0, 80), tokenRule: tokenRule.slice(0, 110), wideRule: wideRule.slice(0, 50) }));
   }
 
   harness.section("client: host identification before authentication");
@@ -1110,6 +1169,20 @@ export async function runClientSuite(harness, { pluginDir }) {
         !("stale" in forwarded) && forwarded.stale === undefined,
         JSON.stringify(forwarded ?? captured));
     }
+    {
+      const postSource = extractFunction(overlay, "postSnapshot");
+      let captured = null;
+      const bridgeSend = async (type, payload) => { captured = payload; return { ok: true }; };
+      const pins = [{ id: "x", tag: "h1", selector: "#x", comment: "c", changes: [], status: "queued", shot: "before-data", afterShot: "after-data", pastedShot: "pasted-data", stale: true }];
+      if (postSource !== undefined) {
+        const post = evaluateExpression(`(bridgeSend, pins, PAGE_URL, document, setHint, updateToolbar, toast, t) => {\n${postSource}\nreturn postSnapshot();\n}`, "postSnapshot");
+        await post(bridgeSend, pins, "http://page/", { title: "T" }, () => {}, () => {}, () => {}, (key) => key);
+      }
+      const forwarded = captured?.pins?.[0];
+      harness.check("overlay: postSnapshot forwards pastedShot on the pin payload",
+        forwarded !== undefined && forwarded.pastedShot === "pasted-data" && forwarded.afterShot === "after-data",
+        JSON.stringify(forwarded ?? captured));
+    }
   }
 
   harness.section("client: overlay css patch copy");
@@ -1147,6 +1220,324 @@ export async function runClientSuite(harness, { pluginDir }) {
         JSON.stringify(written) === JSON.stringify(["body h1 { color: red; }"]) && JSON.stringify(toasts) === JSON.stringify(["cssCopied"]) &&
         JSON.stringify(failingToasts) === JSON.stringify(["cssCopyFailed"]),
         JSON.stringify({ written, toasts, failingToasts, conditional: renderer?.includes("pin.changes.length > 0") }));
+    }
+  }
+
+  harness.section("client: overlay pin popover dimensions");
+  {
+    const dims = extractFunction(overlay, "pinDimensions");
+    const dimsFn = dims === undefined ? undefined : evaluateExpression(`(locate, pin) => {\n${dims}\nreturn pinDimensions(pin);\n}`, "pinDimensions");
+    const liveRect = { width: 320.4, height: 128.6 };
+    const live = dimsFn === undefined ? undefined : dimsFn(() => ({ getBoundingClientRect: () => liveRect }), { selector: "#live", rect: { w: 10, h: 20 } });
+    const snapshot = dimsFn === undefined ? undefined : dimsFn(() => null, { selector: "#gone", rect: { w: 240.9, h: 64.2 } });
+    harness.check("overlay: pinDimensions prefers the live element rect and falls back to the snapshot",
+      dimsFn !== undefined && live === "320×129" && snapshot === "241×64",
+      JSON.stringify({ live, snapshot }));
+    const panelSource = extractFunction(overlay, "renderPinPanel");
+    const bodyStart = panelSource?.indexOf('class: "pin-bubble-body"') ?? -1;
+    const metaAt = panelSource?.indexOf('class: "pin-bubble-meta"') ?? -1;
+    const dimsAt = panelSource?.indexOf("pinDimensions(pin)") ?? -1;
+    const actionsAt = panelSource?.indexOf('class: "pin-bubble-actions"') ?? -1;
+    harness.check("overlay: the popover renders the dimensions line beside the selector preview",
+      panelSource !== undefined && bodyStart !== -1 && metaAt > bodyStart && dimsAt > metaAt && actionsAt > dimsAt,
+      JSON.stringify({ bodyStart, metaAt, dimsAt, actionsAt }));
+  }
+
+  harness.section("client: overlay copy selector button");
+  {
+    const copySource = extractFunction(overlay, "copySelectorText");
+    const panel = extractFunction(overlay, "renderPinPanel");
+    const copy = copySource === undefined ? undefined : evaluateExpression(`(navigator, toast, t, pin) => {\n${copySource}\ncopySelectorText(pin);\n}`, "copySelectorText");
+    let written = [];
+    let toasts = [];
+    let failingToasts = [];
+    const navigatorStub = { clipboard: { writeText: async (text) => { written.push(text); } } };
+    const failingNavigator = { clipboard: { writeText: async () => { throw new Error("denied"); } } };
+    if (copy !== undefined) copy(navigatorStub, (text) => toasts.push(text), (key) => key, { selector: "#target > .card" });
+    if (copy !== undefined) copy(failingNavigator, (text) => failingToasts.push(text), (key) => key, { selector: "#target > .card" });
+    if (copy !== undefined) copy({ clipboard: undefined }, (text) => failingToasts.push(text), (key) => key, { selector: "#target > .card" });
+    await flush();
+    harness.check("overlay: the popover copy-selector button writes the pin selector via the clipboard",
+      copy !== undefined && panel !== undefined && panel.includes("copySelectorText(pin)") && panel.includes('t("copySelector")') &&
+      JSON.stringify(written) === JSON.stringify(["#target > .card"]) && JSON.stringify(toasts) === JSON.stringify(["selectorCopied"]),
+      JSON.stringify({ written, toasts, wired: panel?.includes("copySelectorText(pin)") }));
+    harness.check("overlay: the copy-selector failure path toasts instead of throwing",
+      copy !== undefined && JSON.stringify(failingToasts) === JSON.stringify(["cssCopyFailed", "cssCopyFailed"]),
+      JSON.stringify({ failingToasts }));
+  }
+
+  harness.section("client: overlay theme derivation");
+  {
+    const themeClassSource = extractFunction(overlay, "themeRootClass");
+    const themeClass = themeClassSource === undefined ? undefined : evaluateExpression(`(theme) => {\n${themeClassSource}\nreturn themeRootClass(theme);\n}`, "themeRootClass");
+    harness.check("overlay: themeRootClass maps each theme to its root class",
+      themeClass !== undefined && themeClass("dark") === "root dark" && themeClass("light") === "root" &&
+      themeClass("contrast") === "root dark contrast" && themeClass("sepia") === "root dark" && themeClass(undefined) === "root dark",
+      JSON.stringify({ dark: themeClass?.("dark"), light: themeClass?.("light"), contrast: themeClass?.("contrast"), sepia: themeClass?.("sepia") }));
+    harness.check("overlay: the overlay mounts with the class derived from settings",
+      overlay.includes('el("div", { class: themeRootClass(SETTINGS.theme) })'),
+      "rootDiv creation must derive its class from the settings");
+    const applyBody = /function applySettings\(next\) \{[\s\S]*?\n  \}/.exec(overlay)?.[0] ?? "";
+    const guardBody = /if \(!hostSettingsApplied\) \{[\s\S]*?\n    \}/.exec(applyBody)?.[0] ?? "";
+    harness.check("overlay: applySettings re-applies the theme on every poll",
+      applyBody.includes("rootDiv.className = themeRootClass(next.theme)") && guardBody !== "" && !guardBody.includes("themeRootClass"),
+      applyBody.slice(0, 200));
+  }
+
+  harness.section("client: overlay inspector undo redo");
+  {
+    const makeRun = evaluateExpression(`() => {
+      let adjustUndoStack = [];
+      let adjustRedoStack = [];
+      const adjustValues = new Map([["color", "10px"]]);
+      let adjustText = "";
+      const adjustInvalid = new Set();
+      const adjustPatch = { element: { style: {} } };
+      const adjustBaseline = () => "10px";
+      const resets = [];
+      const restoreAdjustBaseline = (prop) => { resets.push(prop); adjustValues.set(prop, adjustBaseline(prop)); };
+      const previews = [];
+      const previewStyle = (patch, prop, value) => previews.push({ prop, value });
+      const rerenderAdjustRows = () => {};
+      const textApplies = [];
+      const applyAdjustText = (next) => { textApplies.push(next); adjustText = next; };
+      const isSafeValue = () => true;
+      ${extractFunction(overlay, "adjustUpdateProperty")}
+      ${extractFunction(overlay, "applyAdjustEntry")}
+      ${extractFunction(overlay, "adjustUndo")}
+      ${extractFunction(overlay, "adjustRedo")}
+      ${extractFunction(overlay, "adjustUpdateText")}
+      return { adjustUpdateProperty, adjustUpdateText, adjustUndo, adjustRedo, stacks: () => ({ undo: [...adjustUndoStack], redo: [...adjustRedoStack], value: adjustValues.get("color"), text: adjustText, textApplies: [...textApplies], resets: [...resets], previews: [...previews] }) };
+    }`, "adjust-undo-redo");
+    {
+      const run = makeRun();
+      run.adjustUpdateProperty("color", "12px");
+      run.adjustUndo();
+      const after = run.stacks();
+      harness.check("overlay: undo restores the prior property value and pushes the current one to redo",
+        JSON.stringify(after.redo) === JSON.stringify([{ kind: "prop", prop: "color", value: "12px" }]) &&
+        JSON.stringify(after.resets) === JSON.stringify(["color"]) && after.undo.length === 0 && after.value === "10px",
+        JSON.stringify(after));
+    }
+    {
+      const run = makeRun();
+      run.adjustUpdateProperty("color", "12px");
+      run.adjustUndo();
+      run.adjustRedo();
+      const after = run.stacks();
+      harness.check("overlay: redo re-applies what undo popped",
+        after.value === "12px" && after.previews.length === 2 && JSON.stringify(after.previews[1]) === JSON.stringify({ prop: "color", value: "12px" }) &&
+        after.redo.length === 0 && JSON.stringify(after.undo) === JSON.stringify([{ kind: "prop", prop: "color", value: "10px" }]),
+        JSON.stringify(after));
+    }
+    {
+      const run = makeRun();
+      run.adjustUpdateProperty("color", "12px");
+      run.adjustUndo();
+      run.adjustUpdateProperty("color", "14px");
+      const before = run.stacks();
+      run.adjustRedo();
+      const after = run.stacks();
+      harness.check("overlay: a fresh edit clears the redo stack",
+        before.redo.length === 0 && after.redo.length === 0 && after.value === "14px" && after.undo.length === 1 && after.previews.length === 2,
+        JSON.stringify({ before, after }));
+    }
+    {
+      const run = makeRun();
+      run.adjustUpdateText("A");
+      run.adjustUpdateText("B");
+      run.adjustUndo();
+      const mid = run.stacks();
+      run.adjustRedo();
+      const after = run.stacks();
+      run.adjustUpdateText("C");
+      const fresh = run.stacks();
+      harness.check("overlay: text edits swap stepwise through undo and redo",
+        mid.text === "A" && JSON.stringify(mid.redo) === JSON.stringify([{ kind: "text", prop: null, value: "B" }]) &&
+        after.text === "B" && after.redo.length === 0 &&
+        JSON.stringify(after.undo) === JSON.stringify([{ kind: "text", prop: null, value: "" }, { kind: "text", prop: null, value: "A" }]) &&
+        JSON.stringify(after.textApplies) === JSON.stringify(["A", "B", "A", "B"]) &&
+        fresh.text === "C" && fresh.redo.length === 0,
+        JSON.stringify({ mid, after, fresh }));
+    }
+    {
+      const realRun = evaluateExpression(`() => {
+      let adjustUndoStack = [];
+      let adjustRedoStack = [];
+      const adjustValues = new Map([["color", "10px"]]);
+      let adjustText = "";
+      const adjustInvalid = new Set();
+      const adjustPatch = { element: { style: {} }, computedBaselines: new Map([["color", "10px"]]) };
+      const adjustBaseline = () => "10px";
+      const previews = [];
+      const previewStyle = (patch, prop, value) => previews.push({ prop, value });
+      const restored = [];
+      const restoreStyle = (patch, prop) => restored.push(prop);
+      const rerenderAdjustRows = () => {};
+      const applyAdjustText = () => {};
+      const isSafeValue = () => true;
+      let adjustTarget = null;
+      let adjustTargetSelector = "";
+      const adjustLedger = new Map();
+      ${extractFunction(overlay, "restoreAdjustBaseline")}
+      ${extractFunction(overlay, "adjustReset")}
+      ${extractFunction(overlay, "adjustUpdateProperty")}
+      ${extractFunction(overlay, "applyAdjustEntry")}
+      ${extractFunction(overlay, "adjustUndo")}
+      ${extractFunction(overlay, "adjustRedo")}
+      return { adjustUpdateProperty, adjustUndo, adjustRedo, stacks: () => ({ undo: [...adjustUndoStack], redo: [...adjustRedoStack], value: adjustValues.get("color") }) };
+    }`, "adjust-undo-baseline-redo")();
+      realRun.adjustUpdateProperty("color", "12px");
+      realRun.adjustUndo();
+      const afterUndo = realRun.stacks();
+      realRun.adjustRedo();
+      const afterRedo = realRun.stacks();
+      harness.check("overlay: redo survives an undo that lands on the baseline",
+        JSON.stringify(afterUndo.redo) === JSON.stringify([{ kind: "prop", prop: "color", value: "12px" }]) &&
+        afterRedo.value === "12px" && afterRedo.redo.length === 0,
+        JSON.stringify({ afterUndo, afterRedo }));
+    }
+    {
+      const guardAt = overlay.indexOf('if (tag === "INPUT" || tag === "TEXTAREA" || from?.isContentEditable === true) return;');
+      const undoAt = guardAt === -1 ? -1 : overlay.indexOf("adjustUndo();", guardAt);
+      const keydownAt = guardAt === -1 ? -1 : overlay.lastIndexOf('"keydown"', guardAt);
+      const closeSource = extractFunction(overlay, "closeAdjustPanel") ?? "";
+      harness.check("overlay: the inspector undo shortcut never fires for input targets and the stacks clear on close",
+      guardAt !== -1 && undoAt > guardAt && keydownAt !== -1 && overlay.slice(keydownAt, undoAt).includes("adjustPanel !== null") &&
+        closeSource.includes("adjustUndoStack = []") && closeSource.includes("adjustRedoStack = []"),
+        JSON.stringify({ guardAt, undoAt, keydownAt, clears: closeSource.includes("adjustUndoStack = []") }));
+    }
+    {
+      const resetSource = extractFunction(overlay, "adjustReset");
+      const resetRun = resetSource === undefined
+        ? undefined
+        : evaluateExpression(`() => {
+      let adjustTarget = null;
+      let adjustTargetSelector = "";
+      const adjustLedger = new Map();
+      const adjustPatch = { computedBaselines: new Map([["color", "10px"]]) };
+      const adjustValues = new Map([["color", "12px"]]);
+      const adjustInvalid = new Set(["color"]);
+      let adjustRedoStack = [{ kind: "prop", prop: "color", value: "12px" }];
+      const restored = [];
+      const restoreStyle = (patch, prop) => restored.push(prop);
+      const previews = [];
+      const previewStyle = () => {};
+      const rerenderAdjustRows = () => {};
+      ${extractFunction(overlay, "restoreAdjustBaseline")}
+      ${resetSource}
+      adjustReset("color");
+      return { redo: adjustRedoStack.length, value: adjustValues.get("color"), invalid: adjustInvalid.size, restored };
+    }`, "adjustReset")();
+      harness.check("overlay: a manual property reset clears the redo tail and restores the baseline",
+        resetRun !== undefined && resetRun.redo === 0 && resetRun.value === "10px" && resetRun.invalid === 0 &&
+        JSON.stringify(resetRun.restored) === JSON.stringify(["color"]),
+        JSON.stringify(resetRun));
+    }
+  }
+
+  harness.section("client: overlay composer paste");
+  {
+    const draftSource = extractFunction(overlay, "renderDraft");
+    const pasteAt = draftSource === undefined ? -1 : draftSource.indexOf('addEventListener("paste"');
+    const handlerSpan = pasteAt === -1 ? "" : draftSource.slice(pasteAt, pasteAt + 900);
+    harness.check("overlay: the composer paste handler attaches only image items",
+      pasteAt !== -1 && handlerSpan.includes('type.startsWith("image/")') && handlerSpan.includes("getAsFile()") &&
+      handlerSpan.includes("if (file === null) return;") && handlerSpan.indexOf("e.preventDefault()") > handlerSpan.indexOf('startsWith("image/")') &&
+      handlerSpan.indexOf("decodePastedImage(") > handlerSpan.indexOf("e.preventDefault()"),
+      JSON.stringify({ pasteAt, span: handlerSpan.length }));
+    const acceptSource = extractFunction(overlay, "acceptPastedImage");
+    const makeRun = acceptSource === undefined ? undefined : evaluateExpression(`(initialDraft) => {
+      let draft = initialDraft;
+      let pastedShot = null;
+      const toasts = [];
+      const toast = (text) => toasts.push(text);
+      const pasteThumbNode = { src: "" };
+      const pasteChipNode = { style: {} };
+      ${acceptSource}
+      return { accept: acceptPastedImage, state: () => ({ pastedShot, thumb: pasteThumbNode.src, chip: pasteChipNode.style.display, toasts }) };
+    }`, "acceptPastedImage");
+    {
+      const run = makeRun === undefined ? undefined : makeRun({ label: "x" });
+      const first = "data:image/jpeg;base64,AAAA";
+      const second = "data:image/jpeg;base64,BBBB";
+      const tooLarge = "data:image/jpeg;base64," + "A".repeat(4 * 1024 * 1024);
+      const open = run === undefined ? undefined : run.accept(first);
+      const replaced = run === undefined ? undefined : run.accept(second);
+      const rejected = run === undefined ? undefined : run.accept(tooLarge);
+      const closed = makeRun === undefined ? undefined : makeRun(null).accept(first);
+      const state = run === undefined ? undefined : run.state();
+      harness.check("overlay: the composer carries at most one pasted image and the latest paste replaces it",
+        open === true && replaced === true && rejected === false && closed === false &&
+        state !== undefined && state.pastedShot === second && state.thumb === second && state.chip === "" &&
+        JSON.stringify(state.toasts) === JSON.stringify(["pasteTooLarge"]),
+        JSON.stringify({ open, replaced, rejected, closed, state }));
+    }
+    {
+      const pasteSpan = pasteAt === -1 ? "" : draftSource.slice(pasteAt, pasteAt + 1200);
+      const decodeSource = extractFunction(overlay, "decodePastedImage");
+      harness.check("overlay: a failed paste decode reports to the host diag and skips the attach",
+        pasteAt !== -1 && pasteSpan.includes("catch (error)") && pasteSpan.includes("reportDiag(") &&
+        pasteSpan.indexOf("if (dataUrl !== null) acceptPastedImage(") > pasteSpan.indexOf("catch (error)") &&
+        decodeSource !== undefined && /finally\s*\{[^}]*\.close/.test(decodeSource),
+        JSON.stringify({ span: pasteSpan.length, hasDecode: decodeSource !== undefined }));
+    }
+  }
+
+  harness.section("client: overlay draft discard");
+  {
+    const discardSource = extractFunction(overlay, "discardDraft");
+    const run = discardSource === undefined
+      ? undefined
+      : evaluateExpression(`(renderDraft) => {
+      let draft = { label: "x" };
+      let pastedShot = "data:image/jpeg;base64,AAAA";
+      ${discardSource}
+      discardDraft();
+      return { draft, pastedShot };
+    }`, "discardDraft")(() => {});
+    const nullCount = [...overlay.matchAll(/draft = null/g)].length;
+    harness.check("overlay: every draft discard clears the pasted shot",
+      run !== undefined && run.pastedShot === null && run.draft === null &&
+      nullCount === 2 && overlay.includes("let draft = null;"),
+      JSON.stringify({ run, nullCount }));
+  }
+
+  harness.section("client: overlay locate reveal");
+  {
+    const busStart = overlay.indexOf('window.addEventListener("message"');
+    const busLocateAt = busStart === -1 ? -1 : overlay.indexOf('if (data.type === "locate") revealSelector(data.selector);', busStart);
+    const busSpan = busStart === -1 || busLocateAt === -1 ? "" : overlay.slice(busStart, busLocateAt);
+    const guardEnd = busSpan.indexOf('data.source !== "dsh-redline"');
+    harness.check("overlay: the page message bus dispatches locate to reveal the selector",
+      busStart !== -1 && busLocateAt > busStart && guardEnd !== -1 &&
+      !busSpan.slice(guardEnd).includes('addEventListener("message"'),
+      JSON.stringify({ busStart, busLocateAt, guardEnd }));
+    const revealSource = extractFunction(overlay, "revealSelector");
+    const revealFn = revealSource === undefined ? undefined : evaluateExpression(`(locate, showHighlight, clearHighlight, setTimeout, clearTimeout, revealTimer) => {\n${revealSource}\nreturn revealSelector;\n}`, "revealSelector");
+    {
+      const scrolled = [];
+      const highlighted = [];
+      let cleared = 0;
+      const scheduled = [];
+      const target = { scrollIntoView: (options) => scrolled.push(options) };
+      const reveal = revealFn === undefined ? undefined : revealFn((selector) => (selector === "#live" ? target : null), (t) => highlighted.push(t), () => { cleared += 1; }, (fn, ms) => { scheduled.push({ fn, ms }); return scheduled.length; }, () => {}, null);
+      if (reveal !== undefined) reveal("#live");
+      if (scheduled.length === 1) scheduled[0].fn();
+      harness.check("overlay: revealSelector scrolls to and highlights a resolvable element, then auto-clears",
+        reveal !== undefined && JSON.stringify(scrolled) === JSON.stringify([{ behavior: "smooth", block: "center" }]) &&
+        highlighted.length === 1 && highlighted[0] === target && scheduled.length === 1 && scheduled[0]?.ms === 2000 && cleared === 1,
+        JSON.stringify({ scrolled, highlighted: highlighted.length, scheduled: scheduled.length, cleared }));
+    }
+    {
+      const noScroll = [];
+      const noHighlight = [];
+      const noTimer = [];
+      const reveal = revealFn === undefined ? undefined : revealFn(() => null, (t) => noHighlight.push(t), () => {}, (fn, ms) => { noTimer.push({ fn, ms }); return noTimer.length; }, () => {}, null);
+      if (reveal !== undefined) reveal("#gone");
+      harness.check("overlay: revealSelector is a silent no-op for an unresolved selector",
+        reveal !== undefined && noScroll.length === 0 && noHighlight.length === 0 && noTimer.length === 0,
+        JSON.stringify({ noScroll: noScroll.length, noHighlight: noHighlight.length, noTimer: noTimer.length }));
     }
   }
 
@@ -1206,6 +1597,8 @@ export async function runClientSuite(harness, { pluginDir }) {
         adjustTarget: null,
         adjustLedger: new Map(),
         adjustTargetSelector: "",
+        adjustUndoStack: [],
+        adjustRedoStack: [],
         rerenderAdjustRows: () => {},
         tokenSuggestionsFor: () => ["--brand-color"],
         makeTokenProbe: () => null,
@@ -1532,12 +1925,13 @@ export async function runClientSuite(harness, { pluginDir }) {
     // trusted: the overlay only talks to the origin it was served from.
     const apiBase = /const API_BASE = \(\(\) => \{([\s\S]*?)\}\)\(\);/.exec(overlaySource)?.[1] ?? "";
     harness.check("the overlay does not take the host the page names", apiBase.includes("if (scriptOrigin !== null) return scriptOrigin;"), apiBase.slice(0, 160));
-    const handler = /if \(hotkeyMatches\(event, hotkeyComment\)\)[\s\S]*?else if \(hotkeyMatches\(event, hotkeyDraw\)\)[^\n]*/.exec(overlaySource)?.[0] ?? "";
+    const handler = /if \(hotkeyMatches\(event, hotkeyComment\)\)[\s\S]*?else if \(hotkeyMatches\(event, hotkeyHidePins\)\)[^\n]*/.exec(overlaySource)?.[0] ?? "";
     harness.check("the overlay's key handler asks the matcher", handler.includes("hotkeyMatches(event, hotkeyComment)") && handler.includes("hotkeyMatches(event, hotkeyAdjust)") && handler.includes("hotkeyMatches(event, hotkeyDraw)"), handler.slice(0, 120));
-    // One key arms one mode: the three checks are chained, not independent.
-    const chained = handler.match(/hotkeyMatches\(event, hotkey(Comment|Adjust|Draw)\)/g) ?? [];
-    harness.eq("the three hotkeys are checked in a chain", chained.length, 3);
-    harness.check("one key arms one mode", (handler.match(/\belse if\b/g) ?? []).length === 2, handler.slice(0, 120));
+    // One key arms one mode: the mode checks are chained, not independent.
+    const chained = handler.match(/hotkeyMatches\(event, hotkey(Comment|Adjust|Draw|HidePins)\)/g) ?? [];
+    harness.eq("the mode hotkeys are checked in a chain", chained.length, 4);
+    harness.check("one key arms one mode", (handler.match(/\belse if\b/g) ?? []).length === 3, handler.slice(0, 120));
+    harness.check("overlay: the keydown chain arms the hide-pins toggle", handler.includes("hotkeyMatches(event, hotkeyHidePins)") && handler.includes("setHidden(!hidden)"), handler.slice(-160));
     harness.check("the handler does not compare the key on its own", !/event\.key === key(Comment|Adjust|Draw)/.test(overlaySource), "a raw event.key comparison would ignore the modifiers");
 
     // The toolbar shows the key that is configured: the kbd of each button carries it.
@@ -1554,6 +1948,7 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("applySettings applies the comment key", applySettings.includes("hotkeyComment = comment"), applySettings.slice(0, 200));
     harness.check("applySettings applies the adjust key", applySettings.includes("hotkeyAdjust = adjust"), applySettings.slice(0, 200));
     harness.check("applySettings applies the canvas key", applySettings.includes("hotkeyDraw = draw"), applySettings.slice(0, 200));
+    harness.check("applySettings applies the hide-pins key", applySettings.includes("hotkeyHidePins = hidePins"), applySettings.slice(0, 200));
   }
 
   harness.section("client: the shortcut capture");
@@ -1904,6 +2299,49 @@ export async function runClientSuite(harness, { pluginDir }) {
       const after = renderOnce(stub, section.component, {});
       harness.eq("the slow first read did not undo the change", after.states?.[0]?.settings?.screenshot, false);
     }
+  }
+
+  harness.section("client: the settings panel offers the theme select");
+  {
+    const posted = [];
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const hostSettings = { lang: "auto", keys: { comment: "c", adjust: "v", draw: "d", hidePins: "h" }, screenshot: true, cropPad: 72, theme: "dark" };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      window: { addEventListener() {}, removeEventListener() {} },
+      fetch: async (url, options) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/settings") && options?.method === "POST") {
+          const asked = JSON.parse(options.body);
+          posted.push(asked);
+          return jsonResponse({ ok: true, settings: { ...hostSettings, theme: asked.theme ?? hostSettings.theme } });
+        }
+        if (target.includes("/.lr/settings")) return jsonResponse({ ok: true, settings: hostSettings, version: "1.0.24" });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const before = renderOnce(stub, section.component, {});
+    const select = findElements(before.tree, (element) => element.props?.["aria-label"] === "Theme");
+    const options = Array.isArray(select[0]?.props?.children) ? select[0].props.children.length : 0;
+    if (select.length === 1) {
+      select[0].props.onChange({ target: { value: "contrast" } });
+      await flush(4);
+    }
+    harness.check("the settings panel offers the theme select",
+      select.length === 1 && options === 3 && posted.some((body) => body.theme === "contrast"),
+      JSON.stringify({ count: select.length, options, posted: posted.map((body) => body.theme) }));
   }
 
   harness.section("client: plugin manager metadata");
@@ -3265,6 +3703,151 @@ export async function runClientSuite(harness, { pluginDir }) {
     const stillThere = removedSymbols.filter((symbol) => clientSource.includes(symbol));
     harness.check("the DOM surgery is gone", stillThere.length === 0, stillThere.join(", "));
     harness.check("the client no longer arms a card from the status poll", !clientSource.includes("claimByMessageId") && !clientSource.includes("lastDelivered") && clientSource.includes("fields=cmd") && !clientSource.includes("fields=cmd,lastDelivered"));
+  }
+
+  harness.section("client: the card pin row sends a locate command");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    class FakeElement {}
+    const executed = [];
+    const registeredDefinitions = [];
+    const overlayBundle = readFileSync(path.join(pluginDir, "lib", "overlay.js"), "utf8");
+    const bridgeBundle = readFileSync(path.join(pluginDir, "lib", "bridge.js"), "utf8");
+    const fakeWebview = new FakeElement();
+    fakeWebview.dataset = { liveReviewWired: undefined };
+    fakeWebview.getAttribute = (name) => (name === "src" ? "https://example.com/" : null);
+    fakeWebview.addEventListener = (type, handler) => {
+      if (type === "dom-ready") setTimeout(() => handler(), 0);
+    };
+    const pageMountModel = createMountModel();
+    fakeWebview.executeJavaScript = async (code) => {
+      executed.push(code);
+      if (code.includes("lrMountState")) return pageMountModel.answer(code);
+      if (code.includes("window.__LR__ = Object.assign")) {
+        pageMountModel.answer(code);
+        return null;
+      }
+      return null;
+    };
+    const documentStub = {
+      createElement: () => ({ style: {}, dataset: {}, setAttribute() {}, appendChild() {}, remove() {} }),
+      head: { appendChild() {} },
+      body: { appendChild() {} },
+      documentElement: {},
+      readyState: "complete",
+      querySelector: () => null,
+      querySelectorAll: (selector) => (typeof selector === "string" && selector.includes("webview") ? [fakeWebview] : []),
+      addEventListener() {},
+      removeEventListener() {}
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      document: documentStub,
+      sandbox: { Element: FakeElement, MutationObserver: class { observe() {} } },
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url, options) => {
+        const target = String(url);
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.endsWith("/.lr/overlay.js")) return new Response(overlayBundle, { status: 200, headers: { "content-type": "text/javascript" } });
+        if (target.endsWith("/.lr/bridge.js")) return new Response(bridgeBundle, { status: 200, headers: { "content-type": "text/javascript" } });
+        if (target.includes("/.lr/pending")) return jsonResponse({ ok: true, count: 0 });
+        return jsonResponse({});
+      }
+    });
+    const uiConversation = {
+      events: {
+        register(definition) {
+          registeredDefinitions.push(definition);
+          return () => {};
+        }
+      }
+    };
+    const clientApi = fakeClientCtx({ uiConversation });
+    module.apply(clientApi.ctx);
+    clientApi.resolve();
+    await waitFor(() => executed.some((code) => code.includes("window.__LR__ = Object.assign")), 4000);
+    await flush(4);
+    const slot = clientApi.slots.find((entry) => entry.spec.name === "conversation.chat.node");
+    if (slot !== undefined) {
+      const rendered = renderOnce(stub, slot.component, { node: { data: { pins: [{ tag: "h1", selector: "body h1", comment: "locate me", screenshotPath: null }], pageTitle: "Demo", sections: [] } } });
+      const row = findElements(rendered.tree, (element) => element.props?.className === "lr-node-pin");
+      executed.length = 0;
+      if (row.length === 1) row[0].props.onClick();
+      await flush(4);
+      const locate = executed.find((code) => code.includes('type: "locate"'));
+      harness.check("client: the card pin row sends a locate command for the pin selector",
+        row.length === 1 && locate !== undefined && locate.includes('window.postMessage({ source: "dsh-redline", type: "locate", selector: ' + JSON.stringify("body h1") + ' }, "*")'),
+        JSON.stringify({ rows: row.length, executed: executed.map((code) => code.slice(0, 90)) }));
+    } else harness.check("client: the card pin row sends a locate command for the pin selector", false, "chat node slot missing");
+  }
+
+  harness.section("client: the card renders the pasted image");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const fetchCalls = [];
+    const registeredDefinitions = [];
+    class StubURL extends URL {
+      static createObjectURL = () => "blob:stub-url";
+      static revokeObjectURL = () => {};
+    }
+    const documentStub = {
+      createElement(tag) {
+        const node = { tag, href: "", download: "", click: () => {}, style: {}, setAttribute() {} };
+        return node;
+      },
+      documentElement: {},
+      head: { appendChild() {} },
+      body: { appendChild() {} },
+      readyState: "complete",
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener() {},
+      removeEventListener() {}
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      document: documentStub,
+      sandbox: { URL: StubURL },
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url, options) => {
+        const target = String(url);
+        fetchCalls.push({ url: target, headers: options?.headers ?? {} });
+        if (target === "/api/dsh-redline.secret") return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.endsWith("/.lr/settings")) return jsonResponse({ ok: true, settings: { lang: "en", keys: { comment: "x", adjust: "y" }, screenshot: false, cropPad: 96 }, version: "1.0.23" });
+        if (target.includes("/.lr/pending")) return jsonResponse({ ok: true, count: 0 });
+        return jsonResponse({});
+      }
+    });
+    const uiConversation = {
+      events: {
+        register(definition) {
+          registeredDefinitions.push(definition);
+          return () => {};
+        }
+      }
+    };
+    const clientApi = fakeClientCtx({ uiConversation });
+    module.apply(clientApi.ctx);
+    clientApi.resolve();
+    await flush(4);
+    const slot = clientApi.slots.find((entry) => entry.spec.name === "conversation.chat.node");
+    if (slot !== undefined) {
+      const rendered = renderOnce(stub, slot.component, { node: { data: { pins: [{ tag: "h1", selector: "body h1", comment: "colei isto", screenshotPath: null, pastedShotPath: "1700000000-pasted.jpg" }], pageTitle: "Demo", sections: [] } } });
+      for (const effect of rendered.effects) effect();
+      await flush(4);
+      const fetchCall = fetchCalls.find((call) => call.url.includes("/.lr/attachments/1700000000-pasted.jpg"));
+      const after = renderOnce(stub, slot.component, { node: { data: { pins: [{ tag: "h1", selector: "body h1", comment: "colei isto", screenshotPath: null, pastedShotPath: "1700000000-pasted.jpg" }], pageTitle: "Demo", sections: [] } } });
+      const imgs = findElements(after.tree, (element) => element.props?.className === "lr-node-img");
+      harness.check("client: the card fetches and renders the pasted image under the pin",
+        fetchCall !== undefined && fetchCall.headers["x-dsh-redline-secret"] === "a".repeat(64) && imgs.length === 1 && imgs[0]?.props?.src === "blob:stub-url",
+        JSON.stringify({ fetch: fetchCall?.url, imgs: imgs.length }));
+    } else harness.check("client: the card fetches and renders the pasted image under the pin", false, "chat node slot missing");
   }
 
   harness.section("client: the pending card exports the report");
