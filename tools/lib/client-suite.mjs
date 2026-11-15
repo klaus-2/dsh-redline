@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import { collectCallArguments, createMountModel, createReactStub, evaluateExpression, evaluateObjectLiteral, extractArrowConst, extractFunction, extractObjectLiteral, fakeClientCtx, findElements, flush, jsonResponse, loadClientModule, makeLocalStorage, renderOnce, runCleanups, storageShim, waitFor } from "./harness.mjs";
+import { collectCallArguments, createMountModel, createReactStub, evaluateExpression, evaluateObjectLiteral, extractArrowConst, extractFunction, extractObjectLiteral, fakeClientCtx, findByText, findElements, flush, jsonResponse, loadClientModule, makeLocalStorage, renderOnce, runCleanups, storageShim, waitFor } from "./harness.mjs";
 
 // The bridge relay runs in the page, not in the app: it is loaded in its own
 // sandbox so the suite can drive both transports without a browser.
@@ -3093,6 +3093,137 @@ export async function runClientSuite(harness, { pluginDir }) {
       const reason = findElements(after.tree, (element) => typeof element.props?.children === "string" && element.props.children.includes("did not start"));
       harness.check("the row says why the copy did not start", reason.length > 0, JSON.stringify(after.tree).slice(0, 200));
     }
+  }
+
+  harness.section("client: the chat card is a conversation node");
+  {
+    const clientSource = client;
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const fetchCalls = [];
+    const registeredDefinitions = [];
+    const documentStub = {
+      createElement(tag) {
+        const node = { tag, href: "", download: "", click: () => {}, style: {}, setAttribute() {} };
+        return node;
+      },
+      documentElement: {},
+      head: { appendChild() {} },
+      body: { appendChild() {} },
+      readyState: "complete",
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener() {},
+      removeEventListener() {}
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      document: documentStub,
+      fetch: async (url, options) => {
+        const target = String(url);
+        fetchCalls.push({ url: target, headers: options?.headers ?? {} });
+        if (target === "/api/dsh-redline.secret") return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.endsWith("/.lr/settings")) return jsonResponse({ ok: true, settings: { lang: "en", keys: { comment: "x", adjust: "y" }, screenshot: false, cropPad: 96 }, version: "1.0.23" });
+        if (target.includes("/.lr/pending")) return jsonResponse({ ok: true, count: 0 });
+        return jsonResponse({});
+      }
+    });
+    const uiConversation = {
+      events: {
+        register(definition) {
+          registeredDefinitions.push(definition);
+          return () => {};
+        }
+      }
+    };
+    const clientApi = fakeClientCtx({ uiConversation });
+    module.apply(clientApi.ctx);
+    clientApi.resolve();
+    await flush(4);
+
+    const injectedNames = clientApi.injected.map((entry) => entry.name);
+    harness.check("the client injects the conversation node slot", injectedNames.includes("conversation.chat.node"), JSON.stringify(injectedNames));
+
+    harness.check("the client declares the conversation service",
+      Array.isArray(module.inject) && module.inject.includes("uiConversation") && module.inject.includes("slots"),
+      JSON.stringify(module.inject));
+
+    const definition = registeredDefinitions[0];
+    harness.check("the client registers one chat node definition", registeredDefinitions.length === 1 && definition !== undefined, `count=${registeredDefinitions.length}`);
+    if (definition !== undefined) {
+      const builtinKinds = ["user", "steering", "context", "command", "compaction", "turn-error", "turn-max-tokens", "unknown", "assistant-step", "tool-call", "manual-compaction", "model-retry", "turn-tail", "system-prompt", "turn-process", "turn-trigger", "input-message", "developer-message"];
+      harness.check("the definition claims the Redline event",
+        definition.kind === "dsh-redline-annotations" && definition.target === "chat"
+        && !builtinKinds.includes(definition.kind)
+        && definition.match({ type: "user/message", surfaceOp: "append", data: { id: "m1", seq: 7, source: { kind: "dsh-redline" } } })?.exclusive === true
+        && definition.match({ type: "user/message", surfaceOp: "append", data: { id: "m1", seq: 7, source: { kind: "user" } } }) === null,
+        JSON.stringify({ kind: definition.kind, target: definition.target }));
+      harness.check("the definition ignores messages that are not Redline annotations",
+        definition.match({ type: "user/message", surfaceOp: "append", data: { id: "m1", source: { kind: "user" } } }) === null
+        && definition.match({ type: "assistant/message", data: { message: { id: "a1", source: { kind: "model" }, content: [] } } }) === null);
+      harness.check("the definition ignores a message that did not append",
+        definition.match({ type: "user/message", surfaceOp: "replace", data: { id: "m2", source: { kind: "dsh-redline" } } }) === null
+        && definition.match({ type: "user/message", data: { id: "m3", source: { kind: "dsh-redline" } } }) === null);
+      harness.check("the definition reads surfaceOp from the event, not from data",
+        definition.match({ type: "user/message", data: { id: "m4", source: { kind: "dsh-redline" }, surfaceOp: "append" } }) === null
+        && definition.match({ type: "user/message", surfaceOp: "append", data: { id: "m4", source: { kind: "dsh-redline" } } }) !== null);
+      harness.check("the definition builds a view node for the matched event", (() => {
+        const event = { type: "user/message", surfaceOp: "append", seq: 7, data: { id: "m1", source: { kind: "dsh-redline", form: "snapshot", pageTitle: "Demo", pins: [{ tag: "h1", selector: "body h1", comment: "make it bigger", screenshotPath: "1700000000-abcd1234.png" }] } } };
+        const match = { event, role: "start", location: { kind: "unresolved" } };
+        const context = { key: "test-key", kind: definition.kind, id: "m1", matches: [match], start: match, state: undefined, current: new Map() };
+        const state = definition.start(context, match, { previous: () => undefined });
+        context.state = state;
+        definition.update(context, match);
+        const node = definition.buildViewNode(context);
+        return node !== null && node !== undefined
+          && node.kind === definition.kind && node.target === "chat" && node.anchorSeq === 7
+          && node.visibility === "visible" && typeof node.key === "string" && node.key !== ""
+          && Array.isArray(node.data.pins) && node.data.pins[0]?.comment === "make it bigger";
+      })(), "buildViewNode did not produce the expected node");
+    }
+
+    const slotEntry = clientApi.injected.find((entry) => entry.name === "conversation.chat.node");
+    const registeredSlot = clientApi.slots.find((slot) => slot.spec.name === "conversation.chat.node" && slot.spec.key === "dsh-redline-annotations");
+    harness.check("the conversation node slot registers with the definition kind", slotEntry !== undefined && registeredSlot !== undefined);
+
+    if (registeredSlot !== undefined) {
+      const rendered = renderOnce(stub, registeredSlot.component, { node: { data: { pins: [{ tag: "h1", selector: "body h1", comment: "make it bigger", screenshotPath: null }], pageTitle: "Demo", sections: [] } } });
+      const commentHit = findByText(rendered.tree, "make it bigger");
+      const tagHit = findByText(rendered.tree, "h1");
+      const titleHit = findByText(rendered.tree, "Demo");
+      harness.check("the card renders the pins it was given", commentHit.length === 1 && tagHit.length >= 1 && titleHit.length >= 1, JSON.stringify({ comment: commentHit.length, tag: tagHit.length, title: titleHit.length }));
+
+      const htmlProp = findElements(rendered.tree, (element) => element.props?.dangerouslySetInnerHTML !== undefined && element.props.className !== "lr-lead" && element.props.className !== "lr-node-head-icon");
+      harness.check("the card never renders page text as markup", htmlProp.length === 0, JSON.stringify(htmlProp.map((element) => element.props.className)));
+      const xss = renderOnce(stub, registeredSlot.component, { node: { data: { pins: [{ tag: "h1", selector: "body h1", comment: '<img src=x onerror=alert(1)>', screenshotPath: null }], pageTitle: "Demo", sections: [] } } });
+      const literal = findByText(xss.tree, '<img src=x onerror=alert(1)>');
+      harness.check("the card renders an injected comment as literal text", literal.length === 1, JSON.stringify(literal.length));
+      const withSections = renderOnce(stub, registeredSlot.component, { node: { data: { pins: [], pageTitle: "Demo", sections: [{ name: "Overview", text: "Page URL: https://example.test" }, { name: "User Comment 1", text: "make it bigger" }] } } });
+      const sectionText = findByText(withSections.tree, "Page URL: https://example.test");
+      const sectionName = findByText(withSections.tree, "Overview");
+      harness.check("the card renders the sections disclosure", sectionText.length === 1 && sectionName.length >= 1, JSON.stringify({ text: sectionText.length, name: sectionName.length }));
+      const headHits = findByText(rendered.tree, "Browser comments (Redline)");
+      harness.check("the card title appears once", headHits.length === 1, JSON.stringify(headHits.length));
+      const cardSpan = /function RedlineAnnotationsCard[\s\S]*?^    function startStatusArming/m.exec(clientSource)?.[0] ?? "";
+      harness.check("the source keeps dangerouslySetInnerHTML on the icon only", (clientSource.match(/dangerouslySetInnerHTML/g) ?? []).length === 2 && (cardSpan.match(/dangerouslySetInnerHTML/g) ?? []).length === 1, `total=${(clientSource.match(/dangerouslySetInnerHTML/g) ?? []).length}, card=${(cardSpan.match(/dangerouslySetInnerHTML/g) ?? []).length}`);
+
+      fetchCalls.length = 0;
+      const withCrop = renderOnce(stub, registeredSlot.component, { node: { data: { pins: [{ tag: "h1", selector: "body h1", comment: "crop me", screenshotPath: "1700000000-abcd1234.png" }], pageTitle: "Demo", sections: [] } } });
+      for (const effect of withCrop.effects) effect();
+      await flush(4);
+      const cropCall = fetchCalls.find((call) => call.url.includes("/.lr/attachments/1700000000-abcd1234.png"));
+      harness.check("the card asks for the crop with the secret header",
+        cropCall !== undefined && cropCall.headers["x-dsh-redline-secret"] === "a".repeat(64),
+        JSON.stringify(fetchCalls));
+    }
+
+    const removedSymbols = ["data-chat-anchor-key", "dsh-recall-stack", "lr-card-map-v1", "applyCardsToDom", "buildCardElement", "lr-attached", "cardStore"];
+    const stillThere = removedSymbols.filter((symbol) => clientSource.includes(symbol));
+    harness.check("the DOM surgery is gone", stillThere.length === 0, stillThere.join(", "));
+    harness.check("the client no longer arms a card from the status poll", !clientSource.includes("claimByMessageId") && !clientSource.includes("lastDelivered") && clientSource.includes("fields=cmd") && !clientSource.includes("fields=cmd,lastDelivered"));
   }
 
   harness.section("client: the pending card exports the report");

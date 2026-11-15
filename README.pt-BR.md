@@ -23,7 +23,7 @@ Descrever um problema de UI em palavras perde o ponteiro. "O botão da seção d
 1. Em qualquer página aberta no navegador do harness, pressione **C** (comentário) ou **V** (ajuste).
 2. Clique em um elemento. Um popover abre ancorado nele.
 3. Escreva o comentário ou abra o inspetor e ajuste texto, cores, tipografia, tamanho, espaçamento, bordas e efeitos — cada mudança faz preview ao vivo na página.
-4. Confirme. O card acima do composer coleta seus pins. Envie e as anotações chegam ao agente como snapshot junto da sua mensagem — renderizadas nativamente no chat.
+4. Confirme. O card acima do composer coleta seus pins. Envie e as anotações chegam ao agente como snapshot junto da sua mensagem — renderizadas como a linha de chat do Redline.
 5. Pressione **D** para o canvas livre de anotações: pincel, linhas, setas, retângulos, elipses, marcadores de etapas numeradas e texto — envie a página inteira ao chat com cada desenho composto na captura.
 
 ## O que o agente recebe
@@ -52,7 +52,7 @@ Para cada pin, um bloco em um único snapshot:
 - Auditoria de acessibilidade por elemento no popover do pin: contraste do texto, nome acessível, alt da imagem, presença de papel e alvo de 24×24
 - Exportação de relatório de pendências: baixe as anotações pendentes como Markdown ou JSON no card de pendentes (protegido por secret, escopo somente pendentes)
 - Screenshots recortadas por pin (não a viewport inteira)
-- Anotações anexam à próxima mensagem da sessão que você está visualizando, renderizadas como card nativo no chat
+- Anotações anexam à próxima mensagem da sessão que você está visualizando, renderizadas como uma única linha de chat do Redline que reivindica a mensagem (a divulgação genérica de contexto é substituída, não duplicada), e a linha sobrevive a um reload da sessão
 - Reconciliação: remover um pin no card o remove também do overlay da página
 - Interface em English / Português (Brasil) / 简体中文, escolhida pelo idioma do navegador
 
@@ -110,7 +110,7 @@ As três teclas de modo são a única configuração: abra as configurações do
 
 ## Como funciona
 
-A face de cliente injeta o overlay em toda página que o navegador do harness renderiza. O overlay envia as anotações pela ponte de mensagens, e o servidor loopback guarda um snapshot pendente chaveado pela sessão que você está visualizando. Quando você envia uma mensagem, o host anexa o snapshot à vez do agente como uma mensagem de contexto de propriedade do produtor, com metadados de seção, e o chat o renderiza como um card retrátil.
+A face de cliente injeta o overlay em toda página que o navegador do harness renderiza. O overlay envia as anotações pela ponte de mensagens, e o servidor loopback guarda um snapshot pendente chaveado pela sessão que você está visualizando. Quando você envia uma mensagem, o host anexa o snapshot à vez do agente como uma mensagem de contexto de propriedade do produtor, cujo `source` carrega os pins estruturados, e o chat a renderiza pela API de conversation nodes como uma única linha do Redline — com as seções retráteis incluídas — no lugar da divulgação genérica de contexto.
 
 ## Desenvolvimento
 

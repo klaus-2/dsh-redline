@@ -175,6 +175,7 @@ export function fakeClientCtx(overrides = {}) {
       if (name === "remote") return undefined;
       return services[name];
     },
+    ...services,
     slots: {
       inject(name, fn) {
         injected.push({ name, fn });

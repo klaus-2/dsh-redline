@@ -23,7 +23,7 @@ Describing a UI problem in words loses the pointer. "The button in the middle se
 1. Press **C** (comment) or **V** (adjust) in any page opened in the harness browser.
 2. Click an element. A popover opens anchored to it.
 3. Write the comment, or open the inspector and adjust text, colors, typography, size, spacing, borders and effects — every change previews live on the page.
-4. Confirm. The card above the composer collects your pins. Send, and the annotations reach the agent as a snapshot alongside your message — rendered natively in the chat.
+4. Confirm. The card above the composer collects your pins. Send, and the annotations reach the agent as a snapshot alongside your message — rendered as the Redline chat row.
 5. Press **D** for the free annotation canvas: brush, lines, arrows, rectangles, ellipses, numbered step markers and text — send the full page to the chat with every drawing composited into the screenshot.
 
 ## What the agent receives
@@ -52,7 +52,7 @@ For each pin, one block in a single snapshot:
 - Per-element accessibility audit in the pin popover: text contrast, accessible name, image alt, role presence and 24×24 target size
 - Pending report export: download the pending annotations as Markdown or JSON from the pending card (secret-gated, pending-only scope)
 - Cropped screenshots per pin (not the whole viewport)
-- Annotations attach to the next message of the session you are viewing, rendered as a native chat card
+- Annotations attach to the next message of the session you are viewing, rendered as one Redline chat row that claims the message (the generic context disclosure is replaced, not duplicated), and the row survives a session reload
 - Reconciliation: removing a pin from the card removes it from the page overlay too
 - English, Português (Brasil) and 简体中文 in the overlay UI, chosen from the browser locale
 
@@ -110,7 +110,7 @@ two modes cannot share one shortcut.
 
 ## How it works
 
-The client face injects the overlay into every page the harness browser renders. The overlay sends the annotations through the message bridge, and the loopback server stores a pending snapshot keyed by the session you are viewing. When you send a message, the host attaches the snapshot to the agent's turn as a producer-owned context message with section metadata, and the chat renders it as a collapsible card.
+The client face injects the overlay into every page the harness browser renders. The overlay sends the annotations through the message bridge, and the loopback server stores a pending snapshot keyed by the session you are viewing. When you send a message, the host attaches the snapshot to the agent's turn as a producer-owned context message whose `source` carries the structured pins, and the chat renders it through the conversation-node API as one Redline row — collapsible sections included — instead of the generic context disclosure.
 
 ## Develop
 

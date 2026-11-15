@@ -433,6 +433,10 @@ export async function runHostSuite(harness, { pluginDir }) {
       }
       const traversal = await fetch(`${base}/.lr/attachments/..%2F..%2Fsettings.yaml`, { headers: auth });
       harness.check("a traversal attempt is blocked", traversal.status === 404);
+      const traversalDots = await fetch(`${base}/.lr/attachments/..`, { headers: auth });
+      harness.check("a bare dot-dot name is blocked", traversalDots.status === 404);
+      const traversalManyDots = await fetch(`${base}/.lr/attachments/...`, { headers: auth });
+      harness.check("a bare dot-dot-dot name is blocked", traversalManyDots.status === 404);
 
       const removed = await (await fetch(`${base}/.lr/pending/remove-pin`, { method: "POST", headers: json(), body: JSON.stringify({ pinId: "2" }) })).json();
       harness.check("a pin can be removed", removed.removed === true && removed.count === 1, JSON.stringify(removed));
@@ -948,6 +952,25 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.check("the pending snapshot reaches the agent message", annotation !== undefined);
       harness.includes("the annotation carries the comment", annotation?.content?.[0]?.text ?? "", "mude o título");
       harness.check("the annotation carries the sections", Array.isArray(annotation?.source?.sections) && annotation.source.sections.length > 1);
+      harness.check("the annotation carries the structured pins",
+        Array.isArray(annotation?.source?.pins) && annotation.source.pins.length === 1
+        && ["tag", "selector", "comment", "screenshotPath"].every((key) => key in annotation.source.pins[0]),
+        JSON.stringify(annotation?.source?.pins ?? null));
+      harness.check("the annotation source is the same shape the command path sends",
+        annotation?.source?.pageTitle === "Alvo" && typeof annotation?.source?.snapshotId === "string",
+        JSON.stringify({ pageTitle: annotation?.source?.pageTitle, snapshotId: annotation?.source?.snapshotId }));
+
+      await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "clamp", tag: "h1", selector: "body h1", text: "Alvo", comment: `break\u0000${"y".repeat(9000)}`, changes: [] }], screenshot: null }) });
+      const clampedDecision = await preStep(
+        { agent: { id: "session-1" }, messages: [{ id: "m1", source: { kind: "user", rpcId: "rpc-1" } }], signal: undefined },
+        async () => ({ kind: "enter", messages: [{ id: "m1", source: { kind: "user" } }] })
+      );
+      const clamped = (clampedDecision.messages ?? []).find((message) => message.source?.kind === "dsh-redline");
+      harness.check("the annotation pins are clamped",
+        typeof clamped?.source?.pins?.[0]?.comment === "string" && clamped.source.pins[0].comment.length <= 4000 && !clamped.source.pins[0].comment.includes("\u0000"),
+        JSON.stringify({ length: clamped?.source?.pins?.[0]?.comment?.length }));
+      harness.check("the annotation source survives a JSON round trip",
+        clamped !== undefined && JSON.stringify(JSON.parse(JSON.stringify(clamped.source))) === JSON.stringify(clamped.source));
 
       const status = await (await fetch(`${base}/.lr/status`, { headers: auth })).json();
       harness.check("the status reports the delivery", status.lastDelivered !== null && status.lastDelivered.sessionId === "session-1");
@@ -961,6 +984,11 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.check("the command sends the annotations", sent.kind === "success" && followups.length === 1, JSON.stringify(sent));
       harness.includes("the command carries the comment", followups[0]?.content?.[0]?.text ?? "", "outro comentário");
       harness.check("the command carries the extra text", (followups[0]?.content ?? []).some((part) => part.text === "extra"));
+      harness.check("the command message carries the same structured payload",
+        Array.isArray(followups[0]?.source?.pins) && Array.isArray(followups[0]?.source?.sections)
+        && followups[0].source.pins.length === 1 && followups[0].source.sections.length > 1
+        && followups[0].source.pageTitle === "Alvo",
+        JSON.stringify({ pins: followups[0]?.source?.pins, sections: followups[0]?.source?.sections?.length, pageTitle: followups[0]?.source?.pageTitle }));
 
       const attachmentDir = path.join(home, ".dsh", "attachments", "live-review");
       const shotData = Buffer.from(SHOT.split(",")[1], "base64");
