@@ -45,6 +45,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   element is an `svg`: the tag label was being parsed as icon markup, creating
   an empty default-sized svg inside the chip. Strings are now parsed as icons
   only when they come from the icon table verbatim.
+- Popovers (the adjust panel and the pin popover) paint above the pin markers
+  again: the pin layer out-ranked them, so markers floated over the panel
+  wherever the page had pins near it.
+- The inspector footer's Cancel button keeps readable text in the dark theme:
+  the label used the surface token as its color on the surface background.
+- The inspector's token suggestions wrap onto their own line below the color
+  control instead of squeezing it off the panel edge.
 
 ## [1.3.0] - 2026-11-15
 
