@@ -6,7 +6,7 @@ English · [Português (Brasil)](README.pt-BR.md) · [简体中文](README.zh-CN
 
 **Point at any element on the page. Your agent fixes the code.**
 
-`dsh-redline` is a [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that puts visual review inside the harness browser: select an element, leave a comment, adjust styles live, and confirm — the annotations travel to your agent as structured context attached to your next message, with a cropped screenshot of exactly the region you marked.
+`dsh-redline` is a visual feedback and design review plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — think Figma comments / Vercel Toolbar, but the feedback goes straight to your coding agent. Select an element, leave a comment, adjust styles live, and confirm — the annotations travel to your agent as structured context attached to your next message, with a cropped screenshot of exactly the region you marked.
 
 `dsh plugin --profile web add dsh-redline`
 

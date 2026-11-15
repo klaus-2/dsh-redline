@@ -6,7 +6,7 @@
 
 **指向页面上的任意元素，你的智能体直接改代码。**
 
-`dsh-redline` 是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的插件，把可视化评审放进 harness 浏览器：选中元素、写批注、实时调整样式并确认——批注会作为结构化上下文附加到你的下一条消息，并附带精确裁剪的截图。
+`dsh-redline` 是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的可视化反馈与设计评审插件——类似 Figma 批注 / Vercel Toolbar，但反馈直接发送给你的编码智能体。选中元素、写批注、实时调整样式并确认——批注会作为结构化上下文附加到你的下一条消息，并附带精确裁剪的截图。
 
 ```
 dsh plugin --profile web add dsh-redline

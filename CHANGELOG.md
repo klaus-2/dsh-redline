@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-15
+
+### Changed
+
+- **Package metadata rebuilt for plugin-directory search.** The npm description now
+  leads with the product terms ("visual feedback & design review for DeepSeek
+  Harness") instead of the old element-level phrasing; keywords expand from 8 to 20
+  covering the queries plugin directories actually match on (element picker, CSS
+  inspector, screenshot, coding agent, vibe coding). The README opening paragraph
+  now names the product category up front, in all three languages.
+
 ## [1.3.0] - 2026-11-15
 
 This release moves the annotation card into the conversation. The chat renders
