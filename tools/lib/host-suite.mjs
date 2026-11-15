@@ -208,11 +208,14 @@ export async function runHostSuite(harness, { pluginDir }) {
       const control = await fetch(`${base}/.lr/settings`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ lang: "en" }) });
       harness.check("the page origin does not open the control routes", control.status === 401);
 
-      const submitted = await post("annotations.submit", { pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "b1", tag: "h1", selector: "#t", comment: "pela bridge" }] }, { origin: base });
+      const submitted = await post("annotations.submit", { pageUrl: targetUrl, pageTitle: "Alvo", screenshot: SHOT, pins: [{ id: "b1", tag: "h1", selector: "#t", comment: "pela bridge" }] }, { origin: base });
       const submittedBody = await submitted.json();
       harness.check("the bridge stores the annotations", submitted.status === 200 && submittedBody.ok === true && submittedBody.count === 1);
       const pending = await (await fetch(`${base}/.lr/pending`, { headers: auth })).json();
       harness.check("the bridge snapshot waits for the next message", pending.count === 1 && pending.pins[0].comment === "pela bridge", JSON.stringify(pending).slice(0, 140));
+      const bridgeShot = (globalPending.snapshot?.screenshotPath ?? "");
+      const shotDir = path.join(home, ".dsh", "attachments", "live-review");
+      harness.check("the bridge stores the page screenshot", typeof bridgeShot === "string" && bridgeShot.startsWith(shotDir + path.sep) && (bridgeShot.endsWith(".png") || bridgeShot.endsWith(".jpg")), JSON.stringify(bridgeShot));
       const emptied = await post("annotations.submit", { pageUrl: targetUrl, pageTitle: "Alvo", pins: [] }, { origin: base });
       const emptiedBody = await emptied.json();
       const stillPending = await (await fetch(`${base}/.lr/pending`, { headers: auth })).json();

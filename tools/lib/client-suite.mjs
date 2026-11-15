@@ -3302,6 +3302,7 @@ export async function runClientSuite(harness, { pluginDir }) {
     await flush(4);
     const card = client.slots.find((slot) => slot.spec.id === "dsh-redline" && slot.spec.name === "conversation.input.dock");
     harness.check("the pending card registers in the dock", card !== undefined);
+    harness.check("the pending card receives the composer session id", typeof card?.spec?.inject === "function" && card.spec.inject("session-visible").sessionId === "session-visible", JSON.stringify(typeof card?.spec?.inject));
     if (card !== undefined) {
       const first = renderOnce(stub, card.component, {});
       for (const effect of first.effects) effect();
