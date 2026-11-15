@@ -1238,7 +1238,7 @@ export async function runClientSuite(harness, { pluginDir }) {
       const adjustPatch = { element: { style: {} } };
       const adjustBaseline = () => "10px";
       const resets = [];
-      const adjustReset = (prop) => { resets.push(prop); adjustValues.set(prop, adjustBaseline(prop)); };
+      const restoreAdjustBaseline = (prop) => { resets.push(prop); adjustValues.set(prop, adjustBaseline(prop)); };
       const previews = [];
       const previewStyle = (patch, prop, value) => previews.push({ prop, value });
       const rerenderAdjustRows = () => {};
@@ -1304,6 +1304,43 @@ export async function runClientSuite(harness, { pluginDir }) {
         JSON.stringify({ mid, after, fresh }));
     }
     {
+      const realRun = evaluateExpression(`() => {
+      let adjustUndoStack = [];
+      let adjustRedoStack = [];
+      const adjustValues = new Map([["color", "10px"]]);
+      let adjustText = "";
+      const adjustInvalid = new Set();
+      const adjustPatch = { element: { style: {} }, computedBaselines: new Map([["color", "10px"]]) };
+      const adjustBaseline = () => "10px";
+      const previews = [];
+      const previewStyle = (patch, prop, value) => previews.push({ prop, value });
+      const restored = [];
+      const restoreStyle = (patch, prop) => restored.push(prop);
+      const rerenderAdjustRows = () => {};
+      const applyAdjustText = () => {};
+      const isSafeValue = () => true;
+      let adjustTarget = null;
+      let adjustTargetSelector = "";
+      const adjustLedger = new Map();
+      ${extractFunction(overlay, "restoreAdjustBaseline")}
+      ${extractFunction(overlay, "adjustReset")}
+      ${extractFunction(overlay, "adjustUpdateProperty")}
+      ${extractFunction(overlay, "applyAdjustEntry")}
+      ${extractFunction(overlay, "adjustUndo")}
+      ${extractFunction(overlay, "adjustRedo")}
+      return { adjustUpdateProperty, adjustUndo, adjustRedo, stacks: () => ({ undo: [...adjustUndoStack], redo: [...adjustRedoStack], value: adjustValues.get("color") }) };
+    }`, "adjust-undo-baseline-redo")();
+      realRun.adjustUpdateProperty("color", "12px");
+      realRun.adjustUndo();
+      const afterUndo = realRun.stacks();
+      realRun.adjustRedo();
+      const afterRedo = realRun.stacks();
+      harness.check("overlay: redo survives an undo that lands on the baseline",
+        JSON.stringify(afterUndo.redo) === JSON.stringify([{ kind: "prop", prop: "color", value: "12px" }]) &&
+        afterRedo.value === "12px" && afterRedo.redo.length === 0,
+        JSON.stringify({ afterUndo, afterRedo }));
+    }
+    {
       const guardAt = overlay.indexOf('if (tag === "INPUT" || tag === "TEXTAREA" || from?.isContentEditable === true) return;');
       const undoAt = guardAt === -1 ? -1 : overlay.indexOf("adjustUndo();", guardAt);
       const keydownAt = guardAt === -1 ? -1 : overlay.lastIndexOf('"keydown"', guardAt);
@@ -1330,6 +1367,7 @@ export async function runClientSuite(harness, { pluginDir }) {
       const previews = [];
       const previewStyle = () => {};
       const rerenderAdjustRows = () => {};
+      ${extractFunction(overlay, "restoreAdjustBaseline")}
       ${resetSource}
       adjustReset("color");
       return { redo: adjustRedoStack.length, value: adjustValues.get("color"), invalid: adjustInvalid.size, restored };
