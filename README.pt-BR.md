@@ -51,6 +51,7 @@ Para cada pin, um bloco em um único snapshot:
 - Temas do overlay: escuro (padrão), claro e uma variante de alto contraste, escolhidos nas configurações do plugin e persistidos
 - Desfazer/refazer no inspetor: Ctrl+Z / Ctrl+Shift+Z (ou os botões do painel) retrocedem e avançam os ajustes e o texto não confirmados enquanto o painel está aberto
 - Clicar em um pin no card do chat rola a página até o elemento e o destaca por alguns instantes
+- Cole uma imagem no composer do comentário: ela é reduzida (máx. 1600px, JPEG), mostrada como um chip removível e entregue junto do pin para o agente ler
 - Screenshots antes/depois por pin ajustado: o recorte "depois" é capturado ao vivo e, então, a página é restaurada para capturar o recorte "antes" do mesmo enquadramento
 - Comentários em grupo: o modo de grupo da toolbar reúne N elementos e publica um comentário copiado para cada pin do grupo (escopo da página — grupos não atravessam páginas)
 - Predefinições de preview responsivo: restringe a página a 375/768/1280 px ou volta à largura total; pins criados sob uma predefinição registram a largura (nota: unidades `100vw` e navbars `position: fixed` não respeitam a restrição)

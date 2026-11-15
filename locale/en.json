@@ -13,6 +13,8 @@
   "sendTitle": "Save annotation (Enter)",
   "shotOn": "Screenshot attached",
   "composerClose": "Close and cancel the comment",
+  "pasteTooLarge": "Image too large (max 4 MB)",
+  "pasteRemove": "Remove attached image",
   "attachesTo": "attaches to the session chat",
   "savedHint": "Saved — use Send on the card above the composer to dispatch",
   "saveFailed": "Failed to save: ",

@@ -13,6 +13,8 @@
   "sendTitle": "Guardar anotação (Enter)",
   "shotOn": "Screenshot anexada",
   "composerClose": "Fechar e cancelar o comentário",
+  "pasteTooLarge": "Imagem grande demais (máx. 4 MB)",
+  "pasteRemove": "Remover imagem anexada",
   "attachesTo": "anexa ao chat da sessão",
   "savedHint": "Guardada — use Enviar no card acima do composer para despachar",
   "saveFailed": "Falha ao guardar: ",

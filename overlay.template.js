@@ -72,6 +72,8 @@
       "sendTitle": "Save annotation (Enter)",
       "shotOn": "Screenshot attached",
       "composerClose": "Close and cancel the comment",
+      "pasteTooLarge": "Image too large (max 4 MB)",
+      "pasteRemove": "Remove attached image",
       "panelDrag": "Drag to move · double-click to reset",
       "attachesTo": "attaches to the session chat",
       "savedHint": "Saved — use Send on the card above the composer to dispatch",
@@ -248,6 +250,8 @@
       "sendTitle": "Guardar anotação (Enter)",
       "shotOn": "Screenshot anexada",
       "composerClose": "Fechar e cancelar o comentário",
+      "pasteTooLarge": "Imagem grande demais (máx. 4 MB)",
+      "pasteRemove": "Remover imagem anexada",
       "panelDrag": "Arraste para mover · duplo clique para voltar ao padrão",
       "attachesTo": "anexa ao chat da sessão",
       "savedHint": "Guardada — use Enviar no card acima do composer para despachar",
@@ -424,6 +428,8 @@
       "sendTitle": "保存标注 (Enter)",
       "shotOn": "已附加截图",
       "composerClose": "关闭并取消评论",
+      "pasteTooLarge": "图片过大（上限 4 MB）",
+      "pasteRemove": "移除附加图片",
       "panelDrag": "拖动移动 · 双击恢复默认位置",
       "attachesTo": "附加到会话聊天",
       "savedHint": "已保存 — 使用 composer 上方卡片的发送按钮派发",
@@ -651,6 +657,9 @@
   let mode = null;
   let hovered = null;
   let draft = null;
+  let pastedShot = null;
+  let pasteChipNode = null;
+  let pasteThumbNode = null;
   let openPinId = null;
   let screenshotOnSend = SETTINGS.screenshot === false ? false : true;
   let html2canvasReady = null;
@@ -1772,6 +1781,7 @@
       openPinId = null;
       pinPanelNode?.remove();
       pinPanelNode = null;
+      pastedShot = null;
       draft = null;
       renderDraft();
       if (groupComposerNode !== null) setGroupMode(false);
@@ -2261,6 +2271,37 @@
   let composerNode = null;
   let placeComposerDefault = null;
 
+  async function decodePastedImage(file) {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+    bitmap.close?.();
+    return dataUrl;
+  }
+
+  function acceptPastedImage(dataUrl) {
+    if (draft === null) return false;
+    if (typeof dataUrl !== "string" || dataUrl === "") return false;
+    if (dataUrl.length > 4 * 1024 * 1024) {
+      toast(t("pasteTooLarge"), 3200);
+      return false;
+    }
+    pastedShot = dataUrl;
+    if (pasteThumbNode !== null) pasteThumbNode.src = dataUrl;
+    if (pasteChipNode !== null) pasteChipNode.style.display = "";
+    return true;
+  }
+
+  function clearPastedShot() {
+    pastedShot = null;
+    if (pasteThumbNode !== null) pasteThumbNode.removeAttribute("src");
+    if (pasteChipNode !== null) pasteChipNode.style.display = "none";
+  }
+
   function renderDraft() {
     draftNode?.remove();
     composerNode?.remove();
@@ -2292,13 +2333,36 @@
       screenshotOnSend = !screenshotOnSend;
       shotToggle.classList.toggle("toggle-on", screenshotOnSend);
     });
+    pasteChipNode = el("div", { class: "paste-chip" });
+    pasteThumbNode = el("img", { class: "paste-thumb", alt: "" });
+    pasteChipNode.append(pasteThumbNode, el("button", { class: "lr-close paste-remove", title: t("pasteRemove"), type: "button", onclick: () => clearPastedShot() }, "✕"));
+    pasteChipNode.style.display = "none";
     submit.addEventListener("click", () => submitDraft());
+    textarea.addEventListener("paste", (e) => {
+      const items = e.clipboardData?.items;
+      if (items === undefined || items === null) return;
+      let file = null;
+      for (const item of items) {
+        if (typeof item?.type === "string" && item.type.startsWith("image/")) {
+          file = item.getAsFile();
+          break;
+        }
+      }
+      if (file === null) return;
+      e.preventDefault();
+      void (async () => {
+        try {
+          acceptPastedImage(await decodePastedImage(file));
+        } catch {}
+      })();
+    });
     textarea.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         submitDraft();
       }
       if (e.key === "Escape") {
+        pastedShot = null;
         draft = null;
         renderDraft();
       }
@@ -2309,9 +2373,9 @@
         { class: "composer-target" },
         el("span", { class: "chip" }, ICONS.code, `${draft.label}`),
         el("span", { class: "composer-provider" }, el("span", { class: "composer-provider-label" }, t("attachesTo"))),
-        el("button", { class: "lr-close", title: t("composerClose"), onclick: () => { draft = null; renderDraft(); } }, "✕")
+        el("button", { class: "lr-close", title: t("composerClose"), onclick: () => { pastedShot = null; draft = null; renderDraft(); } }, "✕")
       ),
-      el("div", { class: "prompt-input" }, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }, shotToggle), submit))
+      el("div", { class: "prompt-input" }, pasteChipNode, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }, shotToggle), submit))
     );
     fixedLayer.append(composerNode);
     applyPanelPosition(composerNode, "composer");
@@ -2359,9 +2423,11 @@
       at: Date.now()
     };
     if (viewportPresetWidth !== null) pin.viewportWidth = viewportPresetWidth;
+    if (pastedShot !== null) pin.pastedShot = pastedShot;
     pins.push(pin);
     savePins();
     draft = null;
+    pastedShot = null;
     renderDraft();
     renderPins();
     await postSnapshot();
@@ -2386,6 +2452,7 @@
         rect: p.rect,
         shot: p.shot ?? null,
         afterShot: p.afterShot ?? null,
+        pastedShot: p.pastedShot ?? null,
         groupId: p.groupId ?? null,
         viewportWidth: p.viewportWidth ?? null
       }))

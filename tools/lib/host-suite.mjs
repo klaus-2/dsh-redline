@@ -549,6 +549,12 @@ export async function runHostSuite(harness, { pluginDir }) {
         bothShots.text.includes("After screenshot (cropped around the target): C:\\shots\\after.jpg"),
         JSON.stringify(bothShots.text).slice(0, 200));
 
+      const pastedContext = formatContext({ pageUrl: "http://127.0.0.1:9/", pageTitle: "Alvo", pins: [{ id: "pasted", tag: "h1", selector: "body h1", comment: "c", screenshotPath: "C:\\shots\\before.jpg", pastedShotPath: "C:\\shots\\pasted.jpg" }], screenshotPath: null });
+      harness.check("host: formatContext renders the user-provided image line for pasted shots",
+        pastedContext.text.includes("User-provided image: C:\\shots\\pasted.jpg — read this image file for visual context.") &&
+        pastedContext.text.includes("Screenshot (cropped around the target): C:\\shots\\before.jpg"),
+        JSON.stringify(pastedContext.text).slice(0, 240));
+
       const cssPin = formatContext({ pageUrl: "http://127.0.0.1:9/", pageTitle: "Alvo", pins: [{ id: "css", tag: "h1", selector: "body h1", comment: "c", changes: [{ prop: "color", before: "#000", after: "red" }, { prop: "border-radius", before: "0", after: "4px" }] }], screenshotPath: null });
       const cssBacktick = formatContext({ pageUrl: "http://127.0.0.1:9/", pageTitle: "Alvo", pins: [{ id: "css2", tag: "h1", selector: "a`b", comment: "c", changes: [{ prop: "color", before: "#000", after: "red" }] }], screenshotPath: null });
       harness.check("host: formatContext renders requested CSS as an indented code block without backtick fences",
@@ -651,6 +657,20 @@ export async function runHostSuite(harness, { pluginDir }) {
         invalidPins.length === 2 &&
         invalidPins.every((pin) => pin.afterShot === undefined && pin.afterShotPath === undefined),
         JSON.stringify(invalidPins.map((pin) => ({ id: pin.id, afterShot: pin.afterShot, afterShotPath: pin.afterShotPath }))));
+
+      await (await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [
+        { id: "proj-4", tag: "h1", selector: "#t", comment: "imagem colada", pastedShot: SHOT },
+        { id: "proj-5", tag: "h1", selector: "#t", comment: "colado invalido", pastedShot: "not-a-dataurl" }
+      ], screenshot: null }) })).json();
+      const pastedPins = pendingBySession.get("session-contract")?.snapshot?.pins ?? [];
+      const savedPasted = pastedPins.find((pin) => pin.id === "proj-4");
+      const invalidPasted = pastedPins.find((pin) => pin.id === "proj-5");
+      harness.check("host: storeAnnotations saves the pasted image and records pastedShotPath",
+        savedPasted !== undefined && savedPasted.pastedShot === undefined && typeof savedPasted.pastedShotPath === "string" && savedPasted.pastedShotPath.startsWith(attachmentDir + path.sep),
+        JSON.stringify({ savedPasted }));
+      harness.check("host: storeAnnotations deletes a pastedShot that is not a savable data URL",
+        invalidPasted !== undefined && invalidPasted.pastedShot === undefined && invalidPasted.pastedShotPath === undefined,
+        JSON.stringify({ invalidPasted }));
 
       await fetch(`${base}/.lr/pending/clear`, { method: "POST", headers: json(), body: JSON.stringify({ sessionId: "session-contract" }) });
     }

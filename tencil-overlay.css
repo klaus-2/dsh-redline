@@ -421,6 +421,9 @@ kbd {
 .prompt-input textarea:disabled { opacity: 0.6; }
 .prompt-actions { display: flex; align-items: center; justify-content: space-between; }
 .prompt-extras { display: flex; gap: 4px; }
+.paste-chip { display: flex; align-items: center; gap: 6px; padding: 8px 8px 0; }
+.paste-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); flex: none; }
+.paste-remove { flex: none; }
 .send {
   width: 26px; height: 26px; border-radius: 999px;
   display: grid; place-items: center;

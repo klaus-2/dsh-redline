@@ -51,6 +51,7 @@ For each pin, one block in a single snapshot:
 - Overlay themes: dark (default), light and a high-contrast variant, chosen in the plugin settings and persisted
 - Inspector undo/redo: Ctrl+Z / Ctrl+Shift+Z (or the panel buttons) step the uncommitted adjustments and text back and forward while the panel is open
 - Clicking a pin in the chat card scrolls the page to its element and highlights it for a moment
+- Paste an image into the comment composer: it is downscaled (max 1600px, JPEG), shown as a removable chip, and delivered with the pin for the agent to read
 - Before/after screenshots per adjusted pin: the after crop is captured live, then the page is restored and the before crop is captured from the same frame
 - Group comments: toolbar group mode collects N elements and posts one comment copied to every member pin (page-scoped — groups cannot span pages)
 - Responsive preview presets: constrain the page to 375/768/1280 px or reset to full width; pins created under a preset record its width (note: `100vw` units and `position: fixed` navbars do not respect the constraint)

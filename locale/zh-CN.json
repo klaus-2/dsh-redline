@@ -13,6 +13,8 @@
   "sendTitle": "保存标注 (Enter)",
   "shotOn": "已附加截图",
   "composerClose": "关闭并取消评论",
+  "pasteTooLarge": "图片过大（上限 4 MB）",
+  "pasteRemove": "移除附加图片",
   "attachesTo": "附加到会话聊天",
   "savedHint": "已保存 — 使用 composer 上方卡片的发送按钮派发",
   "saveFailed": "保存失败：",

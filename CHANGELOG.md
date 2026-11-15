@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clicking a pin in the chat card locates its element on the page: the guest
   scrolls to it smoothly and the existing highlight box shows it for about two
   seconds. A pin whose element is gone does nothing.
+- Paste an image into the comment composer: the image is downscaled to at most
+  1600px (JPEG), shown as a removable preview chip, saved like the other crops,
+  rendered under the pin in the chat card, and surfaced to the agent as a
+  "User-provided image" context line. One image per comment; anything above
+  4 MB after downscale is refused with a toast.
 
 ## [1.3.0] - 2026-11-15
 

@@ -1110,6 +1110,20 @@ export async function runClientSuite(harness, { pluginDir }) {
         !("stale" in forwarded) && forwarded.stale === undefined,
         JSON.stringify(forwarded ?? captured));
     }
+    {
+      const postSource = extractFunction(overlay, "postSnapshot");
+      let captured = null;
+      const bridgeSend = async (type, payload) => { captured = payload; return { ok: true }; };
+      const pins = [{ id: "x", tag: "h1", selector: "#x", comment: "c", changes: [], status: "queued", shot: "before-data", afterShot: "after-data", pastedShot: "pasted-data", stale: true }];
+      if (postSource !== undefined) {
+        const post = evaluateExpression(`(bridgeSend, pins, PAGE_URL, document, setHint, updateToolbar, toast, t) => {\n${postSource}\nreturn postSnapshot();\n}`, "postSnapshot");
+        await post(bridgeSend, pins, "http://page/", { title: "T" }, () => {}, () => {}, () => {}, (key) => key);
+      }
+      const forwarded = captured?.pins?.[0];
+      harness.check("overlay: postSnapshot forwards pastedShot on the pin payload",
+        forwarded !== undefined && forwarded.pastedShot === "pasted-data" && forwarded.afterShot === "after-data",
+        JSON.stringify(forwarded ?? captured));
+    }
   }
 
   harness.section("client: overlay css patch copy");
@@ -1276,6 +1290,45 @@ export async function runClientSuite(harness, { pluginDir }) {
       guardAt !== -1 && undoAt > guardAt && keydownAt !== -1 && overlay.slice(keydownAt, undoAt).includes("adjustPanel !== null") &&
         closeSource.includes("adjustUndoStack = []") && closeSource.includes("adjustRedoStack = []"),
         JSON.stringify({ guardAt, undoAt, keydownAt, clears: closeSource.includes("adjustUndoStack = []") }));
+    }
+  }
+
+  harness.section("client: overlay composer paste");
+  {
+    const draftSource = extractFunction(overlay, "renderDraft");
+    const pasteAt = draftSource === undefined ? -1 : draftSource.indexOf('addEventListener("paste"');
+    const handlerSpan = pasteAt === -1 ? "" : draftSource.slice(pasteAt, pasteAt + 900);
+    harness.check("overlay: the composer paste handler attaches only image items",
+      pasteAt !== -1 && handlerSpan.includes('type.startsWith("image/")') && handlerSpan.includes("getAsFile()") &&
+      handlerSpan.includes("if (file === null) return;") && handlerSpan.indexOf("e.preventDefault()") > handlerSpan.indexOf('startsWith("image/")') &&
+      handlerSpan.indexOf("decodePastedImage(") > handlerSpan.indexOf("e.preventDefault()"),
+      JSON.stringify({ pasteAt, span: handlerSpan.length }));
+    const acceptSource = extractFunction(overlay, "acceptPastedImage");
+    const makeRun = acceptSource === undefined ? undefined : evaluateExpression(`(initialDraft) => {
+      let draft = initialDraft;
+      let pastedShot = null;
+      const toasts = [];
+      const toast = (text) => toasts.push(text);
+      const pasteThumbNode = { src: "" };
+      const pasteChipNode = { style: {} };
+      ${acceptSource}
+      return { accept: acceptPastedImage, state: () => ({ pastedShot, thumb: pasteThumbNode.src, chip: pasteChipNode.style.display, toasts }) };
+    }`, "acceptPastedImage");
+    {
+      const run = makeRun === undefined ? undefined : makeRun({ label: "x" });
+      const first = "data:image/jpeg;base64,AAAA";
+      const second = "data:image/jpeg;base64,BBBB";
+      const tooLarge = "data:image/jpeg;base64," + "A".repeat(4 * 1024 * 1024);
+      const open = run === undefined ? undefined : run.accept(first);
+      const replaced = run === undefined ? undefined : run.accept(second);
+      const rejected = run === undefined ? undefined : run.accept(tooLarge);
+      const closed = makeRun === undefined ? undefined : makeRun(null).accept(first);
+      const state = run === undefined ? undefined : run.state();
+      harness.check("overlay: the composer carries at most one pasted image and the latest paste replaces it",
+        open === true && replaced === true && rejected === false && closed === false &&
+        state !== undefined && state.pastedShot === second && state.thumb === second && state.chip === "" &&
+        JSON.stringify(state.toasts) === JSON.stringify(["pasteTooLarge"]),
+        JSON.stringify({ open, replaced, rejected, closed, state }));
     }
   }
 
@@ -3550,6 +3603,72 @@ export async function runClientSuite(harness, { pluginDir }) {
         row.length === 1 && locate !== undefined && locate.includes('window.postMessage({ source: "dsh-redline", type: "locate", selector: ' + JSON.stringify("body h1") + ' }, "*")'),
         JSON.stringify({ rows: row.length, executed: executed.map((code) => code.slice(0, 90)) }));
     } else harness.check("client: the card pin row sends a locate command for the pin selector", false, "chat node slot missing");
+  }
+
+  harness.section("client: the card renders the pasted image");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const fetchCalls = [];
+    const registeredDefinitions = [];
+    class StubURL extends URL {
+      static createObjectURL = () => "blob:stub-url";
+      static revokeObjectURL = () => {};
+    }
+    const documentStub = {
+      createElement(tag) {
+        const node = { tag, href: "", download: "", click: () => {}, style: {}, setAttribute() {} };
+        return node;
+      },
+      documentElement: {},
+      head: { appendChild() {} },
+      body: { appendChild() {} },
+      readyState: "complete",
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener() {},
+      removeEventListener() {}
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      document: documentStub,
+      sandbox: { URL: StubURL },
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url, options) => {
+        const target = String(url);
+        fetchCalls.push({ url: target, headers: options?.headers ?? {} });
+        if (target === "/api/dsh-redline.secret") return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.endsWith("/.lr/settings")) return jsonResponse({ ok: true, settings: { lang: "en", keys: { comment: "x", adjust: "y" }, screenshot: false, cropPad: 96 }, version: "1.0.23" });
+        if (target.includes("/.lr/pending")) return jsonResponse({ ok: true, count: 0 });
+        return jsonResponse({});
+      }
+    });
+    const uiConversation = {
+      events: {
+        register(definition) {
+          registeredDefinitions.push(definition);
+          return () => {};
+        }
+      }
+    };
+    const clientApi = fakeClientCtx({ uiConversation });
+    module.apply(clientApi.ctx);
+    clientApi.resolve();
+    await flush(4);
+    const slot = clientApi.slots.find((entry) => entry.spec.name === "conversation.chat.node");
+    if (slot !== undefined) {
+      const rendered = renderOnce(stub, slot.component, { node: { data: { pins: [{ tag: "h1", selector: "body h1", comment: "colei isto", screenshotPath: null, pastedShotPath: "1700000000-pasted.jpg" }], pageTitle: "Demo", sections: [] } } });
+      for (const effect of rendered.effects) effect();
+      await flush(4);
+      const fetchCall = fetchCalls.find((call) => call.url.includes("/.lr/attachments/1700000000-pasted.jpg"));
+      const after = renderOnce(stub, slot.component, { node: { data: { pins: [{ tag: "h1", selector: "body h1", comment: "colei isto", screenshotPath: null, pastedShotPath: "1700000000-pasted.jpg" }], pageTitle: "Demo", sections: [] } } });
+      const imgs = findElements(after.tree, (element) => element.props?.className === "lr-node-img");
+      harness.check("client: the card fetches and renders the pasted image under the pin",
+        fetchCall !== undefined && fetchCall.headers["x-dsh-redline-secret"] === "a".repeat(64) && imgs.length === 1 && imgs[0]?.props?.src === "blob:stub-url",
+        JSON.stringify({ fetch: fetchCall?.url, imgs: imgs.length }));
+    } else harness.check("client: the card fetches and renders the pasted image under the pin", false, "chat node slot missing");
   }
 
   harness.section("client: the pending card exports the report");
