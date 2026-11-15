@@ -1279,6 +1279,36 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
   }
 
+  harness.section("client: overlay locate reveal");
+  {
+    const revealSource = extractFunction(overlay, "revealSelector");
+    const revealFn = revealSource === undefined ? undefined : evaluateExpression(`(locate, showHighlight, clearHighlight, setTimeout, clearTimeout, revealTimer) => {\n${revealSource}\nreturn revealSelector;\n}`, "revealSelector");
+    {
+      const scrolled = [];
+      const highlighted = [];
+      let cleared = 0;
+      const scheduled = [];
+      const target = { scrollIntoView: (options) => scrolled.push(options) };
+      const reveal = revealFn === undefined ? undefined : revealFn((selector) => (selector === "#live" ? target : null), (t) => highlighted.push(t), () => { cleared += 1; }, (fn, ms) => { scheduled.push({ fn, ms }); return scheduled.length; }, () => {}, null);
+      if (reveal !== undefined) reveal("#live");
+      if (scheduled.length === 1) scheduled[0].fn();
+      harness.check("overlay: revealSelector scrolls to and highlights a resolvable element, then auto-clears",
+        reveal !== undefined && JSON.stringify(scrolled) === JSON.stringify([{ behavior: "smooth", block: "center" }]) &&
+        highlighted.length === 1 && highlighted[0] === target && scheduled.length === 1 && scheduled[0]?.ms === 2000 && cleared === 1,
+        JSON.stringify({ scrolled, highlighted: highlighted.length, scheduled: scheduled.length, cleared }));
+    }
+    {
+      const noScroll = [];
+      const noHighlight = [];
+      const noTimer = [];
+      const reveal = revealFn === undefined ? undefined : revealFn(() => null, (t) => noHighlight.push(t), () => {}, (fn, ms) => { noTimer.push({ fn, ms }); return noTimer.length; }, () => {}, null);
+      if (reveal !== undefined) reveal("#gone");
+      harness.check("overlay: revealSelector is a silent no-op for an unresolved selector",
+        reveal !== undefined && noScroll.length === 0 && noHighlight.length === 0 && noTimer.length === 0,
+        JSON.stringify({ noScroll: noScroll.length, noHighlight: noHighlight.length, noTimer: noTimer.length }));
+    }
+  }
+
   harness.section("client: overlay token suggestions");
   {
     const fakeEl = (tag, attrs = {}, ...children) => {
@@ -3441,6 +3471,85 @@ export async function runClientSuite(harness, { pluginDir }) {
     const stillThere = removedSymbols.filter((symbol) => clientSource.includes(symbol));
     harness.check("the DOM surgery is gone", stillThere.length === 0, stillThere.join(", "));
     harness.check("the client no longer arms a card from the status poll", !clientSource.includes("claimByMessageId") && !clientSource.includes("lastDelivered") && clientSource.includes("fields=cmd") && !clientSource.includes("fields=cmd,lastDelivered"));
+  }
+
+  harness.section("client: the card pin row sends a locate command");
+  {
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    class FakeElement {}
+    const executed = [];
+    const registeredDefinitions = [];
+    const overlayBundle = readFileSync(path.join(pluginDir, "lib", "overlay.js"), "utf8");
+    const bridgeBundle = readFileSync(path.join(pluginDir, "lib", "bridge.js"), "utf8");
+    const fakeWebview = new FakeElement();
+    fakeWebview.dataset = { liveReviewWired: undefined };
+    fakeWebview.getAttribute = (name) => (name === "src" ? "https://example.com/" : null);
+    fakeWebview.addEventListener = (type, handler) => {
+      if (type === "dom-ready") setTimeout(() => handler(), 0);
+    };
+    const pageMountModel = createMountModel();
+    fakeWebview.executeJavaScript = async (code) => {
+      executed.push(code);
+      if (code.includes("lrMountState")) return pageMountModel.answer(code);
+      if (code.includes("window.__LR__ = Object.assign")) {
+        pageMountModel.answer(code);
+        return null;
+      }
+      return null;
+    };
+    const documentStub = {
+      createElement: () => ({ style: {}, dataset: {}, setAttribute() {}, appendChild() {}, remove() {} }),
+      head: { appendChild() {} },
+      body: { appendChild() {} },
+      documentElement: {},
+      readyState: "complete",
+      querySelector: () => null,
+      querySelectorAll: (selector) => (typeof selector === "string" && selector.includes("webview") ? [fakeWebview] : []),
+      addEventListener() {},
+      removeEventListener() {}
+    };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      document: documentStub,
+      sandbox: { Element: FakeElement, MutationObserver: class { observe() {} } },
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      fetch: async (url, options) => {
+        const target = String(url);
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.endsWith("/.lr/overlay.js")) return new Response(overlayBundle, { status: 200, headers: { "content-type": "text/javascript" } });
+        if (target.endsWith("/.lr/bridge.js")) return new Response(bridgeBundle, { status: 200, headers: { "content-type": "text/javascript" } });
+        if (target.includes("/.lr/pending")) return jsonResponse({ ok: true, count: 0 });
+        return jsonResponse({});
+      }
+    });
+    const uiConversation = {
+      events: {
+        register(definition) {
+          registeredDefinitions.push(definition);
+          return () => {};
+        }
+      }
+    };
+    const clientApi = fakeClientCtx({ uiConversation });
+    module.apply(clientApi.ctx);
+    clientApi.resolve();
+    await waitFor(() => executed.some((code) => code.includes("window.__LR__ = Object.assign")), 4000);
+    await flush(4);
+    const slot = clientApi.slots.find((entry) => entry.spec.name === "conversation.chat.node");
+    if (slot !== undefined) {
+      const rendered = renderOnce(stub, slot.component, { node: { data: { pins: [{ tag: "h1", selector: "body h1", comment: "locate me", screenshotPath: null }], pageTitle: "Demo", sections: [] } } });
+      const row = findElements(rendered.tree, (element) => element.props?.className === "lr-node-pin");
+      executed.length = 0;
+      if (row.length === 1) row[0].props.onClick();
+      await flush(4);
+      const locate = executed.find((code) => code.includes('type: "locate"'));
+      harness.check("client: the card pin row sends a locate command for the pin selector",
+        row.length === 1 && locate !== undefined && locate.includes('window.postMessage({ source: "dsh-redline", type: "locate", selector: ' + JSON.stringify("body h1") + ' }, "*")'),
+        JSON.stringify({ rows: row.length, executed: executed.map((code) => code.slice(0, 90)) }));
+    } else harness.check("client: the card pin row sends a locate command for the pin selector", false, "chat node slot missing");
   }
 
   harness.section("client: the pending card exports the report");

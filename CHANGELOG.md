@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   property and text edit is undoable (Ctrl+Z or the panel buttons) and
   redoable (Ctrl+Shift+Z / Ctrl+Y); the stacks clear on confirm, cancel or
   close. Committed pin changes keep their per-property reset.
+- Clicking a pin in the chat card locates its element on the page: the guest
+  scrolls to it smoothly and the existing highlight box shows it for about two
+  seconds. A pin whose element is gone does nothing.
 
 ## [1.3.0] - 2026-11-15
 
