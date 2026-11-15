@@ -34,6 +34,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "User-provided image" context line. One image per comment; anything above
   4 MB after downscale is refused with a toast.
 
+### Fixed
+
+- The pending-annotations details panel in the chat dock paints its background
+  again: it depended on a design-system variable the conversation subtree does
+  not resolve, which left the panel fully transparent over the page. It now
+  uses the same background as the dock capsule, and the settings selects
+  follow suit.
+
 ## [1.3.0] - 2026-11-15
 
 This release moves the annotation card into the conversation. The chat renders

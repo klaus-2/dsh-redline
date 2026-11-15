@@ -111,6 +111,15 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("the overlay saves the drawings through the bridge", overlay.includes('bridgeSend("drawings.save"'));
   }
 
+  harness.section("client: the dock surfaces resolve a background");
+  harness.excludes("the dock and settings no longer use the unresolved bg-base variable", client, "--dsw-alias-bg-base");
+  {
+    const detailsRule = /\.lr-details\s*\{[^}]*\}/.exec(client)?.[0] ?? "";
+    harness.check("the dock details panel paints with the capsule background",
+      detailsRule !== "" && detailsRule.includes("background: var(--dsw-specific-tip, #f7f8fa)"),
+      detailsRule.slice(0, 120));
+  }
+
   harness.section("client: host identification before authentication");
   {
     const secret = "regression-placeholder-secret";
