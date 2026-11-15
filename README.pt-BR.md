@@ -49,6 +49,7 @@ Para cada pin, um bloco em um único snapshot:
 - Reancoragem de pins obsoletos: quando o elemento alvo sai do DOM, o pin é marcado e o popover avisa; arrastar o marcador religa o pin
 - O popover do pin mostra as dimensões em tempo real do alvo (L×A px), recaindo para o snapshot fixado quando o elemento não existe mais
 - Temas do overlay: escuro (padrão), claro e uma variante de alto contraste, escolhidos nas configurações do plugin e persistidos
+- Desfazer/refazer no inspetor: Ctrl+Z / Ctrl+Shift+Z (ou os botões do painel) retrocedem e avançam os ajustes e o texto não confirmados enquanto o painel está aberto
 - Screenshots antes/depois por pin ajustado: o recorte "depois" é capturado ao vivo e, então, a página é restaurada para capturar o recorte "antes" do mesmo enquadramento
 - Comentários em grupo: o modo de grupo da toolbar reúne N elementos e publica um comentário copiado para cada pin do grupo (escopo da página — grupos não atravessam páginas)
 - Predefinições de preview responsivo: restringe a página a 375/768/1280 px ou volta à largura total; pins criados sob uma predefinição registram a largura (nota: unidades `100vw` e navbars `position: fixed` não respeitam a restrição)

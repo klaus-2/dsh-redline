@@ -130,6 +130,8 @@
     "drawStep": "Step",
     "drawUndo": "Undo",
     "drawRedo": "Redo",
+    "adjustUndo": "Undo",
+    "adjustRedo": "Redo",
     "drawSend": "Add to chat",
     "drawColor": "Color",
     "drawWidth": "Thickness",
@@ -304,6 +306,8 @@
     "drawStep": "Passo",
     "drawUndo": "Desfazer",
     "drawRedo": "Refazer",
+    "adjustUndo": "Desfazer",
+    "adjustRedo": "Refazer",
     "drawSend": "Adicionar ao chat",
     "drawColor": "Cor",
     "drawWidth": "Espessura",
@@ -478,6 +482,8 @@
     "drawStep": "步骤",
     "drawUndo": "撤销",
     "drawRedo": "重做",
+    "adjustUndo": "撤销",
+    "adjustRedo": "重做",
     "drawSend": "添加到聊天",
     "drawColor": "颜色",
     "drawWidth": "粗细",
@@ -847,6 +853,9 @@
     .lr-confirm { all: unset; cursor: pointer; flex: 1; height: 30px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; display: grid; place-items: center; }
     .lr-confirm:hover { filter: brightness(1.1); }
     .lr-confirm[data-disabled] { opacity: .45; pointer-events: none; }
+    .lr-undo, .lr-redo { all: unset; cursor: pointer; flex: none; height: 24px; padding: 0 9px; border-radius: 8px; background: var(--n-100); color: var(--n-700); font-size: 11px; display: grid; place-items: center; }
+    .lr-undo:hover, .lr-redo:hover { background: var(--n-200); color: var(--n-950); }
+    .lr-undo[data-disabled], .lr-redo[data-disabled] { opacity: .45; pointer-events: none; }
 .lr-draw-canvas { position: fixed; inset: 0; pointer-events: none; touch-action: none; z-index: 2147483590; }
 .lr-draw-canvas[data-on] { pointer-events: auto; cursor: crosshair; }
 .lr-draw-canvas[data-tool="none"] { cursor: default; }
@@ -1841,6 +1850,17 @@
       const from = event.composedPath?.()[0] ?? event.target;
       const tag = from?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || from?.isContentEditable === true) return;
+      if (adjustPanel !== null && (event.ctrlKey || event.metaKey) && !event.altKey) {
+        const undoKey = event.key.toLowerCase();
+        const undoShortcut = undoKey === "z" && !event.shiftKey;
+        const redoShortcut = (undoKey === "z" && event.shiftKey) || undoKey === "y";
+        if (undoShortcut || redoShortcut) {
+          event.preventDefault();
+          if (redoShortcut) adjustRedo();
+          else adjustUndo();
+          return;
+        }
+      }
       if (drawMode && drawTyping === null && drawSel !== null && (event.key === "Delete" || event.key === "Backspace")) {
         event.preventDefault();
         snapshotDraw();
@@ -3118,6 +3138,8 @@
   let adjustInvalid = new Set();
   let adjustLedger = new Map();
   const adjustSeen = { flex: false, layout: false, positioned: false };
+  let adjustUndoStack = [];
+  let adjustRedoStack = [];
 
   function adjustBaseline(prop) {
     const ledger = adjustTarget !== null ? adjustLedger.get(adjustTargetSelector) : undefined;
@@ -3147,6 +3169,10 @@
     }
     adjustInvalid.delete(prop);
     if (adjustPatch !== null) previewStyle(adjustPatch, prop, next);
+    if (next !== adjustValues.get(prop)) {
+      adjustUndoStack.push({ kind: "prop", prop, value: adjustBaseline(prop) });
+      adjustRedoStack = [];
+    }
     adjustValues.set(prop, next);
     rerenderAdjustRows();
   }
@@ -3161,11 +3187,46 @@
     rerenderAdjustRows();
   }
   function adjustUpdateText(next) {
+    if (adjustText !== next) {
+      adjustUndoStack.push({ kind: "text", prop: null, value: adjustText });
+      adjustRedoStack = [];
+    }
+    applyAdjustText(next);
+  }
+  function applyAdjustText(next) {
     adjustText = next;
     if (adjustPatch === null || adjustPatch.originalText === null) return;
     if (next === adjustPatch.originalText.value) restoreText(adjustPatch);
     else adjustPatch.originalText.node.data = next;
     rerenderAdjustRows();
+  }
+  function applyAdjustEntry(entry) {
+    if (entry.kind === "text") {
+      applyAdjustText(entry.value);
+      return;
+    }
+    if (entry.value !== adjustBaseline(entry.prop)) {
+      adjustInvalid.delete(entry.prop);
+      if (adjustPatch !== null) previewStyle(adjustPatch, entry.prop, entry.value);
+      adjustValues.set(entry.prop, entry.value);
+      rerenderAdjustRows();
+      return;
+    }
+    adjustReset(entry.prop);
+  }
+  function adjustUndo() {
+    const entry = adjustUndoStack.pop();
+    if (entry === undefined) return;
+    if (entry.kind === "text") adjustRedoStack.push({ kind: "text", prop: null, value: adjustText });
+    else adjustRedoStack.push({ kind: "prop", prop: entry.prop, value: adjustValues.get(entry.prop) ?? "" });
+    applyAdjustEntry(entry);
+  }
+  function adjustRedo() {
+    const entry = adjustRedoStack.pop();
+    if (entry === undefined) return;
+    if (entry.kind === "text") adjustUndoStack.push({ kind: "text", prop: null, value: adjustText });
+    else adjustUndoStack.push({ kind: "prop", prop: entry.prop, value: adjustValues.get(entry.prop) ?? "" });
+    applyAdjustEntry(entry);
   }
 
 
@@ -3539,6 +3600,8 @@
   function rerenderAdjustRows() {
     for (const fn of adjustRerender) { try { fn(); } catch {} }
     if (adjustConfirmBtn !== null) adjustConfirmBtn.toggleAttribute("data-disabled", !adjustCanConfirm());
+    if (adjustUndoBtn !== null) adjustUndoBtn.toggleAttribute("data-disabled", adjustUndoStack.length === 0);
+    if (adjustRedoBtn !== null) adjustRedoBtn.toggleAttribute("data-disabled", adjustRedoStack.length === 0);
   }
   function adjustCanConfirm() {
     const comment = adjustCommentInput?.value?.trim() ?? "";
@@ -3651,6 +3714,8 @@
 
   let adjustCommentInput = null;
   let adjustConfirmBtn = null;
+  let adjustUndoBtn = null;
+  let adjustRedoBtn = null;
   let adjustTargetSelector = "";
 
   function closeAdjustPanel(restore) {
@@ -3663,6 +3728,10 @@
     adjustRerender = [];
     adjustCommentInput = null;
     adjustConfirmBtn = null;
+    adjustUndoBtn = null;
+    adjustRedoBtn = null;
+    adjustUndoStack = [];
+    adjustRedoStack = [];
   }
 
   function openAdjustPanel(target) {
@@ -3692,7 +3761,9 @@
 
     const rect = adjustTarget.getBoundingClientRect();
     const panel = el("div", { class: "popover composer lr-insp" });
-    const targetLine = el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, `<${adjustTarget.localName}>`), el("span", { class: "lr-insp-sub" }, adjustTargetSelector.slice(0, 60)), el("button", { class: "lr-close", title: t("panelClose"), onclick: () => closeAdjustPanel(true) }, "✕"));
+    adjustUndoBtn = el("button", { class: "lr-undo", type: "button", title: t("adjustUndo"), onclick: () => adjustUndo() }, t("adjustUndo"));
+    adjustRedoBtn = el("button", { class: "lr-redo", type: "button", title: t("adjustRedo"), onclick: () => adjustRedo() }, t("adjustRedo"));
+    const targetLine = el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, `<${adjustTarget.localName}>`), el("span", { class: "lr-insp-sub" }, adjustTargetSelector.slice(0, 60)), adjustUndoBtn, adjustRedoBtn, el("button", { class: "lr-close", title: t("panelClose"), onclick: () => closeAdjustPanel(true) }, "✕"));
     panel.append(targetLine);
     adjustCommentInput = el("textarea", { class: "lr-comment", placeholder: t("commentOptional"), rows: "2" });
     adjustCommentInput.value = existing?.comment === "Ajuste visual" ? "" : (existing?.comment ?? "");

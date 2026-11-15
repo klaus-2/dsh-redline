@@ -1211,6 +1211,74 @@ export async function runClientSuite(harness, { pluginDir }) {
       applyBody.slice(0, 200));
   }
 
+  harness.section("client: overlay inspector undo redo");
+  {
+    const makeRun = evaluateExpression(`() => {
+      let adjustUndoStack = [];
+      let adjustRedoStack = [];
+      const adjustValues = new Map([["color", "10px"]]);
+      let adjustText = "";
+      const adjustInvalid = new Set();
+      const adjustPatch = { element: { style: {} } };
+      const adjustBaseline = () => "10px";
+      const resets = [];
+      const adjustReset = (prop) => { resets.push(prop); adjustValues.set(prop, adjustBaseline(prop)); };
+      const previews = [];
+      const previewStyle = (patch, prop, value) => previews.push({ prop, value });
+      const rerenderAdjustRows = () => {};
+      const applyAdjustText = () => {};
+      const isSafeValue = () => true;
+      ${extractFunction(overlay, "adjustUpdateProperty")}
+      ${extractFunction(overlay, "applyAdjustEntry")}
+      ${extractFunction(overlay, "adjustUndo")}
+      ${extractFunction(overlay, "adjustRedo")}
+      return { adjustUpdateProperty, adjustUndo, adjustRedo, stacks: () => ({ undo: adjustUndoStack, redo: adjustRedoStack, value: adjustValues.get("color"), resets, previews }) };
+    }`, "adjust-undo-redo");
+    {
+      const run = makeRun();
+      run.adjustUpdateProperty("color", "12px");
+      run.adjustUndo();
+      const after = run.stacks();
+      harness.check("overlay: undo restores the prior property value and pushes the current one to redo",
+        JSON.stringify(after.redo) === JSON.stringify([{ kind: "prop", prop: "color", value: "12px" }]) &&
+        JSON.stringify(after.resets) === JSON.stringify(["color"]) && after.undo.length === 0 && after.value === "10px",
+        JSON.stringify(after));
+    }
+    {
+      const run = makeRun();
+      run.adjustUpdateProperty("color", "12px");
+      run.adjustUndo();
+      run.adjustRedo();
+      const after = run.stacks();
+      harness.check("overlay: redo re-applies what undo popped",
+        after.value === "12px" && after.previews.length === 2 && JSON.stringify(after.previews[1]) === JSON.stringify({ prop: "color", value: "12px" }) &&
+        after.redo.length === 0 && JSON.stringify(after.undo) === JSON.stringify([{ kind: "prop", prop: "color", value: "10px" }]),
+        JSON.stringify(after));
+    }
+    {
+      const run = makeRun();
+      run.adjustUpdateProperty("color", "12px");
+      run.adjustUndo();
+      run.adjustUpdateProperty("color", "14px");
+      const before = run.stacks();
+      run.adjustRedo();
+      const after = run.stacks();
+      harness.check("overlay: a fresh edit clears the redo stack",
+        before.redo.length === 0 && after.redo.length === 0 && after.value === "14px" && after.undo.length === 1 && after.previews.length === 2,
+        JSON.stringify({ before, after }));
+    }
+    {
+      const guardAt = overlay.indexOf('if (tag === "INPUT" || tag === "TEXTAREA" || from?.isContentEditable === true) return;');
+      const undoAt = guardAt === -1 ? -1 : overlay.indexOf("adjustUndo();", guardAt);
+      const keydownAt = guardAt === -1 ? -1 : overlay.lastIndexOf('"keydown"', guardAt);
+      const closeSource = extractFunction(overlay, "closeAdjustPanel") ?? "";
+      harness.check("overlay: the inspector undo shortcut never fires for input targets and the stacks clear on close",
+      guardAt !== -1 && undoAt > guardAt && keydownAt !== -1 && overlay.slice(keydownAt, undoAt).includes("adjustPanel !== null") &&
+        closeSource.includes("adjustUndoStack = []") && closeSource.includes("adjustRedoStack = []"),
+        JSON.stringify({ guardAt, undoAt, keydownAt, clears: closeSource.includes("adjustUndoStack = []") }));
+    }
+  }
+
   harness.section("client: overlay token suggestions");
   {
     const fakeEl = (tag, attrs = {}, ...children) => {
@@ -1267,6 +1335,8 @@ export async function runClientSuite(harness, { pluginDir }) {
         adjustTarget: null,
         adjustLedger: new Map(),
         adjustTargetSelector: "",
+        adjustUndoStack: [],
+        adjustRedoStack: [],
         rerenderAdjustRows: () => {},
         tokenSuggestionsFor: () => ["--brand-color"],
         makeTokenProbe: () => null,

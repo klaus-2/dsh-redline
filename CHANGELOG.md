@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `theme` setting (default `dark`). The choice applies on every settings poll
   without a reload; the high-contrast theme keeps the dark palette with
   stronger borders, outlines on interactive elements and brighter text.
+- Undo and redo for the inspector adjustments: while the panel is open, every
+  property and text edit is undoable (Ctrl+Z or the panel buttons) and
+  redoable (Ctrl+Shift+Z / Ctrl+Y); the stacks clear on confirm, cancel or
+  close. Committed pin changes keep their per-property reset.
 
 ## [1.3.0] - 2026-11-15
 

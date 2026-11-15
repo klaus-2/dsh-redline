@@ -160,6 +160,8 @@
   "drawStep": "步骤",
   "drawUndo": "撤销",
   "drawRedo": "重做",
+  "adjustUndo": "撤销",
+  "adjustRedo": "重做",
   "drawSend": "添加到聊天",
   "drawColor": "颜色",
   "drawWidth": "粗细",

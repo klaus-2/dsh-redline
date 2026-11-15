@@ -160,6 +160,8 @@
   "drawStep": "Passo",
   "drawUndo": "Desfazer",
   "drawRedo": "Refazer",
+  "adjustUndo": "Desfazer",
+  "adjustRedo": "Refazer",
   "drawSend": "Adicionar ao chat",
   "drawColor": "Cor",
   "drawWidth": "Espessura",
