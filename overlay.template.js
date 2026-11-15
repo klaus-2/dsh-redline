@@ -858,8 +858,8 @@
     .lr-effect-label { flex: none; width: 70px; font-size: 11px; color: var(--n-400); }
     .lr-rawhint { font-size: 10px; color: var(--n-500); }
     .lr-footer { display: flex; gap: 8px; padding: 8px 10px 10px; border-top: 1px solid var(--n-100); }
-    .lr-cancel { all: unset; cursor: pointer; flex: 1; height: 30px; border-radius: 10px; background: var(--n-100); color: var(--n-200); font-size: 12px; display: grid; place-items: center; }
-    .lr-cancel:hover { background: var(--n-200); color: var(--n-100); }
+    .lr-cancel { all: unset; cursor: pointer; flex: 1; height: 30px; border-radius: 10px; background: var(--n-100); color: var(--n-700); font-size: 12px; display: grid; place-items: center; }
+    .lr-cancel:hover { background: var(--n-200); color: var(--n-950); }
     .lr-confirm { all: unset; cursor: pointer; flex: 1; height: 30px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; display: grid; place-items: center; }
     .lr-confirm:hover { filter: brightness(1.1); }
     .lr-confirm[data-disabled] { opacity: .45; pointer-events: none; }

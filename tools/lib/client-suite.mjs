@@ -147,6 +147,16 @@ export async function runClientSuite(harness, { pluginDir }) {
       JSON.stringify({ popoverZ, absZ, fixedZ }));
   }
 
+  harness.section("client: overlay footer button contrast");
+  {
+    const cancelRule = /\.lr-cancel \{[^}]*\}/.exec(overlay)?.[0] ?? "";
+    const cancelHover = /\.lr-cancel:hover \{[^}]*\}/.exec(overlay)?.[0] ?? "";
+    harness.check("overlay: the cancel button keeps readable text in the dark palette",
+      cancelRule.includes("background: var(--n-100)") && cancelRule.includes("color: var(--n-700)") &&
+      cancelHover.includes("color: var(--n-950)"),
+      JSON.stringify({ cancelRule: cancelRule.slice(0, 90), cancelHover: cancelHover.slice(0, 60) }));
+  }
+
   harness.section("client: host identification before authentication");
   {
     const secret = "regression-placeholder-secret";
