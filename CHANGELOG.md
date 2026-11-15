@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The pin popover shows the target's dimensions (W×H px), live from the
+  element and falling back to the pinned snapshot when the element is gone.
+
 ## [1.3.0] - 2026-11-15
 
 This release moves the annotation card into the conversation. The chat renders

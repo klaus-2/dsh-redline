@@ -1150,6 +1150,26 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
   }
 
+  harness.section("client: overlay pin popover dimensions");
+  {
+    const dims = extractFunction(overlay, "pinDimensions");
+    const dimsFn = dims === undefined ? undefined : evaluateExpression(`(locate, pin) => {\n${dims}\nreturn pinDimensions(pin);\n}`, "pinDimensions");
+    const liveRect = { width: 320.4, height: 128.6 };
+    const live = dimsFn === undefined ? undefined : dimsFn(() => ({ getBoundingClientRect: () => liveRect }), { selector: "#live", rect: { w: 10, h: 20 } });
+    const snapshot = dimsFn === undefined ? undefined : dimsFn(() => null, { selector: "#gone", rect: { w: 240.9, h: 64.2 } });
+    harness.check("overlay: pinDimensions prefers the live element rect and falls back to the snapshot",
+      dimsFn !== undefined && live === "320×129" && snapshot === "241×64",
+      JSON.stringify({ live, snapshot }));
+    const panelSource = extractFunction(overlay, "renderPinPanel");
+    const bodyStart = panelSource?.indexOf('class: "pin-bubble-body"') ?? -1;
+    const metaAt = panelSource?.indexOf('class: "pin-bubble-meta"') ?? -1;
+    const dimsAt = panelSource?.indexOf("pinDimensions(pin)") ?? -1;
+    const actionsAt = panelSource?.indexOf('class: "pin-bubble-actions"') ?? -1;
+    harness.check("overlay: the popover renders the dimensions line beside the selector preview",
+      panelSource !== undefined && bodyStart !== -1 && metaAt > bodyStart && dimsAt > metaAt && actionsAt > dimsAt,
+      JSON.stringify({ bodyStart, metaAt, dimsAt, actionsAt }));
+  }
+
   harness.section("client: overlay token suggestions");
   {
     const fakeEl = (tag, attrs = {}, ...children) => {

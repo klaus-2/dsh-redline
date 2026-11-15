@@ -22,6 +22,7 @@
   "reopen": "Reabrir",
   "del": "Excluir",
   "pinStale": "Alvo não encontrado — pin obsoleto. Arraste o marcador para reancorar.",
+  "pinDimensions": "Dimensões",
   "copyCss": "Copiar CSS",
   "cssCopied": "CSS copiado para a área de transferência",
   "cssCopyFailed": "Não foi possível copiar o CSS",

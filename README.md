@@ -46,6 +46,7 @@ For each pin, one block in a single snapshot:
 - Design-token suggestions in the inspector: the page's own `var(--token)` is offered when its resolved value matches the value being edited
 - CSS patch export: the committed adjustments render as a copyable `selector { prop: value; }` rule in the overlay and as a `Requested CSS:` block in the agent context
 - Stale pin re-anchoring: when the target element leaves the DOM the pin is flagged and the popover warns, and dragging the marker re-binds it
+- Pin popover shows the target's live dimensions (W×H px), falling back to the pinned snapshot when the element is gone
 - Before/after screenshots per adjusted pin: the after crop is captured live, then the page is restored and the before crop is captured from the same frame
 - Group comments: toolbar group mode collects N elements and posts one comment copied to every member pin (page-scoped — groups cannot span pages)
 - Responsive preview presets: constrain the page to 375/768/1280 px or reset to full width; pins created under a preset record its width (note: `100vw` units and `position: fixed` navbars do not respect the constraint)
