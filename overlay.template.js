@@ -752,7 +752,7 @@
   const host = document.createElement("div");
   host.id = "dsh-redline-host";
   const shadow = host.attachShadow({ mode: "open" });
-  const rootDiv = el("div", { class: "root dark" });
+  const rootDiv = el("div", { class: themeRootClass(SETTINGS.theme) });
   const styleEl = document.createElement("style");
   styleEl.textContent = TENCIL_CSS + `
     .lr-close { all: unset; cursor: pointer; margin-left: auto; width: 20px; height: 20px;
@@ -1577,6 +1577,12 @@
     installKeyShield();
   }
 
+  function themeRootClass(theme) {
+    if (theme === "light") return "root";
+    if (theme === "contrast") return "root dark contrast";
+    return "root dark";
+  }
+
 
 
 
@@ -1725,6 +1731,7 @@
       if (typeof next.screenshot === "boolean") screenshotOnSend = next.screenshot;
       if (Number.isFinite(Number(next.cropPad))) CROP_PAD = Math.max(16, Math.min(200, Math.round(Number(next.cropPad))));
     }
+    rootDiv.className = themeRootClass(next.theme);
     if (next.keys === null || typeof next.keys !== "object") return;
     let changed = false;
     const comment = parseHotkey(next.keys.comment);

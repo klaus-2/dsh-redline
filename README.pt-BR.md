@@ -48,6 +48,7 @@ Para cada pin, um bloco em um único snapshot:
 - Botão de copiar seletor no popover do pin: coloca o seletor CSS do pin na área de transferência verbatim
 - Reancoragem de pins obsoletos: quando o elemento alvo sai do DOM, o pin é marcado e o popover avisa; arrastar o marcador religa o pin
 - O popover do pin mostra as dimensões em tempo real do alvo (L×A px), recaindo para o snapshot fixado quando o elemento não existe mais
+- Temas do overlay: escuro (padrão), claro e uma variante de alto contraste, escolhidos nas configurações do plugin e persistidos
 - Screenshots antes/depois por pin ajustado: o recorte "depois" é capturado ao vivo e, então, a página é restaurada para capturar o recorte "antes" do mesmo enquadramento
 - Comentários em grupo: o modo de grupo da toolbar reúne N elementos e publica um comentário copiado para cada pin do grupo (escopo da página — grupos não atravessam páginas)
 - Predefinições de preview responsivo: restringe a página a 375/768/1280 px ou volta à largura total; pins criados sob uma predefinição registram a largura (nota: unidades `100vw` e navbars `position: fixed` não respeitam a restrição)
@@ -110,6 +111,8 @@ Páginas rodando no navegador do harness podem enviar anotações por design —
 O plugin inicia um servidor loopback (`127.0.0.1:47477`, caindo para as próximas 20 portas) que serve o overlay, os anexos de screenshot e a coleta de anotações.
 
 As quatro teclas de modo (comentário, ajuste, canvas, ocultar pins) são a única configuração de atalho: abra as configurações do plugin e troque a tecla de comentário, de ajuste ou de canvas — a tecla de ocultar pins é preservada a cada salvamento e pode ser editada diretamente em `~/.dsh/redline/settings.json`. Um atalho pode ter modificadores (`Ctrl+Shift+A`), os modificadores precisam bater exatamente, e dois modos não podem compartilhar um atalho.
+
+O tema do overlay também é uma configuração: escuro (o padrão), claro ou uma variante de alto contraste da paleta escura. Ele se aplica na página imediatamente e sobrevive a reloads e reinícios.
 
 ## Como funciona
 

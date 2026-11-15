@@ -74,6 +74,26 @@
   color-scheme: dark;
 }
 
+.root.contrast {
+  --n-500: hsl(96 4% 72%);
+  --n-600: hsl(105 4% 84%);
+  --n-700: hsl(100 4% 90%);
+  --n-900: hsl(120 2% 97%);
+  --n-950: hsl(120 4% 100%);
+  --surface: hsl(90 4% 6%);
+  --line: hsl(100 6% 55%);
+  --shadow: 0 0 0 2px rgba(255, 255, 255, 0.28), 0 16px 40px -8px rgba(0, 0, 0, 0.8);
+  color-scheme: dark;
+}
+
+.root.contrast button,
+.root.contrast input,
+.root.contrast select,
+.root.contrast textarea {
+  outline: 1px solid var(--line);
+  outline-offset: -1px;
+}
+
 * { scrollbar-width: thin; scrollbar-color: var(--n-200) transparent; }
 
 @supports selector(::-webkit-scrollbar) {

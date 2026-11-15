@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   comment composer disappear, the toolbar stays as the restore affordance. The
   key is the new `keys.hidePins` setting (default `h`), re-armed on every
   settings poll, and the visibility does not persist across reloads.
+- The overlay gains light and high-contrast themes, persisted as the new
+  `theme` setting (default `dark`). The choice applies on every settings poll
+  without a reload; the high-contrast theme keeps the dark palette with
+  stronger borders, outlines on interactive elements and brighter text.
 
 ## [1.3.0] - 2026-11-15
 

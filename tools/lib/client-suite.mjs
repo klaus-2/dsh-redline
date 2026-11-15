@@ -1193,6 +1193,24 @@ export async function runClientSuite(harness, { pluginDir }) {
       JSON.stringify({ failingToasts }));
   }
 
+  harness.section("client: overlay theme derivation");
+  {
+    const themeClassSource = extractFunction(overlay, "themeRootClass");
+    const themeClass = themeClassSource === undefined ? undefined : evaluateExpression(`(theme) => {\n${themeClassSource}\nreturn themeRootClass(theme);\n}`, "themeRootClass");
+    harness.check("overlay: themeRootClass maps each theme to its root class",
+      themeClass !== undefined && themeClass("dark") === "root dark" && themeClass("light") === "root" &&
+      themeClass("contrast") === "root dark contrast" && themeClass("sepia") === "root dark" && themeClass(undefined) === "root dark",
+      JSON.stringify({ dark: themeClass?.("dark"), light: themeClass?.("light"), contrast: themeClass?.("contrast"), sepia: themeClass?.("sepia") }));
+    harness.check("overlay: the overlay mounts with the class derived from settings",
+      overlay.includes('el("div", { class: themeRootClass(SETTINGS.theme) })'),
+      "rootDiv creation must derive its class from the settings");
+    const applyBody = /function applySettings\(next\) \{[\s\S]*?\n  \}/.exec(overlay)?.[0] ?? "";
+    const guardBody = /if \(!hostSettingsApplied\) \{[\s\S]*?\n    \}/.exec(applyBody)?.[0] ?? "";
+    harness.check("overlay: applySettings re-applies the theme on every poll",
+      applyBody.includes("rootDiv.className = themeRootClass(next.theme)") && guardBody !== "" && !guardBody.includes("themeRootClass"),
+      applyBody.slice(0, 200));
+  }
+
   harness.section("client: overlay token suggestions");
   {
     const fakeEl = (tag, attrs = {}, ...children) => {
@@ -1949,6 +1967,49 @@ export async function runClientSuite(harness, { pluginDir }) {
       const after = renderOnce(stub, section.component, {});
       harness.eq("the slow first read did not undo the change", after.states?.[0]?.settings?.screenshot, false);
     }
+  }
+
+  harness.section("client: the settings panel offers the theme select");
+  {
+    const posted = [];
+    const stub = createReactStub();
+    const localStorage = makeLocalStorage();
+    const hostSettings = { lang: "auto", keys: { comment: "c", adjust: "v", draw: "d", hidePins: "h" }, screenshot: true, cropPad: 72, theme: "dark" };
+    const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+      react: stub.React,
+      localStorage,
+      console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+      window: { addEventListener() {}, removeEventListener() {} },
+      fetch: async (url, options) => {
+        const target = String(url);
+        if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+        if (target.includes("/.lr/settings") && options?.method === "POST") {
+          const asked = JSON.parse(options.body);
+          posted.push(asked);
+          return jsonResponse({ ok: true, settings: { ...hostSettings, theme: asked.theme ?? hostSettings.theme } });
+        }
+        if (target.includes("/.lr/settings")) return jsonResponse({ ok: true, settings: hostSettings, version: "1.0.24" });
+        if (target.includes("/api/dsh-redline.secret")) return jsonResponse({ ok: true, secret: "a".repeat(64) });
+        return jsonResponse({});
+      }
+    });
+    const client = fakeClientCtx({});
+    module.apply(client.ctx);
+    client.resolve();
+    const section = client.slots.find((slot) => slot.spec.name === "settings.section");
+    const rendered = renderOnce(stub, section.component, {});
+    for (const effect of rendered.effects) effect();
+    await flush(4);
+    const before = renderOnce(stub, section.component, {});
+    const select = findElements(before.tree, (element) => element.props?.["aria-label"] === "Theme");
+    const options = Array.isArray(select[0]?.props?.children) ? select[0].props.children.length : 0;
+    if (select.length === 1) {
+      select[0].props.onChange({ target: { value: "contrast" } });
+      await flush(4);
+    }
+    harness.check("the settings panel offers the theme select",
+      select.length === 1 && options === 3 && posted.some((body) => body.theme === "contrast"),
+      JSON.stringify({ count: select.length, options, posted: posted.map((body) => body.theme) }));
   }
 
   harness.section("client: plugin manager metadata");
