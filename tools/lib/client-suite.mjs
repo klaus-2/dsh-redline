@@ -155,6 +155,13 @@ export async function runClientSuite(harness, { pluginDir }) {
       cancelRule.includes("background: var(--n-100)") && cancelRule.includes("color: var(--n-700)") &&
       cancelHover.includes("color: var(--n-950)"),
       JSON.stringify({ cancelRule: cancelRule.slice(0, 90), cancelHover: cancelHover.slice(0, 60) }));
+
+    const darkCancel = /\.root\.dark \.lr-cancel \{[^}]*\}/.exec(overlay)?.[0] ?? "";
+    const chipIcon = /\.chip svg \{[^}]*\}/.exec(overlay)?.[0] ?? "";
+    harness.check("overlay: dark footer and chip icons keep their own explicit colors and size",
+      darkCancel.includes("background: var(--n-200)") && darkCancel.includes("color: var(--n-950)") &&
+      chipIcon.includes("width: 12px") && chipIcon.includes("height: 12px"),
+      JSON.stringify({ darkCancel, chipIcon }));
   }
 
   harness.section("client: overlay inspector row wrapping");
@@ -1022,6 +1029,9 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("the template keeps its core symbols", templateMissing.length === 0, templateMissing.join(", "));
     harness.check("the popover drag handle is wired on every panel", ["composerNode, \"composer\"", "panel, \"pin\"", "panel, \"adjust\""].every((call) => template.includes(`wirePanelDrag(${call}`)), template.includes("function wirePanelDrag") ? "call missing" : "function missing");
     harness.check("the drag handle keeps the page scrollable from the panel body", css.includes(".popover .composer-target { cursor: grab; touch-action: none;") && css.includes(".composer-target button { cursor: pointer; touch-action: auto; }"), css.includes(".popover .composer-target { cursor: grab;") ? "body rule missing" : "handle rule missing");
+    const drag = extractFunction(template, "wirePanelDrag");
+    harness.check("the drag handle leaves interactive controls clickable", drag !== undefined && drag.includes("isInteractivePanelTarget(event.target)") && /pointerdown|mousedown|touchstart/u.test(drag), drag === undefined ? "wirePanelDrag missing" : "interactive guard missing");
+    harness.check("both popovers wire their close button as a button", template.includes('class: "lr-close", title: t("composerClose"), type: "button"') && template.includes('class: "lr-close", title: t("panelClose"), type: "button"'), "close buttons missing type");
     harness.check("the draft pin carries the tencil rim shimmer", css.includes(".pin-draft .pin-body") && css.includes("rim-travel 2.4s linear infinite"), css.includes("rim-travel") ? "draft rule missing" : "rim animation missing");
     // .pin is position:fixed with no transformed ancestor, so anchorPoint must work in
     // viewport coordinates; html2canvas is the one legitimate scroll consumer and keeps its offsets.
