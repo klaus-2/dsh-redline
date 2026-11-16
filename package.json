@@ -1,6 +1,6 @@
 {
   "name": "dsh-redline",
-  "version": "1.4.1",
+  "version": "1.4.0",
   "type": "module",
   "main": "./lib/index.js",
   "description": "Visual feedback & design review for DeepSeek Harness: click any UI element in the browser, comment, tweak CSS live, and send structured context + screenshot to your agent.",
