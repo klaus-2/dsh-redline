@@ -7,13 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.4.1] - 2026-11-16
-
-### Fixed
-
-- **Popover controls and close behavior work again in the overlay.** Buttons and controls inside the popover respond to clicks, and close actions behave as expected.
-  ([`b735518`](https://github.com/klaus-2/dsh-redline/commit/b735518))
-
 ## [1.4.0] - 2026-11-15
 
 _The theme, hotkey and settings entries below take effect after the dsh restarts
