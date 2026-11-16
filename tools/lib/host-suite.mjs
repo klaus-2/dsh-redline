@@ -20,7 +20,6 @@ const PROTECTED_ROUTES = [
   { path: "/.lr/pending", method: "GET" },
   { path: "/.lr/pending-pins", method: "GET" },
   { path: "/.lr/report", method: "GET" },
-  { path: "/.lr/client-cmd", method: "GET" },
   { path: "/.lr/proxy/abc", method: "GET" },
   { path: "/.lr/attachments/missing.jpg", method: "GET" },
   { path: "/.lr/annotations", method: "POST" },
@@ -236,10 +235,7 @@ export async function runHostSuite(harness, { pluginDir }) {
       const drawings = await post("drawings.save", { items: [{ type: "stroke" }, { nope: true }] }, { origin: base });
       harness.check("the bridge stores the drawings", drawings.status === 200 && (await drawings.json()).count === 1);
       const diag = await post("diag", { detail: "suite marker" }, { origin: base });
-      harness.check("the bridge takes the diagnostic line", diag.status === 200 && (await diag.json()).ok === true);
-      const status = await (await fetch(`${base}/.lr/status`, { headers: auth })).json();
-      harness.check("the page diagnostic reaches the host log", status.diag.some((entry) => entry.detail.includes("suite marker")), JSON.stringify(status.diag.slice(-2)));
-      harness.check("the page diagnostic is marked as coming from the page", status.diag.some((entry) => entry.detail.startsWith("[page]")), JSON.stringify(status.diag.slice(-2)));
+      harness.check("the bridge rejects an unknown message", diag.status === 400, `status ${diag.status}`);
       const afterSubmit = await (await fetch(`${base}/.lr/bridge`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ type: "state.get", payload: {} }) })).text();
       harness.check("the host log never reaches the page", !afterSubmit.includes("attaches to the next prompt") && !afterSubmit.includes("suite marker"), afterSubmit.slice(0, 160));
     }

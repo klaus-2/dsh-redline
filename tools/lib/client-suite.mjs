@@ -3672,7 +3672,7 @@ export async function runClientSuite(harness, { pluginDir }) {
       harness.check("the card renders the sections disclosure", sectionText.length === 1 && sectionName.length >= 1, JSON.stringify({ text: sectionText.length, name: sectionName.length }));
       const headHits = findByText(rendered.tree, "Browser comments (Redline)");
       harness.check("the card title appears once", headHits.length === 1, JSON.stringify(headHits.length));
-      const cardSpan = /function RedlineAnnotationsCard[\s\S]*?^    function startStatusArming/m.exec(clientSource)?.[0] ?? "";
+            const cardSpan = /function RedlineAnnotationsCard[\s\S]*?^    function PendingCommentsCard/m.exec(clientSource)?.[0] ?? "";
       harness.check("the source keeps dangerouslySetInnerHTML on the icon only", (clientSource.match(/dangerouslySetInnerHTML/g) ?? []).length === 2 && (cardSpan.match(/dangerouslySetInnerHTML/g) ?? []).length === 1, `total=${(clientSource.match(/dangerouslySetInnerHTML/g) ?? []).length}, card=${(cardSpan.match(/dangerouslySetInnerHTML/g) ?? []).length}`);
 
       fetchCalls.length = 0;
@@ -3712,7 +3712,7 @@ export async function runClientSuite(harness, { pluginDir }) {
     const removedSymbols = ["data-chat-anchor-key", "dsh-recall-stack", "lr-card-map-v1", "applyCardsToDom", "buildCardElement", "lr-attached", "cardStore"];
     const stillThere = removedSymbols.filter((symbol) => clientSource.includes(symbol));
     harness.check("the DOM surgery is gone", stillThere.length === 0, stillThere.join(", "));
-    harness.check("the client no longer arms a card from the status poll", !clientSource.includes("claimByMessageId") && !clientSource.includes("lastDelivered") && clientSource.includes("fields=cmd") && !clientSource.includes("fields=cmd,lastDelivered"));
+    harness.check("the client no longer arms a card from the status poll", !clientSource.includes("claimByMessageId") && !clientSource.includes("lastDelivered") && !clientSource.includes("startStatusArming") && !clientSource.includes("fields=cmd"));
   }
 
   harness.section("client: the card pin row sends a locate command");
