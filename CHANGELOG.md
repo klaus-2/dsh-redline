@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_The new overlay surfaces below take effect after the dsh restarts with the
+updated plugin: the host serves the overlay and the settings panel._
+
+### Added
+
+- **Focus mode dims the page and keeps the selected element interactive.** The
+  pin popover's Focus action puts a spotlight on the target and dims the rest
+  of the page while the element and the page stay fully interactive; the layer
+  repositions on scroll and resize, and Esc, closing the bubble, resolving or
+  deleting the pin, closing the panels or hiding the overlay exits it.
+- **A dismissible toast confirms copy and resolve/delete actions in the page.** Copying the CSS or the selector and resolving or deleting annotations confirm with a toast that stacks in the page overlay, carries its own ✕ and auto-dismisses; the chat card shows a separate inline notice for report export and bulk results. The draw-sent and saved confirmations move onto the same stack and get their durations back.
+- **Quick accessibility fixes offer the applicable action on a detected
+  problem.** A failing text-contrast audit proposes a colour that reaches 4.5:1
+  against the resolved background and a failing image-alt audit proposes alt
+  text; the proposal previews live on the element, Apply keeps it and records
+  it on the pin (reaching the agent context and the JSON report with the
+  original value marked as untrusted page evidence), Discard restores the
+  original. Accessible name, role and target size stay report-only.
+- **A page accessibility audit groups the whole page's problems by check
+  type.** A toolbar button scans the page and lists the findings grouped by
+  contrast, accessible name, image alt, role and target size, with per-group
+  counts, the element label, the selector and the measured value per row;
+  clicking a row scrolls the element into view and highlights it, and failing
+  contrast and image-alt rows expose the quick fix. The sweep is bounded to the
+  first 400 candidates and the panel states how many elements were scanned and
+  how many findings there are.
+- **Comment templates insert a reusable sentence with one click.** Five
+  built-in templates (align with the design, reduce spacing, increase
+  contrast, fix overflow, explain why) insert at the caret in the comment
+  composer and in the pin-edit composer; there is no template store and
+  nothing persists.
+- **Duplicate a pin to reuse its comment and adjustments on another element.**
+  A popover action arms a one-shot duplicate: the next picked element gets a
+  new pin with a fresh id and its own selector, the comment copied verbatim
+  and the adjustments re-based onto the new target's computed values. The
+  source pin is untouched, the new element is not restyled, and the duplicate
+  starts without a screenshot.
+- **The pin bubble warns when a selector matches more than one element.** The
+  warning line names the match count and the selector; it is informational
+  only and changes no behaviour.
+- **A preview shows the exact context, images and comments that will be sent
+  to the agent.** The dock renders each section of the pending snapshot as a
+  collapsible block plus the cropped screenshot of every pin; the previewed
+  context is the exact string the delivery attaches. The route is
+  secret-gated and lives in the host dock only — the page cannot read it.
+- **Select several pins in the card and resolve or delete them at once.** The
+  annotations card gains per-row checkboxes, a selection count and a bulk bar
+  that resolves or deletes the selection through one route.
+
+### Changed
+
+- **Removing a pin from the card removes it from the page overlay too; a
+  resolved pin is kept and marked as resolved.** The overlay's own Resolve now
+  reports to the host immediately, the host answers with the ids it resolved,
+  and the overlay keeps those pins marked resolved instead of re-sending them,
+  so the card and the page overlay stop disagreeing. Every mutation of the
+  pending snapshot — the single removal and the new bulk route alike — rebuilds
+  the context and the sections the agent receives, so the preview and the
+  delivery never carry a stale block.
+
 ## [1.4.0] - 2026-11-15
 
 _The theme, hotkey and settings entries below take effect after the dsh restarts

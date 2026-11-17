@@ -48,18 +48,26 @@ Para cada pin, um bloco em um único snapshot:
 - Botão de copiar seletor no popover do pin: coloca o seletor CSS do pin na área de transferência verbatim
 - Reancoragem de pins obsoletos: quando o elemento alvo sai do DOM, o pin é marcado e o popover avisa; arrastar o marcador religa o pin
 - O popover do pin mostra as dimensões em tempo real do alvo (L×A px), recaindo para o snapshot fixado quando o elemento não existe mais
+- O balão do pin avisa quando um seletor corresponde a mais de um elemento, com a contagem.
+- Duplique um pin para reaproveitar o comentário e os ajustes em outro elemento.
+- O modo de foco escurece a página e mantém o elemento selecionado interativo; Esc sai.
 - Temas do overlay: escuro (padrão), claro e uma variante de alto contraste, escolhidos nas configurações do plugin e persistidos
 - Desfazer/refazer no inspetor: Ctrl+Z / Ctrl+Shift+Z (ou os botões do painel) retrocedem e avançam os ajustes e o texto não confirmados enquanto o painel está aberto
 - Clicar em um pin no card do chat rola a página até o elemento e o destaca por alguns instantes
 - Cole uma imagem no composer do comentário: ela é reduzida (máx. 1600px, JPEG), mostrada como um chip removível e entregue junto do pin para o agente ler
 - Screenshots antes/depois por pin ajustado: o recorte "depois" é capturado ao vivo e, então, a página é restaurada para capturar o recorte "antes" do mesmo enquadramento
 - Comentários em grupo: o modo de grupo da toolbar reúne N elementos e publica um comentário copiado para cada pin do grupo (escopo da página — grupos não atravessam páginas)
+- Modelos de comentário inserem uma frase reutilizável no compositor com um clique.
 - Predefinições de preview responsivo: restringe a página a 375/768/1280 px ou volta à largura total; pins criados sob uma predefinição registram a largura (nota: unidades `100vw` e navbars `position: fixed` não respeitam a restrição)
-- Auditoria de acessibilidade por elemento no popover do pin: contraste do texto, nome acessível, alt da imagem, presença de papel e alvo de 24×24
+- Auditoria de acessibilidade no balão do pin e em toda a página, agrupada por tipo de verificação.
+- Correções rápidas aumentam o contraste do texto e adicionam texto alternativo, com pré-visualização antes de confirmar.
+- Um toast dispensável na página confirma copiar e resolver/excluir; o card do chat mostra um aviso inline para exportar o relatório e para ações em lote.
 - Exportação de relatório de pendências: baixe as anotações pendentes como Markdown ou JSON no card de pendentes (protegido por secret, escopo somente pendentes)
+- Pré-visualize o contexto, as imagens e os comentários exatos que serão enviados ao agente.
 - Screenshots recortadas por pin (não a viewport inteira)
+- Selecione vários pins no cartão e resolva ou exclua de uma vez.
 - Anotações anexam à próxima mensagem da sessão que você está visualizando, renderizadas como uma única linha de chat do Redline que reivindica a mensagem (a divulgação genérica de contexto é substituída, não duplicada), e a linha sobrevive a um reload da sessão
-- Reconciliação: remover um pin no card o remove também do overlay da página
+- Remover um pin do cartão também o remove da sobreposição da página; um pin resolvido é mantido e marcado como resolvido.
 - Interface em English / Português (Brasil) / 简体中文, escolhida pelo idioma do navegador
 
 ## Instalação

@@ -75,6 +75,12 @@
       "composerClose": "Close and cancel the comment",
       "pasteTooLarge": "Image too large (max 4 MB)",
       "pasteRemove": "Remove attached image",
+      "templatesLabel": "Templates",
+      "templateAlignDesign": "Align with the design",
+      "templateReduceSpacing": "Reduce spacing",
+      "templateIncreaseContrast": "Increase contrast",
+      "templateFixOverflow": "Fix overflow",
+      "templateExplainWhy": "Explain why this is a problem",
       "panelDrag": "Drag to move · double-click to reset",
       "attachesTo": "attaches to the session chat",
       "savedHint": "Saved — use Send on the card above the composer to dispatch",
@@ -85,6 +91,15 @@
       "reopen": "Reopen",
       "del": "Delete",
       "pinStale": "Target not found — pin is stale. Drag the marker to re-anchor.",
+      "ambiguousSelectorWarning": "This selector matches {n} elements on the page.",
+      "ambiguousSelectorDetail": "Selector: {selector}",
+      "focusMode": "Focus",
+      "focusModeExit": "Exit focus",
+      "focusModeActive": "Focusing: {label}. Press Esc to exit.",
+      "focusModeDismiss": "Dismiss focus mode",
+      "duplicatePin": "Duplicate",
+      "duplicateHint": "Click an element to duplicate this pin. Press Esc to cancel.",
+      "duplicateDone": "Pin duplicated.",
       "pinDimensions": "Dimensions",
       "copyCss": "Copy CSS",
       "cssCopied": "CSS copied to clipboard",
@@ -103,6 +118,17 @@
       "a11yWarn": "Warn",
       "a11yUnknown": "Unknown",
       "a11yNotApplicable": "n/a",
+      "a11yFixApply": "Apply",
+      "a11yFixDiscard": "Discard",
+      "a11yFixContrastProposal": "Contrast {before} → {after} (ratio {ratioBefore} → {ratioAfter})",
+      "a11yFixAltProposal": "Alt text: {value}",
+      "a11yFixApplied": "Fix applied.",
+      "a11yFixDiscarded": "Fix discarded.",
+      "pinDeleted": "Annotation deleted.",
+      "a11yNoAutoFix": "No automatic fix for this check.",
+      "a11yFixContrastUnavailable": "This background cannot reach a 4.5:1 contrast ratio. Change the background instead.",
+      "auditFixComment": "Accessibility fix (text contrast)",
+      "auditFixCommentAlt": "Accessibility fix (image alt text)",
       "groupBtn": "Group",
       "groupHint": "Click elements to group, then press Enter",
       "groupCreated": "Group created",
@@ -113,6 +139,15 @@
       "pendingTitle": "Annotations waiting for your next prompt in the chat",
       "pendingCount": "{n} pending",
       "restoredPins": "Redline: {n} pin(s) restored",
+      "a11yAuditPage": "Page accessibility audit",
+      "a11yAuditScanned": "Scanned {scanned} elements — {findings} findings",
+      "a11yAuditNoIssues": "No accessibility issues found in the scanned elements.",
+      "a11yAuditGroupContrast": "Contrast",
+      "a11yAuditGroupName": "Accessible name",
+      "a11yAuditGroupAlt": "Image alt",
+      "a11yAuditGroupRole": "Role",
+      "a11yAuditGroupTargetSize": "Target size",
+      "a11yAuditIssuesCount": "{n} issues",
     "drawTool": "Draw",
     "drawTitle": "Free canvas",
     "drawHint": "Canvas mode — draw over the page · Esc exits",
@@ -253,6 +288,12 @@
       "composerClose": "Fechar e cancelar o comentário",
       "pasteTooLarge": "Imagem grande demais (máx. 4 MB)",
       "pasteRemove": "Remover imagem anexada",
+      "templatesLabel": "Modelos",
+      "templateAlignDesign": "Alinhar com o design",
+      "templateReduceSpacing": "Reduzir espaçamento",
+      "templateIncreaseContrast": "Aumentar o contraste",
+      "templateFixOverflow": "Corrigir overflow",
+      "templateExplainWhy": "Explicar por que isto é um problema",
       "panelDrag": "Arraste para mover · duplo clique para voltar ao padrão",
       "attachesTo": "anexa ao chat da sessão",
       "savedHint": "Guardada — use Enviar no card acima do composer para despachar",
@@ -263,6 +304,15 @@
       "reopen": "Reabrir",
       "del": "Excluir",
       "pinStale": "Alvo não encontrado — pin obsoleto. Arraste o marcador para reancorar.",
+      "ambiguousSelectorWarning": "Este seletor corresponde a {n} elementos na página.",
+      "ambiguousSelectorDetail": "Seletor: {selector}",
+      "focusMode": "Foco",
+      "focusModeExit": "Sair do foco",
+      "focusModeActive": "Foco: {label}. Pressione Esc para sair.",
+      "focusModeDismiss": "Dispensar modo de foco",
+      "duplicatePin": "Duplicar",
+      "duplicateHint": "Clique em um elemento para duplicar este pin. Pressione Esc para cancelar.",
+      "duplicateDone": "Pin duplicado.",
       "pinDimensions": "Dimensões",
       "copyCss": "Copiar CSS",
       "cssCopied": "CSS copiado para a área de transferência",
@@ -281,6 +331,17 @@
       "a11yWarn": "Atenção",
       "a11yUnknown": "Desconhecido",
       "a11yNotApplicable": "n/a",
+      "a11yFixApply": "Aplicar",
+      "a11yFixDiscard": "Descartar",
+      "a11yFixContrastProposal": "Contraste {before} → {after} (razão {ratioBefore} → {ratioAfter})",
+      "a11yFixAltProposal": "Texto alternativo: {value}",
+      "a11yFixApplied": "Correção aplicada.",
+      "a11yFixDiscarded": "Correção descartada.",
+      "pinDeleted": "Anotação excluída.",
+      "a11yNoAutoFix": "Sem correção automática para esta verificação.",
+      "a11yFixContrastUnavailable": "Este fundo não atinge uma razão de contraste de 4,5:1. Altere o fundo.",
+      "auditFixComment": "Correção de acessibilidade (contraste do texto)",
+      "auditFixCommentAlt": "Correção de acessibilidade (texto alternativo da imagem)",
       "groupBtn": "Agrupar",
       "groupHint": "Clique nos elementos para agrupar, depois pressione Enter",
       "groupCreated": "Grupo criado",
@@ -291,6 +352,15 @@
       "pendingTitle": "Anotações aguardando seu próximo prompt no chat",
       "pendingCount": "{n} pendente(s)",
       "restoredPins": "Redline: {n} pin(s) restaurado(s)",
+      "a11yAuditPage": "Auditoria de acessibilidade da página",
+      "a11yAuditScanned": "Analisados {scanned} elementos — {findings} problemas",
+      "a11yAuditNoIssues": "Nenhum problema de acessibilidade encontrado nos elementos analisados.",
+      "a11yAuditGroupContrast": "Contraste",
+      "a11yAuditGroupName": "Nome acessível",
+      "a11yAuditGroupAlt": "Texto alternativo da imagem",
+      "a11yAuditGroupRole": "Função",
+      "a11yAuditGroupTargetSize": "Tamanho do alvo",
+      "a11yAuditIssuesCount": "{n} problemas",
     "drawTool": "Desenhar",
     "drawTitle": "Canvas livre",
     "drawHint": "Modo canvas — desenhe sobre a página · Esc sai",
@@ -431,6 +501,12 @@
       "composerClose": "关闭并取消评论",
       "pasteTooLarge": "图片过大（上限 4 MB）",
       "pasteRemove": "移除附加图片",
+      "templatesLabel": "模板",
+      "templateAlignDesign": "与设计对齐",
+      "templateReduceSpacing": "减少间距",
+      "templateIncreaseContrast": "提高对比度",
+      "templateFixOverflow": "修复溢出",
+      "templateExplainWhy": "说明为什么这是个问题",
       "panelDrag": "拖动移动 · 双击恢复默认位置",
       "attachesTo": "附加到会话聊天",
       "savedHint": "已保存 — 使用 composer 上方卡片的发送按钮派发",
@@ -441,6 +517,15 @@
       "reopen": "重新打开",
       "del": "删除",
       "pinStale": "未找到目标 — 图钉已失效。拖动标记以重新锚定。",
+      "ambiguousSelectorWarning": "此选择器匹配页面上的 {n} 个元素。",
+      "ambiguousSelectorDetail": "选择器：{selector}",
+      "focusMode": "聚焦",
+      "focusModeExit": "退出聚焦",
+      "focusModeActive": "聚焦中：{label}。按 Esc 退出。",
+      "focusModeDismiss": "关闭聚焦模式",
+      "duplicatePin": "复制",
+      "duplicateHint": "点击某个元素以复制此 pin。按 Esc 取消。",
+      "duplicateDone": "Pin 已复制。",
       "pinDimensions": "尺寸",
       "copyCss": "复制 CSS",
       "cssCopied": "CSS 已复制到剪贴板",
@@ -459,6 +544,17 @@
       "a11yWarn": "警告",
       "a11yUnknown": "未知",
       "a11yNotApplicable": "不适用",
+      "a11yFixApply": "应用",
+      "a11yFixDiscard": "放弃",
+      "a11yFixContrastProposal": "对比度 {before} → {after}（比值 {ratioBefore} → {ratioAfter}）",
+      "a11yFixAltProposal": "替代文本：{value}",
+      "a11yFixApplied": "修复已应用。",
+      "a11yFixDiscarded": "修复已放弃。",
+      "pinDeleted": "批注已删除。",
+      "a11yNoAutoFix": "此检查没有自动修复。",
+      "a11yFixContrastUnavailable": "此背景无法达到 4.5:1 对比度。请改为调整背景。",
+      "auditFixComment": "无障碍修复（文本对比度）",
+      "auditFixCommentAlt": "无障碍修复（图片替代文本）",
       "groupBtn": "成组",
       "groupHint": "点击要成组的元素，然后按 Enter",
       "groupCreated": "组已创建",
@@ -469,6 +565,15 @@
       "pendingTitle": "标注将随你的下一条消息发送",
       "pendingCount": "{n} 条待发送",
       "restoredPins": "Redline: 已恢复 {n} 个图钉",
+      "a11yAuditPage": "页面无障碍审计",
+      "a11yAuditScanned": "已扫描 {scanned} 个元素 — {findings} 个问题",
+      "a11yAuditNoIssues": "在已扫描的元素中未发现无障碍问题。",
+      "a11yAuditGroupContrast": "对比度",
+      "a11yAuditGroupName": "可访问名称",
+      "a11yAuditGroupAlt": "图片替代文本",
+      "a11yAuditGroupRole": "角色",
+      "a11yAuditGroupTargetSize": "目标尺寸",
+      "a11yAuditIssuesCount": "{n} 个问题",
     "drawTool": "绘制",
     "drawTitle": "自由画布",
     "drawHint": "画布模式 — 在页面上绘制 · Esc 退出",
@@ -656,12 +761,17 @@
   let hotkeyHidePins = parseHotkey(SETTINGS.keys?.hidePins) ?? parseHotkey("h");
   const t = (key) => UI_LOCALES[UI_LANG][key] ?? UI_LOCALES.en[key] ?? key;
   let mode = null;
+  let duplicateArmed = null;
   let hovered = null;
   let draft = null;
   let pastedShot = null;
   let pasteChipNode = null;
   let pasteThumbNode = null;
   let openPinId = null;
+  const focusState = { current: null };
+  let focusSpotlightNode = null;
+  let focusHintNode = null;
+  let focusRepositionTimer = null;
   let screenshotOnSend = SETTINGS.screenshot === false ? false : true;
   let html2canvasReady = null;
   let hidden = false;
@@ -688,10 +798,10 @@
     try {
       const raw = JSON.parse(sessionStorage.getItem(PANEL_POS_KEY) ?? "null");
       const read = (value) => (Number.isFinite(value?.x) && Number.isFinite(value?.y) ? { x: Math.round(value.x), y: Math.round(value.y) } : null);
-      const stored = { composer: read(raw?.composer), pin: read(raw?.pin), adjust: read(raw?.adjust) };
+      const stored = { composer: read(raw?.composer), pin: read(raw?.pin), adjust: read(raw?.adjust), audit: read(raw?.audit) };
       return stored;
     } catch {
-      return { composer: null, pin: null, adjust: null };
+      return { composer: null, pin: null, adjust: null, audit: null };
     }
   }
   function savePanelPositions() {
@@ -738,6 +848,14 @@
     }
   }
 
+  function countSelectorMatches(selector, queryAll) {
+    try {
+      return queryAll(selector).length;
+    } catch {
+      return 0;
+    }
+  }
+
   function quickLabel(el) {
     const component = reactComponentName(el);
     const tag = `${el.localName}${el.id ? `#${el.id}` : ""}`;
@@ -764,6 +882,53 @@
     return null;
   }
 
+  function buildDuplicatePin(source, target, id, readBefore) {
+    return {
+      id,
+      tag: target.tag,
+      role: target.role,
+      label: target.label,
+      selector: target.selector,
+      text: target.text,
+      component: target.component,
+      comment: source.comment,
+      changes: (Array.isArray(source.changes) ? source.changes : []).map((change) => ({ prop: change.prop, before: readBefore(change.prop), after: change.after })),
+      pageUrl: source.pageUrl,
+      rect: target.rect,
+      offsets: target.offsets,
+      shot: null,
+      status: "queued"
+    };
+  }
+
+  function createDuplicatePin(target, event) {
+    const source = duplicateArmed;
+    duplicateArmed = null;
+    if (source === null) return;
+    const rect = target.getBoundingClientRect();
+    const pin = buildDuplicatePin(
+      source,
+      {
+        selector: cssPath(target),
+        tag: target.localName,
+        role: target.getAttribute?.("role") ?? "",
+        label: target.getAttribute?.("aria-label") ?? "",
+        text: (target.textContent ?? "").trim().slice(0, 300),
+        component: reactComponentName(target) ?? "",
+        rect: { x: rect.left, y: rect.top, w: rect.width, h: rect.height },
+        offsets: { ox: event ? event.clientX - rect.left : rect.width / 2, oy: event ? event.clientY - rect.top : rect.height / 2 }
+      },
+      crypto.randomUUID(),
+      (prop) => computedValue(target, prop)
+    );
+    pin.at = Date.now();
+    pins.push(pin);
+    savePins();
+    renderPins();
+    void postSnapshot();
+    toast(t("duplicateDone"), 2600);
+  }
+
 
   const host = document.createElement("div");
   host.id = "dsh-redline-host";
@@ -777,11 +942,12 @@
     .lr-close:hover { background: var(--n-100); color: var(--n-950); }
     .chip > span { flex: none; }
     .chip svg { flex: none; width: 12px; height: 12px; }
-    .pin-bubble-body { padding: 0 10px 8px; color: var(--n-950); }
+    .pin-bubble-body { padding: 0 10px 8px; color: var(--n-950); max-height: 220px; overflow: auto; }
     .pin-bubble-meta { color: var(--n-500); font-size: 11px; word-break: break-all; margin-bottom: 4px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     .pin-bubble-changes { color: var(--n-600); font-size: 11px; margin-top: 4px; }
     .pin-bubble-stale { color: var(--error); font-size: 11px; margin-top: 4px; }
+    .pin-bubble-warning { color: var(--error); font-size: 11px; margin-top: 4px; }
     .lr-a11y { display: grid; gap: 3px; margin: 6px 0 0; padding: 6px 8px; border-radius: 8px; background: var(--n-100); }
     .lr-a11y-title { color: var(--n-500); font-size: 11px; font-weight: 600; }
     .lr-a11y-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--n-600); }
@@ -792,11 +958,41 @@
     .lr-a11y-chip.fail { background: color-mix(in oklab, var(--error), white 75%); color: var(--error); }
     .lr-a11y-chip.warn { background: color-mix(in oklab, var(--warn), white 75%); color: var(--warn); }
     .lr-a11y-chip.unknown, .lr-a11y-chip.n\/a { background: var(--n-200); color: var(--n-600); }
-    .pin-bubble-actions { display: flex; gap: 6px; padding: 6px 10px 10px; }
+    .lr-a11y-fix { all: unset; cursor: pointer; flex: none; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; background: var(--n-200); color: var(--n-950); }
+    .lr-a11y-fix:hover { background: var(--accent); color: #fff; }
+    .lr-a11y-fix-proposal { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 5px 7px; border-radius: 8px; background: var(--n-200); font-size: 11px; color: var(--n-700); }
+    .lr-a11y-fix-proposal .lr-field { height: 22px; flex: 1 1 100%; }
+    .lr-a11y-fix-proposal button { all: unset; cursor: pointer; padding: 2px 8px; border-radius: 7px; font-size: 11px; background: var(--n-950); color: var(--n-50); }
+    .lr-a11y-fix-proposal button:hover { filter: brightness(1.15); }
+    .lr-a11y-fix-note { flex: 1; min-width: 0; word-break: break-word; }
+    .pin-bubble-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 10px 10px; }
     .pin-bubble-actions button { all: unset; cursor: pointer; padding: 3px 10px; border-radius: 8px;
       font-size: 12px; background: var(--n-100); color: var(--n-950); }
     .pin-bubble-actions button:hover { background: var(--n-200); }
     .pin-bubble-actions .danger { color: var(--error); }
+    .pin-bubble-actions-secondary { flex-wrap: wrap; }
+    .lr-audit-panel { position: fixed; width: 320px; max-width: calc(100vw - 24px); max-height: min(70vh, 560px); display: flex; flex-direction: column; overflow: hidden; }
+    .lr-audit-body { overflow-y: auto; padding: 0 10px 10px; display: grid; gap: 6px; }
+    .lr-audit-group { display: grid; gap: 3px; margin: 0; padding: 6px 8px; border-radius: 8px; background: var(--n-100); }
+    .lr-audit-group-title { display: flex; align-items: center; gap: 6px; color: var(--n-500); font-size: 11px; font-weight: 600; }
+    .lr-audit-count { flex: none; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; background: color-mix(in oklab, var(--error), white 75%); color: var(--error); }
+    .lr-audit-row { all: unset; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--n-600); }
+    .lr-audit-row:hover { color: var(--n-950); }
+    .lr-audit-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lr-audit-value { max-width: 110px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--n-500); }
+    .lr-audit-row .lr-a11y-fix { margin-left: auto; }
+    .lr-audit-summary { color: var(--n-500); font-size: 11px; padding: 2px 0 6px; }
+    .lr-focus-spotlight { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none;
+      border-radius: 6px; outline: 2px solid rgba(255,255,255,0.9); box-shadow: 0 0 0 100vmax rgba(0,0,0,0.55); z-index: 2147483603; }
+    .lr-focus-hint { position: fixed; left: 50%; top: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px; border-radius: 10px; background: var(--n-950); color: var(--n-50); font-size: 11px; pointer-events: none; z-index: 2147483604; }
+    .lr-focus-hint .lr-close { pointer-events: auto; }
+    .lr-toast-stack { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); pointer-events: none; display: grid; gap: 8px; z-index: 2147483602; }
+    .lr-toast-stack .toast { position: static; left: auto; bottom: auto; transform: none; }
+    .lr-template-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+    .lr-template-label { flex: none; color: var(--n-500); font-size: 10px; }
+    .lr-template-chip { all: unset; box-sizing: border-box; cursor: pointer; padding: 2px 7px; border-radius: 8px; background: var(--n-100); color: var(--accent); font-size: 10px; }
+    .lr-template-chip:hover { background: var(--n-200); }
 
     .lr-insp { width: 372px; max-width: calc(100vw - 24px); overflow: hidden; }
     .lr-insp-sub { color: var(--n-500); font-size: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
@@ -1451,7 +1647,7 @@
         saveDrawings();
         redrawDrawings();
         updateDrawBarState();
-        setHint(t("drawSentHint"), 3600);
+        toast(t("drawSentHint"), 3600);
       }
     } finally {
       drawSending = false;
@@ -1696,9 +1892,14 @@
     viewportBtn.classList.toggle("tool-active", !vpIsDefault());
   }
   const eyeBtn = el("button", { class: "tool", title: "Mostrar/ocultar pins", html: ICONS.eye });
+  const auditBtn = el("button", { class: "tool", title: t("a11yAuditPage"), "aria-label": t("a11yAuditPage") }, el("span", { class: "tool-label" }, t("a11yAuditPage")));
+  auditBtn.addEventListener("click", () => {
+    if (auditPanelNode !== null) closeAuditPanel();
+    else openAuditPanel();
+  });
     drawBtn = el("button", { class: "tool", title: t("drawTitle") + " (" + formatHotkey(hotkeyDraw) + ")", html: ICONS_CANVAS.brush }, el("span", { class: "tool-label" }, t("drawTool")), el("kbd", {}, formatHotkey(hotkeyDraw)));
     drawBtn.addEventListener("click", () => toggleDraw());
-    toolbar.append(statusDot, divider, commentBtn, pendingSpan, adjustBtn, drawBtn, groupBtn, viewportBtn, eyeBtn);
+    toolbar.append(statusDot, divider, commentBtn, pendingSpan, adjustBtn, drawBtn, groupBtn, viewportBtn, eyeBtn, auditBtn);
   wrap.append(hint, toolbar);
   rootDiv.append(wrap);
 
@@ -1726,6 +1927,13 @@
     groupBtn.querySelector(".tool-label").textContent = t("groupBtn");
     viewportBtn.title = t("viewportLabel");
     viewportBtn.setAttribute("aria-label", t("viewportLabel"));
+    auditBtn.title = t("a11yAuditPage");
+    auditBtn.setAttribute("aria-label", t("a11yAuditPage"));
+    auditBtn.querySelector(".tool-label").textContent = t("a11yAuditPage");
+    if (auditPanelNode !== null) {
+      const chip = auditPanelNode.querySelector(".chip");
+      if (chip !== null) chip.textContent = t("a11yAuditPage");
+    }
     updateViewportBtn();
     eyeBtn.title = t("eyeTitle");
     statusDot.title = t("statusTitle");
@@ -1792,6 +2000,9 @@
       openPinId = null;
       pinPanelNode?.remove();
       pinPanelNode = null;
+      a11yFixHandler.current = null;
+      exitFocusMode();
+      closeAuditPanel();
       discardDraft();
       if (groupComposerNode !== null) setGroupMode(false);
     }
@@ -1836,6 +2047,59 @@
     revealTimer = setTimeout(() => { clearHighlight(); revealTimer = null; }, 2000);
   }
 
+  function focusSpotlightRect(rect) {
+    return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+  }
+
+  function exitFocusMode() {
+    focusState.current = null;
+    focusSpotlightNode?.remove();
+    focusSpotlightNode = null;
+    focusHintNode?.remove();
+    focusHintNode = null;
+    if (focusRepositionTimer !== null) {
+      clearTimeout(focusRepositionTimer);
+      focusRepositionTimer = null;
+    }
+  }
+
+  function enterFocusMode(pin) {
+    const target = locate(pin.selector);
+    if (target === null) return;
+    const label = quickLabel(target);
+    const rect = target.getBoundingClientRect();
+    focusState.current = { selector: pin.selector, label, rect };
+    const box = focusSpotlightRect(rect);
+    focusSpotlightNode = el("div", { class: "lr-focus-spotlight" });
+    Object.assign(focusSpotlightNode.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` });
+    rootDiv.append(focusSpotlightNode);
+    focusHintNode = el("div", { class: "lr-focus-hint" },
+      el("span", {}, t("focusModeActive").replace("{label}", label)),
+      el("button", { class: "lr-close", title: t("focusModeDismiss"), type: "button", onclick: () => exitFocusMode() }, "✕"));
+    rootDiv.append(focusHintNode);
+    if (focusRepositionTimer !== null) clearTimeout(focusRepositionTimer);
+    focusRepositionTimer = setTimeout(() => { focusRepositionTimer = null; repositionFocus(); }, 0);
+  }
+
+  function toggleFocusMode(pin) {
+    if (focusState.current !== null) {
+      exitFocusMode();
+      return;
+    }
+    enterFocusMode(pin);
+  }
+
+  function repositionFocus() {
+    if (focusState.current === null) return;
+    const target = locate(focusState.current.selector);
+    if (target === null) return;
+    const rect = target.getBoundingClientRect();
+    focusState.current.rect = rect;
+    if (focusSpotlightNode === null) return;
+    const box = focusSpotlightRect(rect);
+    Object.assign(focusSpotlightNode.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` });
+  }
+
   document.addEventListener(
     "mousemove",
     (event) => {
@@ -1858,7 +2122,8 @@
       event.preventDefault();
       event.stopPropagation();
       if (mode === "picking") {
-        openDraft(target, event);
+        if (duplicateArmed !== null) createDuplicatePin(target, event);
+        else openDraft(target, event);
 
         setMode(null);
       } else if (mode === "adjust") {
@@ -1872,6 +2137,35 @@
     },
     true
   );
+
+  function handleEscape(event) {
+    if (focusState.current !== null) {
+      exitFocusMode();
+      return true;
+    }
+    if (drawMode) { toggleDraw(false); return true; }
+    if (groupMode) { setGroupMode(false); return true; }
+    if (adjustPanel !== null) {
+      closeAdjustPanel(true);
+      return true;
+    }
+    if (openPinId !== null) {
+      openPinId = null;
+      pinPanelNode?.remove();
+      pinPanelNode = null;
+      a11yFixHandler.current = null;
+      exitFocusMode();
+      return true;
+    }
+    if (auditPanelNode !== null) {
+      closeAuditPanel();
+      return true;
+    }
+    if (draft !== null) {
+      discardDraft();
+    } else if (mode !== null) setMode(null);
+    return true;
+  }
 
   document.addEventListener(
     "keydown",
@@ -1915,15 +2209,8 @@
       else if (hotkeyMatches(event, hotkeyDraw)) toggleDraw();
       else if (hotkeyMatches(event, hotkeyHidePins)) setHidden(!hidden);
       if (event.key === "Escape") {
-        if (drawMode) { toggleDraw(false); return; }
-        if (groupMode) { setGroupMode(false); return; }
-        if (adjustPanel !== null) {
-          closeAdjustPanel(true);
-          return;
-        }
-        if (draft !== null) {
-          discardDraft();
-        } else if (mode !== null) setMode(null);
+        handleEscape(event);
+        return;
       }
       if (event.key === "Enter" && groupMode && groupComposerNode === null) {
         event.preventDefault();
@@ -1935,6 +2222,7 @@
 
   function setMode(next) {
     mode = mode === next ? null : next;
+    if (mode !== "picking" && duplicateArmed !== null) duplicateArmed = null;
     if (mode !== "picking" && mode !== "adjust") clearHighlight();
     if (mode === "picking") {
       setHint(t("pickHint"));
@@ -2054,6 +2342,7 @@
       }
     }
     repositionDraft();
+    repositionFocus();
   }
   function repositionDraft() {
     if (draft === null || draftNode === null || composerNode === null) return;
@@ -2323,6 +2612,37 @@
     renderDraft();
   }
 
+  function insertAtCaret(textarea, text) {
+    const value = textarea.value ?? "";
+    const start = textarea.selectionStart ?? value.length;
+    const end = textarea.selectionEnd ?? start;
+    return {
+      value: `${value.slice(0, start)}${text}${value.slice(end)}`,
+      selectionStart: start,
+      selectionEnd: start + text.length
+    };
+  }
+
+  function applyTemplate(textarea, text) {
+    const value = textarea.value ?? "";
+    const caret = textarea.selectionStart ?? value.length;
+    const separator = value !== "" && caret === value.length && !/\s$/.test(value) ? " " : "";
+    const next = insertAtCaret(textarea, `${separator}${text}`);
+    textarea.value = next.value;
+    textarea.selectionStart = next.selectionStart;
+    textarea.selectionEnd = next.selectionEnd;
+    textarea.focus({ preventScroll: true });
+  }
+
+  function renderTemplateRow(textarea) {
+    const row = el("div", { class: "lr-template-row" });
+    row.append(el("span", { class: "lr-template-label" }, t("templatesLabel")));
+    for (const key of ["templateAlignDesign", "templateReduceSpacing", "templateIncreaseContrast", "templateFixOverflow", "templateExplainWhy"]) {
+      row.append(el("button", { class: "lr-template-chip", type: "button", onclick: () => applyTemplate(textarea, t(key)) }, t(key)));
+    }
+    return row;
+  }
+
   function renderDraft() {
     draftNode?.remove();
     composerNode?.remove();
@@ -2398,7 +2718,7 @@
         el("span", { class: "composer-provider" }, el("span", { class: "composer-provider-label" }, t("attachesTo"))),
         el("button", { class: "lr-close", title: t("composerClose"), type: "button", onclick: discardDraft }, "✕")
       ),
-      el("div", { class: "prompt-input" }, pasteChipNode, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }, shotToggle), submit))
+      el("div", { class: "prompt-input" }, pasteChipNode, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }, renderTemplateRow(textarea), shotToggle), submit))
     );
     fixedLayer.append(composerNode);
     applyPanelPosition(composerNode, "composer");
@@ -2471,6 +2791,7 @@
         comment: p.comment,
         changes: p.changes,
         textChange: p.textChange ?? null,
+        fixes: p.fixes ?? [],
         rect: p.rect,
         shot: p.shot ?? null,
         afterShot: p.afterShot ?? null,
@@ -2482,7 +2803,7 @@
     try {
       const data = await bridgeSend("annotations.submit", payload);
       if (data === null || typeof data !== "object" || data.ok !== true) throw new Error(`HTTP ${data?.error ?? "?"}`);
-      setHint(t("savedHint"), 4200);
+      toast(t("savedHint"), 4200);
       updateToolbar();
       return true;
     } catch (error) {
@@ -2602,6 +2923,8 @@
   const A11Y_SEMANTIC_TAGS = new Set(["button", "input", "select", "textarea", "img", "h1", "h2", "h3", "h4", "h5", "h6", "nav", "main", "header", "footer", "ul", "ol", "table"]);
   const A11Y_ROW_LABELS = { contrast: "a11yContrast", name: "a11yAccessibleName", imgAlt: "a11yImgAlt", role: "a11yRole", targetSize: "a11yTargetSize" };
   const A11Y_STATUS_KEYS = { pass: "a11yPass", fail: "a11yFail", warn: "a11yWarn", unknown: "a11yUnknown", "n/a": "a11yNotApplicable" };
+  const A11Y_FIXABLE_CHECKS = new Set(["contrast", "imgAlt"]);
+  const a11yFixHandler = { current: null };
   function relativeLuminance(color) {
     const channel = (raw) => {
       const c = raw / 255;
@@ -2675,6 +2998,55 @@
     const rect = el.getBoundingClientRect?.() ?? { width: 0, height: 0 };
     rows.push({ check: "targetSize", status: rect.width >= 24 && rect.height >= 24 ? "pass" : "fail", value: `${Math.round(rect.width)}×${Math.round(rect.height)}` });
     return rows;
+  }
+  const A11Y_AUDIT_FAMILY_SELECTORS = { interactive: "button, a, input, select, textarea, [contenteditable]", images: "img", semantic: "h1, h2, h3, h4, h5, h6, nav, main, header, footer, ul, ol, table" };
+  function collectAuditCandidates(families, walkBudget) {
+    const seen = new Set();
+    const candidates = [];
+    const add = (element) => {
+      if (!(element instanceof Element) || seen.has(element)) return;
+      seen.add(element);
+      candidates.push(element);
+    };
+    for (const collect of [families?.interactive, families?.images, families?.semantic]) {
+      if (typeof collect !== "function") continue;
+      for (const element of collect()) add(element);
+    }
+    if (typeof families?.textBearing === "function") {
+      let visited = 0;
+      const walk = (node) => {
+        if (node === null || node === undefined || visited >= walkBudget) return;
+        visited += 1;
+        for (const child of node.childNodes ?? []) {
+          if (child.nodeType === 3 && typeof child.data === "string" && child.data.trim() !== "") {
+            add(node);
+            break;
+          }
+        }
+        for (const child of node.children ?? []) walk(child);
+      };
+      walk(families.textBearing());
+    }
+    return candidates;
+  }
+  function pickAuditCandidates(candidates, cap) {
+    const list = Array.isArray(candidates) ? candidates : [];
+    return list.slice(0, cap);
+  }
+  const A11Y_GROUP_TITLES = { contrast: "a11yAuditGroupContrast", name: "a11yAuditGroupName", imgAlt: "a11yAuditGroupAlt", role: "a11yAuditGroupRole", targetSize: "a11yAuditGroupTargetSize" };
+  function groupAuditFindings(findings) {
+    const groups = [];
+    const byCheck = new Map();
+    for (const finding of Array.isArray(findings) ? findings : []) {
+      if (finding?.status !== "fail") continue;
+      if (!byCheck.has(finding.check)) {
+        const group = { check: finding.check, label: A11Y_ROW_LABELS[finding.check] ?? finding.check, title: A11Y_GROUP_TITLES[finding.check] ?? finding.check, findings: [] };
+        byCheck.set(finding.check, group);
+        groups.push(group);
+      }
+      byCheck.get(finding.check).findings.push(finding);
+    }
+    return groups;
   }
   let groupMode = false;
   let groupPicks = [];
@@ -2946,12 +3318,202 @@
 
   function a11yAuditSection(target) {
     const rows = auditElement(target);
-    return rows.length === 0 ? null : el("div", { class: "lr-a11y" },
-      el("div", { class: "lr-a11y-title" }, t("a11yTitle")),
-      rows.map((row) => el("div", { class: "lr-a11y-row" },
+    if (rows.length === 0) return null;
+    const section = el("div", { class: "lr-a11y" }, el("div", { class: "lr-a11y-title" }, t("a11yTitle")));
+    for (const row of rows) {
+      const line = el("div", { class: "lr-a11y-row" },
         el("span", { class: "lr-a11y-label" }, t(A11Y_ROW_LABELS[row.check] ?? row.check)),
         el("span", { class: "lr-a11y-value" }, row.value),
-        el("span", { class: `lr-a11y-chip ${row.status === "n/a" ? "na" : row.status}` }, t(A11Y_STATUS_KEYS[row.status] ?? row.status)))));
+        el("span", { class: `lr-a11y-chip ${row.status === "n/a" ? "na" : row.status}` }, t(A11Y_STATUS_KEYS[row.status] ?? row.status)));
+      if (row.status === "fail" && a11yFixHandler.current !== null && A11Y_FIXABLE_CHECKS.has(row.check)) {
+        line.append(el("button", { class: "lr-a11y-fix", type: "button", onclick: () => showA11yFixPreview(section, line, target, row.check) }, t("a11yFixApply")));
+      }
+      section.append(line);
+    }
+    return section;
+  }
+
+  function showA11yFixPreview(container, anchor, target, check) {
+    const handler = a11yFixHandler.current;
+    if (handler === null || !(target instanceof Element)) return;
+    container.querySelector(":scope > .lr-a11y-fix-proposal")?.remove();
+    container.querySelectorAll(".lr-a11y-fix[data-applied]").forEach((node) => { node.removeAttribute("data-applied"); node.textContent = t("a11yFixApply"); });
+    const proposalRow = el("div", { class: "lr-a11y-fix-proposal" });
+    if (!A11Y_FIXABLE_CHECKS.has(check)) {
+      proposalRow.append(el("span", { class: "lr-a11y-fix-note" }, t("a11yNoAutoFix")));
+      anchor.after(proposalRow);
+      return;
+    }
+    if (anchor instanceof Element && anchor.classList?.contains("lr-a11y-fix")) {
+      anchor.dataset.applied = "true";
+      anchor.textContent = t("a11yFixApplied");
+    }
+    if (check === "contrast") {
+      const proposal = proposeContrastFix(getComputedStyle(target).color ?? "", resolveReadableBackground(target));
+      if (proposal === null) {
+        proposalRow.append(el("span", { class: "lr-a11y-fix-note" }, t("a11yFixContrastUnavailable")));
+        anchor.after(proposalRow);
+        return;
+      }
+      const original = target.style.getPropertyValue("color");
+      const ratioText = (value) => String(Math.round(value * 100) / 100);
+      target.style.setProperty("color", proposal.after);
+      proposalRow.append(
+        el("span", { class: "lr-a11y-fix-note" }, t("a11yFixContrastProposal").replace("{before}", proposal.before).replace("{after}", proposal.after).replace("{ratioBefore}", ratioText(proposal.ratioBefore)).replace("{ratioAfter}", ratioText(proposal.ratioAfter))),
+        el("button", { type: "button", onclick: () => {
+          const pin = handler.ensurePin(target, "contrast");
+          if (!Array.isArray(pin.fixes)) pin.fixes = [];
+          pin.fixes.push({ check: "contrast", prop: "color", before: proposal.before, after: proposal.after });
+          proposalRow.remove();
+          toast(t("a11yFixApplied"));
+          void postSnapshot();
+        } }, t("a11yFixApply")),
+        el("button", { type: "button", onclick: () => {
+          if (original === "") target.style.removeProperty("color");
+          else target.style.setProperty("color", original);
+          proposalRow.remove();
+          toast(t("a11yFixDiscarded"));
+        } }, t("a11yFixDiscard"))
+      );
+    } else {
+      const attr = (name) => {
+        const value = target.getAttribute?.(name);
+        return typeof value === "string" ? value : undefined;
+      };
+      const original = attr("alt") ?? null;
+      const note = el("span", { class: "lr-a11y-fix-note" });
+      const field = el("input", { class: "lr-field", type: "text" });
+      field.value = deriveAltText({ alt: attr("alt"), ariaLabel: attr("aria-label"), title: attr("title"), src: attr("src") });
+      target.setAttribute("alt", field.value);
+      field.addEventListener("input", () => {
+        target.setAttribute("alt", field.value);
+        note.textContent = t("a11yFixAltProposal").replace("{value}", field.value);
+      });
+      note.textContent = t("a11yFixAltProposal").replace("{value}", field.value);
+      proposalRow.append(
+        field,
+        note,
+        el("button", { type: "button", onclick: () => {
+          const pin = handler.ensurePin(target, "imgAlt");
+          if (!Array.isArray(pin.fixes)) pin.fixes = [];
+          pin.fixes.push({ check: "imgAlt", prop: null, before: original, after: field.value });
+          proposalRow.remove();
+          toast(t("a11yFixApplied"));
+          void postSnapshot();
+        } }, t("a11yFixApply")),
+        el("button", { type: "button", onclick: () => {
+          if (original === null) target.removeAttribute("alt");
+          else target.setAttribute("alt", original);
+          proposalRow.remove();
+          toast(t("a11yFixDiscarded"));
+        } }, t("a11yFixDiscard"))
+      );
+    }
+    anchor.after(proposalRow);
+  }
+
+  function closePinPanel() {
+    openPinId = null;
+    pinPanelNode?.remove();
+    pinPanelNode = null;
+    a11yFixHandler.current = null;
+    exitFocusMode();
+  }
+
+  let auditPanelNode = null;
+  let auditPlaceDefault = null;
+  function closeAuditPanel() {
+    auditPanelNode?.remove();
+    auditPanelNode = null;
+    auditPlaceDefault = null;
+  }
+  function runPageAudit() {
+    const root = document.body ?? document.documentElement;
+    const interactive = () => Array.from(root.querySelectorAll(A11Y_AUDIT_FAMILY_SELECTORS.interactive)).slice(0, 400);
+    const images = () => Array.from(root.querySelectorAll(A11Y_AUDIT_FAMILY_SELECTORS.images)).slice(0, 400);
+    const semantic = () => Array.from(root.querySelectorAll(A11Y_AUDIT_FAMILY_SELECTORS.semantic)).slice(0, 400);
+    const textBearing = () => root;
+    const collected = collectAuditCandidates({ interactive, images, semantic, textBearing }, 400);
+    const inspectionList = pickAuditCandidates(collected, 400);
+    const findings = [];
+    for (const element of inspectionList) {
+      for (const row of auditElement(element)) {
+        if (row.status === "fail") findings.push({ check: row.check, status: row.status, value: row.value, selector: cssPath(element), label: quickLabel(element), element });
+      }
+    }
+    return { scanned: inspectionList.length, collected: collected.length, findings };
+  }
+  function openAuditPanel() {
+    closeAuditPanel();
+    mountShadow();
+    const result = runPageAudit();
+    const groups = groupAuditFindings(result.findings);
+    a11yFixHandler.current = {
+      ensurePin: (element, check) => {
+        const selector = cssPath(element);
+        let pin = pins.find((p) => p.selector === selector);
+        if (pin === undefined) {
+          const rect = element.getBoundingClientRect();
+          pin = {
+            id: crypto.randomUUID(),
+            tag: element.localName,
+            role: element.getAttribute?.("role") ?? "",
+            label: element.getAttribute?.("aria-label") ?? "",
+            selector,
+            text: (element.textContent ?? "").trim().slice(0, 300),
+            component: reactComponentName(element) ?? "",
+            comment: check === "imgAlt" ? t("auditFixCommentAlt") : t("auditFixComment"),
+            changes: [],
+            pageUrl: PAGE_URL,
+            rect: { x: rect.left, y: rect.top, w: rect.width, h: rect.height },
+            offsets: { ox: rect.width / 2, oy: rect.height / 2 },
+            shot: null,
+            status: "queued",
+            at: Date.now()
+          };
+          if (viewportPresetWidth !== null) pin.viewportWidth = viewportPresetWidth;
+          pins.push(pin);
+          savePins();
+          renderPins();
+        }
+        return pin;
+      }
+    };
+    const panel = el("div", { class: "popover composer lr-audit-panel", style: "width:320px" });
+    const placeDefault = () => {
+      panel.style.left = `${Math.min(Math.max(8, window.innerWidth - 348), Math.max(8, window.innerWidth - panel.offsetWidth - 8))}px`;
+      panel.style.top = `${Math.min(Math.max(8, 64), Math.max(8, window.innerHeight - panel.offsetHeight - 8))}px`;
+      panel.style.transform = "none";
+    };
+    auditPlaceDefault = placeDefault;
+    const body = el("div", { class: "lr-audit-body" }, el("div", { class: "lr-audit-summary" }, t("a11yAuditScanned").replace("{scanned}", result.scanned).replace("{findings}", result.findings.length)));
+    if (groups.length === 0) {
+      body.append(el("div", { class: "lr-audit-summary" }, t("a11yAuditNoIssues")));
+    }
+    for (const group of groups) {
+      const section = el("div", { class: "lr-audit-group" }, el("div", { class: "lr-audit-group-title" }, t(group.title), el("span", { class: "lr-audit-count" }, t("a11yAuditIssuesCount").replace("{n}", group.findings.length))));
+      for (const finding of group.findings) {
+        section.append(el("button", { class: "lr-audit-row", type: "button", onclick: () => revealSelector(finding.selector) },
+          el("span", { class: "lr-audit-label" }, finding.label),
+          el("span", { class: "lr-audit-value" }, finding.value),
+          A11Y_FIXABLE_CHECKS.has(group.check) ? el("button", { class: "lr-a11y-fix", type: "button", onclick: (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            revealSelector(finding.selector);
+            showA11yFixPreview(section, section, finding.element, group.check);
+          } }, t("a11yFixApply")) : null));
+      }
+      body.append(section);
+    }
+    panel.append(
+      el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, t("a11yAuditPage")), el("button", { class: "lr-close", title: t("panelClose"), type: "button", onclick: () => closeAuditPanel() }, "✕")),
+      body
+    );
+    auditPanelNode = panel;
+    fixedLayer.append(panel);
+    placeDefault();
+    applyPanelPosition(panel, "audit");
+    wirePanelDrag(panel, "audit", () => auditPlaceDefault?.());
   }
 
   function renderPinPanel(pin) {
@@ -2963,6 +3525,7 @@
     const panel = el("div", { class: "popover composer", style: "width:320px" });
     const changesText = pin.changes.map((c) => `${c.prop}: ${c.before} → ${c.after}`).join(" · ");
     const textChangeText = pin.textChange ? `texto: "${pin.textChange.before}" → "${pin.textChange.after}"` : "";
+    const ambiguousCount = countSelectorMatches(pin.selector, (sel) => document.querySelectorAll(sel));
     const textarea = el("textarea", { placeholder: t("editComment") });
     textarea.value = pin.comment;
     const submit = el("button", { class: "send", title: t("saveEdit") }, ICONS.arrowUp);
@@ -2976,11 +3539,23 @@
       renderPins();
     });
     const auditTarget = locate(pin.selector);
+    a11yFixHandler.current = auditTarget === null || pin.tag === "canvas" ? null : {
+      ensurePin: () => {
+        pin.fixes = Array.isArray(pin.fixes) ? pin.fixes : [];
+        return pin;
+      }
+    };
+    const focusBtn = el("button", {
+      onclick: () => {
+        toggleFocusMode(pin);
+        focusBtn.textContent = focusState.current !== null ? t("focusModeExit") : t("focusMode");
+      }
+    }, focusState.current !== null ? t("focusModeExit") : t("focusMode"));
     panel.append(
-      el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, `${pins.filter((p) => p.status !== "resolvido").indexOf(pin) + 1} · ${quickLabel(locate(pin.selector) ?? pin.tag)}`)),
-      el("div", { class: "pin-bubble-body" }, el("div", { class: "pin-bubble-meta" }, `${pin.selector.slice(0, 90)}${pin.component ? ` · ${pin.component}` : ""}`), el("div", { class: "pin-bubble-meta" }, `${t("pinDimensions")}: ${pinDimensions(pin)} px`), pin.stale === true ? el("div", { class: "pin-bubble-stale" }, t("pinStale")) : null, changesText !== "" ? el("div", { class: "pin-bubble-changes" }, changesText) : null, textChangeText !== "" ? el("div", { class: "pin-bubble-changes" }, textChangeText) : null),
+      el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, `${pins.filter((p) => p.status !== "resolvido").indexOf(pin) + 1} · ${quickLabel(locate(pin.selector) ?? pin.tag)}`), el("button", { class: "lr-close", title: t("panelClose"), type: "button", onclick: () => closePinPanel() }, "✕")),
+      el("div", { class: "pin-bubble-body" }, el("div", { class: "pin-bubble-meta" }, `${pin.selector.slice(0, 90)}${pin.component ? ` · ${pin.component}` : ""}`), el("div", { class: "pin-bubble-meta" }, `${t("pinDimensions")}: ${pinDimensions(pin)} px`), pin.stale === true ? el("div", { class: "pin-bubble-stale" }, t("pinStale")) : null, ambiguousCount > 1 ? el("div", { class: "pin-bubble-warning" }, `${t("ambiguousSelectorWarning").replace("{n}", ambiguousCount)} ${t("ambiguousSelectorDetail").replace("{selector}", pin.selector)}`) : null, changesText !== "" ? el("div", { class: "pin-bubble-changes" }, changesText) : null, textChangeText !== "" ? el("div", { class: "pin-bubble-changes" }, textChangeText) : null),
       auditTarget === null || pin.tag === "canvas" ? null : a11yAuditSection(auditTarget),
-      el("div", { class: "prompt-input" }, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }), submit)),
+      el("div", { class: "prompt-input" }, renderTemplateRow(textarea), textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }), submit)),
       el(
         "div",
         { class: "pin-bubble-actions" },
@@ -2990,7 +3565,9 @@
           onclick: () => {
             pin.status = pin.status === "resolvido" ? "queued" : "resolvido";
             savePins();
+            postSnapshot();
             openPinId = null;
+            exitFocusMode();
             renderPinPanel(pin);
             renderPins();
           }
@@ -3003,23 +3580,32 @@
             openPinId = null;
             pinPanelNode?.remove();
             pinPanelNode = null;
+            exitFocusMode();
             renderPins();
+            toast(t("pinDeleted"));
           }
         }, t("del"))
-      )
+      ),
+      el("div", { class: "pin-bubble-actions pin-bubble-actions-secondary" }, focusBtn, el("button", {
+        onclick: () => {
+          duplicateArmed = pin;
+          setMode("picking");
+          setHint(t("duplicateHint"));
+        }
+      }, t("duplicatePin")))
     );
     const placePinDefault = () => {
       const anchor = anchorPoint(pin) ?? { x: pin.rect.x, y: pin.rect.y };
       panel.style.left = `${Math.min(Math.max(8, anchor.x + 16), window.innerWidth - 336)}px`;
-      panel.style.top = `${Math.min(Math.max(8, anchor.y - 40), window.innerHeight - 280)}px`;
+      panel.style.top = `${Math.min(Math.max(8, anchor.y - 40), Math.max(8, window.innerHeight - panel.offsetHeight - 8))}px`;
       panel.style.transform = "none";
     };
     const left = Math.min(Math.max(8, point.x + 16), window.innerWidth - 336);
-    const top = Math.min(Math.max(8, point.y - 40), window.innerHeight - 280);
-    panel.style.left = `${left}px`;
-    panel.style.top = `${top}px`;
     pinPanelNode = panel;
     rootDiv.append(panel);
+    const top = Math.min(Math.max(8, point.y - 40), Math.max(8, window.innerHeight - panel.offsetHeight - 8));
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
     applyPanelPosition(panel, "pin");
     wirePanelDrag(panel, "pin", placePinDefault);
   }
@@ -3111,6 +3697,60 @@
   }
   function hexOf(color) {
     return `#${[color.r, color.g, color.b].map((x) => Math.max(0, Math.min(255, x)).toString(16).padStart(2, "0")).join("")}`;
+  }
+  function blendColor(color, target, amount) {
+    return {
+      r: Math.round(color.r + (target.r - color.r) * amount),
+      g: Math.round(color.g + (target.g - color.g) * amount),
+      b: Math.round(color.b + (target.b - color.b) * amount),
+      a: color.a
+    };
+  }
+  function proposeContrastFix(textColor, backgroundColor) {
+    const text = typeof textColor === "string" ? parseColor(textColor) : textColor;
+    const background = typeof backgroundColor === "string" ? parseColor(backgroundColor) : backgroundColor;
+    if (text === null || background === null || (text.a ?? 1) < 1 || (background.a ?? 1) < 1) return null;
+    const backgroundLuminance = relativeLuminance(background);
+    const target = backgroundLuminance >= 0.25 ? { r: 0, g: 0, b: 0 } : { r: 255, g: 255, b: 255 };
+    const ratioBefore = contrastRatio(text, background);
+    if (ratioBefore === null || ratioBefore >= 4.5) return null;
+    const reachesTarget = contrastRatio(target, background);
+    if (reachesTarget === null || reachesTarget < 4.5) return null;
+    let low = 0;
+    let high = 1;
+    let best = null;
+    for (let i = 0; i < 24; i += 1) {
+      const mid = (low + high) / 2;
+      const candidate = blendColor(text, target, mid);
+      const ratio = contrastRatio(candidate, background);
+      if (ratio !== null && ratio >= 4.5) {
+        best = candidate;
+        high = mid;
+      } else {
+        low = mid;
+      }
+    }
+    if (best === null) return null;
+    return { before: hexOf(text), after: hexOf(best), ratioBefore, ratioAfter: contrastRatio(best, background) };
+  }
+  function deriveAltText(descriptor) {
+    const alt = descriptor?.alt;
+    const ariaLabel = descriptor?.ariaLabel;
+    const title = descriptor?.title;
+    const src = descriptor?.src;
+    if (typeof alt === "string" && alt.trim() !== "") return alt.trim();
+    if (typeof ariaLabel === "string" && ariaLabel.trim() !== "") return ariaLabel.trim();
+    if (typeof title === "string" && title.trim() !== "") return title.trim();
+    if (typeof src === "string" && src.trim() !== "") {
+      const withoutQuery = src.split(/[?#]/u)[0];
+      const parts = withoutQuery.split("/");
+      const basename = parts[parts.length - 1] ?? "";
+      if (basename !== "") {
+        try { return decodeURIComponent(basename); }
+        catch { return basename; }
+      }
+    }
+    return "";
   }
   function isSafeValue(value) {
     const v = value.trim();
@@ -4115,18 +4755,24 @@
         }
       }
       if (data.active === true) lastAgentActivity = Date.now();
-      reconcileWithHost(data.pendingIds);
+      reconcileWithHost(data.pendingIds, data.resolvedIds ?? []);
       renderPins();
     } catch {}
   }
 
 
-  function reconcileWithHost(ids) {
+  function reconcileWithHost(ids, resolvedIds) {
     try {
       const known = new Set(Array.isArray(ids) ? ids : []);
+      const resolved = new Set(Array.isArray(resolvedIds) ? resolvedIds : []);
       let changed = false;
       pins = pins.filter((p) => {
         if (p.status !== "queued") return true;
+        if (resolved.has(p.id)) {
+          p.status = "resolvido";
+          changed = true;
+          return true;
+        }
         if (known.has(p.id)) return true;
         if (Date.now() - (p.at ?? 0) < 6000) return true;
         changed = true;
@@ -4137,15 +4783,33 @@
   }
   setInterval(pollStatus, 2500);
 
+  const toastStack = el("div", { class: "lr-toast-stack" });
+  rootDiv.append(toastStack);
+
+  function pushToast(container, text, ms, makeItem) {
+    const stack = container ?? makeItem("div", { class: "lr-toast-stack" });
+    stack.className = "lr-toast-stack";
+    stack.style.pointerEvents = "none";
+    const item = makeItem("div", { class: "toast toast-info", style: "pointer-events: auto" }, String(text));
+    item.style.pointerEvents = "auto";
+    const dismiss = makeItem("button", { class: "lr-close", title: t("panelClose"), type: "button", onclick: () => item.remove() }, "✕");
+    item.append(dismiss);
+    stack.append(item);
+    setTimeout(() => item.remove(), ms);
+    return item;
+  }
+
   function toast(text, ms = 2600) {
     mountShadow();
-    setHint(text);
-    setTimeout(() => setHint(null), ms);
+    pushToast(toastStack, text, ms, el);
   }
 
   function closePanels() {
     pinPanelNode?.remove();
     pinPanelNode = null;
+    a11yFixHandler.current = null;
+    exitFocusMode();
+    closeAuditPanel();
     if (adjustPanel !== null) closeAdjustPanel(true);
   }
 

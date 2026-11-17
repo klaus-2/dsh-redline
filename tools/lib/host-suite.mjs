@@ -20,6 +20,7 @@ const PROTECTED_ROUTES = [
   { path: "/.lr/pending", method: "GET" },
   { path: "/.lr/pending-pins", method: "GET" },
   { path: "/.lr/report", method: "GET" },
+  { path: "/.lr/preview", method: "GET" },
   { path: "/.lr/client-cmd", method: "GET" },
   { path: "/.lr/proxy/abc", method: "GET" },
   { path: "/.lr/attachments/missing.jpg", method: "GET" },
@@ -28,6 +29,7 @@ const PROTECTED_ROUTES = [
   { path: "/.lr/resolve", method: "POST" },
   { path: "/.lr/pending/clear", method: "POST" },
   { path: "/.lr/pending/remove-pin", method: "POST" },
+  { path: "/.lr/pending/bulk", method: "POST" },
   { path: "/.lr/client-ping", method: "POST" },
   { path: "/.lr/settings", method: "POST" },
   { path: "/.lr/drawings", method: "POST" },
@@ -41,7 +43,7 @@ export async function runHostSuite(harness, { pluginDir }) {
     const source = readFileSync(modulePath, "utf8");
     const secretHeader = /SECRET_HEADER = "([^"]+)"/.exec(source)?.[1] ?? "";
     const pluginVersion = /PLUGIN_VERSION = "([^"]+)"/.exec(source)?.[1] ?? "";
-    const { startServer, formatContext, apply, pendingBySession, globalPending } = await import(moduleUrl);
+    const { startServer, formatContext, buildSections, apply, pendingBySession, globalPending } = await import(moduleUrl);
 
     const targetPort = await freePort();
     const fixturePages = new Map();
@@ -179,7 +181,7 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.check("the bridge answers a page the host served", own.status === 200);
       const state = await own.json();
       harness.check("the bridge state is the narrow projection", state.ok === true && typeof state.lang === "string" && Array.isArray(state.pendingIds) && Array.isArray(state.deliveredIds) && state.settings !== undefined && state.events === undefined && state.diag === undefined, JSON.stringify(state).slice(0, 160));
-      harness.eq("the bridge state carries exactly the narrow keys", Object.keys(state).sort(), ["active", "deliveredIds", "lang", "ok", "pendingIds", "settings"]);
+      harness.eq("the bridge state carries exactly the narrow keys, now including resolvedIds — the projection is deliberately widened to carry the resolved status (D12)", Object.keys(state).sort(), ["active", "deliveredIds", "lang", "ok", "pendingIds", "resolvedIds", "settings"]);
       const unsupported = await post("settings.update", {}, { ...auth });
       harness.check("the bridge refuses a message outside the allowlist", unsupported.status === 400);
       const withSecret = await post("state.get", {}, { ...auth });
@@ -608,10 +610,10 @@ export async function runHostSuite(harness, { pluginDir }) {
         JSON.stringify({ post: contractPost, afterShotPath: contractPin?.afterShotPath }));
 
       const projection = await (await fetch(`${base}/.lr/pending?sessionId=session-contract`, { headers: auth })).json();
-      harness.check("host: GET /.lr/pending pins projection omits screenshot and grouping fields",
+      harness.check("host: GET /.lr/pending pins projection omits screenshot and grouping fields, with status added deliberately (D12: the dock shows what happened to each pin)",
         projection.count === 1 && projection.pins.length === 1 &&
-        JSON.stringify(Object.keys(projection.pins[0]).sort()) === JSON.stringify(["comment", "component", "id", "index", "role", "selector", "tag", "text"]) &&
-        projection.pins[0].shot === undefined && projection.pins[0].afterShot === undefined &&
+        JSON.stringify(Object.keys(projection.pins[0]).sort()) === JSON.stringify(["comment", "component", "id", "index", "role", "selector", "status", "tag", "text"]) &&
+        projection.pins[0].status === "queued" && projection.pins[0].shot === undefined && projection.pins[0].afterShot === undefined &&
         projection.pins[0].screenshotPath === undefined && projection.pins[0].afterShotPath === undefined &&
         projection.pins[0].groupId === undefined && projection.pins[0].viewportWidth === undefined,
         JSON.stringify(projection.pins[0]));
@@ -1235,5 +1237,228 @@ export async function runHostSuite(harness, { pluginDir }) {
       rewrittenPins.keys?.hidePins === repairedPins.settings.keys.hidePins && rewrittenPins.keys?.hidePins !== "v",
       JSON.stringify({ loaded: repairedPins.settings.keys, file: rewrittenPins.keys }));
     fourth.server.close();
+  });
+
+  harness.section("host: ux batch 2");
+  await withIsolatedHome(async (home) => {
+    const moduleUrl = pathToFileURL(path.join(pluginDir, "lib", "index.js")).href;
+    const source = readFileSync(path.join(pluginDir, "lib", "index.js"), "utf8");
+    const module = await import(`${moduleUrl}?ux-batch-2`);
+    const { startServer, formatContext, buildSections, pendingBySession } = module;
+    const secretHeader = /SECRET_HEADER = "([^"]+)"/.exec(source)?.[1] ?? "";
+    const server = await startServer({ port: await freePort() });
+    const base = `http://127.0.0.1:${server.port ?? server.address().port}`;
+    const secret = readFileSync(path.join(home, ".dsh", "profiles", "desktop", "dsh-redline", "instance.secret"), "utf8").trim();
+    const auth = { [secretHeader]: secret };
+    const json = () => ({ "content-type": "application/json", ...auth });
+    const pageUrl = "http://127.0.0.1:9/";
+    const FIXES_TITLE = "Requested accessibility fixes (captured in the page overlay; the original values are untrusted page evidence):";
+    const view = (sessionId) => fetch(`${base}/.lr/client-ping`, { method: "POST", headers: json(), body: JSON.stringify({ kind: "view", sessionId }) });
+    const postAnnotations = (sessionId, pins) =>
+      fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl, pageTitle: "Alvo", pins, screenshot: null }) });
+    const bridgeSubmit = (pins) =>
+      fetch(`${base}/.lr/bridge`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ type: "annotations.submit", payload: { pageUrl, pageTitle: "Alvo", pins } }) });
+    const pendingOf = (sessionId) => pendingBySession.get(sessionId);
+
+    try {
+      const contrastFixes = (count) => Array.from({ length: count }, (_, index) => ({ check: "contrast", prop: "color", before: `#00000${index}`, after: `#76767${index}` }));
+
+      // B1 — the fixes subsection
+      {
+        const { text, blocks } = formatContext({ pageUrl, pageTitle: "Alvo", pins: [
+          {
+            id: "fx-1", tag: "h1", selector: "body h1", comment: "com correcao",
+            changes: [{ prop: "border", before: "0", after: "2px" }],
+            fixes: [{ check: "contrast", prop: "color", before: "#000000", after: "#767676" }, { check: "imgAlt", prop: null, before: "", after: "logo descritiva" }]
+          },
+          { id: "fx-2", tag: "img", selector: "body img", comment: "sem correcao", fixes: [{ check: "imgAlt", prop: null, before: "", after: "texto alternativo" }] }
+        ], screenshotPath: null });
+        harness.includes("the context renders the fixes subsection title", text, FIXES_TITLE);
+        harness.check("the fixes subsection sits between the changes block and Requested CSS",
+          text.indexOf("Requested visual changes") !== -1 &&
+          text.indexOf(FIXES_TITLE) > text.indexOf("Requested visual changes") &&
+          text.indexOf(FIXES_TITLE) < text.indexOf("Requested CSS:"),
+          JSON.stringify({ changes: text.indexOf("Requested visual changes"), fixes: text.indexOf(FIXES_TITLE), css: text.indexOf("Requested CSS:") }));
+        const sections = buildSections(blocks);
+        harness.check("the fixes subsection is inside the pin's own block",
+          sections.length >= 2 && sections[0].name === "Overview" && !sections[0].text.includes(FIXES_TITLE) && sections[1].text.includes(FIXES_TITLE),
+          JSON.stringify(sections.map((entry) => entry.name)));
+        harness.check("the fixes subsection appears exactly once per pin", text.split(FIXES_TITLE).length - 1 === 2, String(text.split(FIXES_TITLE).length - 1));
+        harness.check("each fix renders one line in the pinned form",
+          text.includes("- contrast: color #000000 -> #767676") && text.includes("- imgAlt: alt"),
+          JSON.stringify(text.slice(text.indexOf(FIXES_TITLE), text.indexOf(FIXES_TITLE) + 240)));
+        const blockText = blocks[0].join("\n");
+        harness.check("the fixes subsection carries the pin's selector", blockText.slice(blockText.indexOf(FIXES_TITLE)).includes("body h1"), JSON.stringify(blockText.slice(blockText.indexOf(FIXES_TITLE))));
+        harness.includes("the colour fix renders its CSS rule under the subsection", blockText, "body h1 { color: #767676; }");
+        harness.check("a colour fix is not merged into pin.changes",
+          blockText.includes("- border: 0 -> 2px") &&
+          blockText.includes("Requested CSS:\n    body h1 { border: 2px; }") &&
+          !blockText.includes("Requested CSS:\n    body h1 { border: 2px; color: #767676; }"),
+          JSON.stringify(blockText.slice(blockText.indexOf("Requested visual changes"))));
+        const attrOnly = formatContext({ pageUrl, pageTitle: "Alvo", pins: [{ id: "fx-3", tag: "img", selector: "body img", comment: "só alt", fixes: [{ check: "imgAlt", prop: null, before: "", after: "texto alternativo" }] }], screenshotPath: null });
+        harness.check("an attribute fix never renders through the changes CSS path",
+          !attrOnly.text.includes("Requested CSS:") && !attrOnly.text.includes("Requested visual changes") && attrOnly.text.includes("- imgAlt: alt"),
+          JSON.stringify(attrOnly.text.slice(0, 400)));
+        await view("session-fixes");
+        await postAnnotations("session-fixes", [{ id: "fx-json", tag: "h1", selector: "body h1", comment: "projecao json", fixes: [{ check: "contrast", prop: "color", before: "#000000", after: "#767676" }] }]);
+        const reportJson = await (await fetch(`${base}/.lr/report?sessionId=session-fixes&format=json`, { headers: auth })).json();
+        harness.eq("the json report projects each pin's fixes", reportJson.pins?.[0]?.fixes, [{ check: "contrast", prop: "color", before: "#000000", after: "#767676" }]);
+        const evidenceFn = evaluateExpression(`(${extractFunction(source, "evidence")})`, "evidence");
+        const annotationPinsFn = evaluateExpression(`(evidence) => {\n${extractFunction(source, "annotationPins")}\nreturn annotationPins;\n}`, "annotationPins")(evidenceFn);
+        const projected = annotationPinsFn([{ id: "fx-chat", tag: "h1", selector: "body h1", comment: "linha do chat", fixes: [{ check: "contrast", prop: "color", before: "#000000", after: "#767676" }] }]);
+        harness.eq("annotationPins projects each pin's fixes into the chat row", projected?.[0]?.fixes, [{ check: "contrast", prop: "color", before: "#000000", after: "#767676" }]);
+      }
+
+      // B2 — the bridge fix cap
+      {
+        await view("session-cap");
+        await bridgeSubmit([
+          { id: "cap-a", tag: "h1", selector: "body h1", comment: "cap a", fixes: contrastFixes(6) },
+          { id: "cap-b", tag: "h1", selector: "body h2", comment: "cap b", fixes: contrastFixes(6) }
+        ]);
+        const cappedPins = pendingOf("session-cap")?.snapshot?.pins ?? [];
+        harness.check("the fixes accepted across the snapshot are capped at 8 in total",
+          (cappedPins.find((pin) => pin.id === "cap-a")?.fixes?.length ?? 0) === 6 && (cappedPins.find((pin) => pin.id === "cap-b")?.fixes?.length ?? 0) === 2,
+          JSON.stringify(cappedPins.map((pin) => ({ id: pin.id, fixes: pin.fixes?.length }))));
+        await bridgeSubmit([{ id: "cap-c", tag: "h1", selector: "body h1", comment: "cap c", fixes: contrastFixes(10) }]);
+        const cappedSingle = pendingOf("session-cap")?.snapshot?.pins ?? [];
+        harness.check("a pin whose fixes exceed the cap is kept with its fixes sliced",
+          cappedSingle.length === 1 && cappedSingle[0]?.id === "cap-c" && (cappedSingle[0]?.fixes?.length ?? 0) === 8,
+          JSON.stringify({ pins: cappedSingle.length, fixes: cappedSingle[0]?.fixes?.length }));
+      }
+
+      // B3 — the bridge state
+      {
+        await view("session-state");
+        await bridgeSubmit([{ id: "st-1", tag: "h1", selector: "body h1", comment: "estado da ponte" }]);
+        await fetch(`${base}/.lr/pending/bulk`, { method: "POST", headers: json(), body: JSON.stringify({ sessionId: "session-state", ids: ["st-1"], action: "resolve" }) });
+        const state = await (await fetch(`${base}/.lr/bridge`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ type: "state.get", payload: {} }) })).json();
+        harness.eq("the bridge state carries exactly the narrow keys, re-asserted with the deliberate resolvedIds widening (D12)", Object.keys(state).sort(), ["active", "deliveredIds", "lang", "ok", "pendingIds", "resolvedIds", "settings"]);
+        harness.check("pendingIds still lists the resolved pin and resolvedIds carries it",
+          Array.isArray(state.pendingIds) && state.pendingIds.includes("st-1") && Array.isArray(state.resolvedIds) && state.resolvedIds.includes("st-1"),
+          JSON.stringify({ pendingIds: state.pendingIds, resolvedIds: state.resolvedIds }));
+      }
+
+      // B4 — the bulk route
+      {
+        await view("session-bulk-b");
+        await postAnnotations("session-bulk-b", [
+          { id: "bb-1", tag: "h1", selector: "body h1", comment: "comente o um" },
+          { id: "bb-2", tag: "h2", selector: "body h2", comment: "comente o dois" }
+        ]);
+        const resolveResponse = await fetch(`${base}/.lr/pending/bulk`, { method: "POST", headers: json(), body: JSON.stringify({ sessionId: "session-bulk-b", ids: ["bb-1"], action: "resolve" }) });
+        const resolveBody = await resolveResponse.json();
+        const afterResolve = await (await fetch(`${base}/.lr/pending?sessionId=session-bulk-b`, { headers: auth })).json();
+        harness.check("the bulk resolve marks the pin resolvido",
+          afterResolve.pins.find((pin) => pin.id === "bb-1")?.status === "resolvido" && afterResolve.pins.find((pin) => pin.id === "bb-2")?.status === "queued",
+          JSON.stringify(afterResolve.pins));
+        harness.check("the bulk resolve answers 200 with the applied id",
+          resolveResponse.status === 200 && resolveBody.ok === true && resolveBody.applied === 1 && JSON.stringify(resolveBody.ids) === JSON.stringify(["bb-1"]),
+          JSON.stringify(resolveBody));
+        const rebuiltText = formatContext(pendingOf("session-bulk-b").snapshot).text;
+        harness.check("formatContext skips the resolved pin's comment and keeps the unresolved one",
+          !rebuiltText.includes("comente o um") && rebuiltText.includes("comente o dois"),
+          JSON.stringify(rebuiltText.slice(0, 300)));
+        const deleteBody = await (await fetch(`${base}/.lr/pending/bulk`, { method: "POST", headers: json(), body: JSON.stringify({ sessionId: "session-bulk-b", ids: ["bb-1"], action: "delete" }) })).json();
+        const afterDelete = await (await fetch(`${base}/.lr/pending?sessionId=session-bulk-b`, { headers: auth })).json();
+        harness.check("the bulk delete removes the pin from the snapshot",
+          deleteBody.applied === 1 && afterDelete.count === 1 && afterDelete.pins.every((pin) => pin.id !== "bb-1"),
+          JSON.stringify({ deleteBody, count: afterDelete.count }));
+        const afterDeleteContext = pendingOf("session-bulk-b").context ?? "";
+        harness.check("the deleted pin is gone from the rebuilt context",
+          !afterDeleteContext.includes("comente o um") && afterDeleteContext.includes("comente o dois"),
+          JSON.stringify(afterDeleteContext.slice(0, 300)));
+        const unknownAction = await fetch(`${base}/.lr/pending/bulk`, { method: "POST", headers: json(), body: JSON.stringify({ sessionId: "session-bulk-b", ids: ["bb-2"], action: "explode" }) });
+        const unknownBody = await unknownAction.json();
+        const afterUnknown = await (await fetch(`${base}/.lr/pending?sessionId=session-bulk-b`, { headers: auth })).json();
+        harness.check("an unknown bulk action answers 200 with no mutation and does not throw",
+          unknownAction.status === 200 && unknownBody.ok === true && unknownBody.applied === 0 && JSON.stringify(unknownBody.ids) === JSON.stringify([]) &&
+          afterUnknown.count === 1 && afterUnknown.pins[0]?.id === "bb-2" && afterUnknown.pins[0]?.status === "queued",
+          JSON.stringify({ unknownBody, pins: afterUnknown.pins }));
+      }
+
+      // B5 — exactly one bulk route
+      {
+        const bulkRouteCount = (source.match(/pathname === "\/\.lr\/pending\/bulk"/g) ?? []).length;
+        harness.check("there is exactly one bulk route and no per-action twin",
+          bulkRouteCount === 1 && !source.includes("/.lr/pending/resolve-pins") && !source.includes("/.lr/pending/remove-pins"),
+          `bulkRouteCount=${bulkRouteCount}`);
+      }
+
+      // B6 — the preview route
+      {
+        await view("session-preview");
+        await postAnnotations("session-preview", [
+          { id: "pv-1", tag: "h1", selector: "body h1", comment: "preview com imagem", shot: SHOT },
+          { id: "pv-2", tag: "h2", selector: "body h2", comment: "preview sem imagem" }
+        ]);
+        const previewBody = await (await fetch(`${base}/.lr/preview?sessionId=session-preview`, { headers: auth })).json();
+        harness.check("the preview route answers the pinned shape",
+          previewBody.ok === true && typeof previewBody.context === "string" && Array.isArray(previewBody.sections) &&
+          previewBody.pins.length === 2 && previewBody.pins.every((pin) => JSON.stringify(Object.keys(pin).sort()) === JSON.stringify(["comment", "id", "screenshot"])),
+          JSON.stringify(previewBody).slice(0, 240));
+        harness.eq("the preview context equals pending.context exactly", previewBody.context, pendingOf("session-preview").context);
+        harness.eq("the preview sections equal pending.sections", previewBody.sections, pendingOf("session-preview").sections);
+        harness.check("each preview screenshot is the basename only",
+          previewBody.pins[0].screenshot !== "" && !previewBody.pins[0].screenshot.includes("/") && !previewBody.pins[0].screenshot.includes("\\") &&
+          !previewBody.pins[0].screenshot.startsWith("..") && previewBody.pins[1].screenshot === "",
+          JSON.stringify(previewBody.pins.map((pin) => pin.screenshot)));
+        const unknownPreview = await (await fetch(`${base}/.lr/preview?sessionId=session-preview-unknown`, { headers: auth })).json();
+        const absentPreview = await (await fetch(`${base}/.lr/preview`, { headers: auth })).json();
+        harness.check("the preview route answers the empty shape for an unknown or absent session",
+          JSON.stringify(unknownPreview) === JSON.stringify({ ok: true, context: "", sections: [], pins: [] }) &&
+          JSON.stringify(absentPreview) === JSON.stringify({ ok: true, context: "", sections: [], pins: [] }),
+          JSON.stringify({ unknown: unknownPreview, absent: absentPreview }));
+      }
+
+      // B7 — the auth and the gates
+      {
+        const previewDenied = await fetch(`${base}/.lr/preview?sessionId=session-preview`);
+        const pendingDenied = await fetch(`${base}/.lr/pending?sessionId=session-preview`);
+        harness.check("the preview route without the secret is rejected like the neighbouring /.lr/pending",
+          previewDenied.status === 401 && pendingDenied.status === 401 &&
+          previewDenied.headers.get("access-control-allow-origin") === null && pendingDenied.headers.get("access-control-allow-origin") === null,
+          `preview=${previewDenied.status} pending=${pendingDenied.status}`);
+        const bulkDenied = await fetch(`${base}/.lr/pending/bulk`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+        harness.check("the bulk route without the secret is rejected", bulkDenied.status === 401 && bulkDenied.headers.get("access-control-allow-origin") === null, `status=${bulkDenied.status}`);
+        harness.check("both new routes are protected and exercised by the auth matrix",
+          PROTECTED_ROUTES.some((route) => route.path === "/.lr/preview" && route.method === "GET") &&
+          PROTECTED_ROUTES.some((route) => route.path === "/.lr/pending/bulk" && route.method === "POST"),
+          JSON.stringify(PROTECTED_ROUTES.map((route) => `${route.method} ${route.path}`)));
+        const publicPathsLiteral = /const PUBLIC_PATHS = new Set\(\[([^\]]*)\]\);/.exec(source)?.[1] ?? "";
+        const bridgePathsLiteral = /const BRIDGE_PATHS = new Set\(\[([^\]]*)\]\);/.exec(source)?.[1] ?? "";
+        harness.check("the preview route is in neither PUBLIC_PATHS nor BRIDGE_PATHS",
+          !publicPathsLiteral.includes("/.lr/preview") && !bridgePathsLiteral.includes("/.lr/preview"),
+          `public=${publicPathsLiteral} bridge=${bridgePathsLiteral}`);
+      }
+
+      // B8 — the context rebuild
+      {
+        await view("session-guard");
+        await postAnnotations("session-guard", [
+          { id: "gr-1", tag: "h1", selector: "body h1", comment: "guarda um" },
+          { id: "gr-2", tag: "h2", selector: "body h2", comment: "guarda dois" }
+        ]);
+        await fetch(`${base}/.lr/pending/remove-pin`, { method: "POST", headers: json(), body: JSON.stringify({ sessionId: "session-guard", pinId: "gr-1" }) });
+        const guardContext = pendingOf("session-guard").context ?? "";
+        harness.check("removePendingPin still rebuilds the context (regression guard)",
+          !guardContext.includes("guarda um") && guardContext.includes("guarda dois"),
+          JSON.stringify(guardContext.slice(0, 300)));
+        await view("session-rebuild");
+        await postAnnotations("session-rebuild", [
+          { id: "rb-1", tag: "h1", selector: "body h1", comment: "rebuilt um", changes: [{ prop: "color", before: "#000", after: "red" }] },
+          { id: "rb-2", tag: "h2", selector: "body h2", comment: "rebuilt dois" }
+        ]);
+        await fetch(`${base}/.lr/pending/bulk`, { method: "POST", headers: json(), body: JSON.stringify({ sessionId: "session-rebuild", ids: ["rb-2"], action: "resolve" }) });
+        const rebuilt = pendingOf("session-rebuild");
+        const fresh = formatContext(rebuilt.snapshot);
+        harness.check("the bulk route rebuilds context and sections from the mutated snapshot",
+          rebuilt.context === fresh.text && JSON.stringify(rebuilt.sections) === JSON.stringify(buildSections(fresh.blocks)) &&
+          !rebuilt.context.includes("rebuilt dois") && rebuilt.context.includes("rebuilt um"),
+          JSON.stringify({ contextMatches: rebuilt.context === fresh.text, sectionsMatch: JSON.stringify(rebuilt.sections) === JSON.stringify(buildSections(fresh.blocks)) }));
+      }
+    } finally {
+      server.close();
+    }
   });
 }

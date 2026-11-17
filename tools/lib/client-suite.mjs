@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import { collectCallArguments, createMountModel, createReactStub, evaluateExpression, evaluateObjectLiteral, extractArrowConst, extractFunction, extractObjectLiteral, fakeClientCtx, findByText, findElements, flush, jsonResponse, loadClientModule, makeLocalStorage, renderOnce, runCleanups, storageShim, waitFor } from "./harness.mjs";
+import { pathToFileURL } from "node:url";
+import { collectCallArguments, createMountModel, createReactStub, evaluateExpression, evaluateObjectLiteral, extractArrowConst, extractFunction, extractObjectLiteral, fakeClientCtx, findByClass, findByText, findElements, flush, freePort, jsonResponse, loadClientModule, makeLocalStorage, renderOnce, runCleanups, storageShim, waitFor, withIsolatedHome } from "./harness.mjs";
 
 // The bridge relay runs in the page, not in the app: it is loaded in its own
 // sandbox so the suite can drive both transports without a browser.
@@ -3940,6 +3941,923 @@ export async function runClientSuite(harness, { pluginDir }) {
         harness.check("client: export failure renders an inline error instead of a broken download",
           errorLine.length === 1 && typeof errorLine[0].props?.children === "string" && errorLine[0].props.children !== "reportFailed" && errorLine[0].props.children.includes("download failed") && downloads.length === 0,
           JSON.stringify({ error: errorLine.length, text: errorLine[0]?.props?.children, downloads: downloads.length }));
+      }
+    }
+  }
+
+  harness.section("client: overlay ux batch 2");
+  {
+    const fakeNode = (tag, attrs = {}, ...children) => {
+      const node = { attrs, children: [], handlers: {}, removed: false, style: {}, append(child) { if (child !== null && child !== undefined) this.children.push(child); return child; }, addEventListener(type, fn) { this.handlers[type] = fn; }, remove() { this.removed = true; } };
+      for (const [key, value] of Object.entries(attrs)) node[key === "class" ? "className" : key] = value;
+      if (typeof node.style === "string") {
+        const parsed = {};
+        for (const declaration of node.style.split(";")) {
+          const at = declaration.indexOf(":");
+          if (at !== -1) parsed[declaration.slice(0, at).trim().replace(/-([a-z])/gu, (m, c) => c.toUpperCase())] = declaration.slice(at + 1).trim();
+        }
+        node.style = parsed;
+      }
+      for (const child of children) node.append(child);
+      return node;
+    };
+    const spotlightRule = /\.lr-focus-spotlight \{[\s\S]*?\}/.exec(overlay)?.[0] ?? "";
+    const hintRule = /\.lr-focus-hint \{[\s\S]*?\}/.exec(overlay)?.[0] ?? "";
+    const bodyRule = /\.pin-bubble-body \{[^}]*\}/.exec(overlay)?.[0] ?? "";
+    const panelSource = extractFunction(overlay, "renderPinPanel") ?? "";
+    const escapeSource = extractFunction(overlay, "handleEscape") ?? "";
+    const exitSource = extractFunction(overlay, "exitFocusMode") ?? "";
+    const closePinSource = extractFunction(overlay, "closePinPanel") ?? "";
+    const closePanelsSource = extractFunction(overlay, "closePanels") ?? "";
+    const setHiddenSource = extractFunction(overlay, "setHidden") ?? "";
+    const setModeSource = extractFunction(overlay, "setMode") ?? "";
+    const pollSource = extractFunction(overlay, "pollStatus") ?? "";
+    const openAuditSource = extractFunction(overlay, "openAuditPanel") ?? "";
+    const fixSource = extractFunction(overlay, "showA11yFixPreview") ?? "";
+    const postSource = extractFunction(overlay, "postSnapshot") ?? "";
+    const guardAt = overlay.indexOf('if (tag === "INPUT" || tag === "TEXTAREA" || from?.isContentEditable === true) return;');
+    const keydownAt = guardAt === -1 ? -1 : overlay.lastIndexOf('"keydown"', guardAt);
+    const listenerSpan = keydownAt === -1 ? "" : overlay.slice(keydownAt, keydownAt + 3000);
+
+    harness.check("overlay: pushToast appends exactly one toast item to the container it is handed", (() => {
+      const pushRun = extractFunction(overlay, "pushToast") === undefined ? undefined : evaluateExpression(`(container, text, ms, makeItem, t, setTimeout) => {\n${extractFunction(overlay, "pushToast")}\nreturn pushToast(container, text, ms, makeItem);\n}`, "pushToast");
+      const timers = [];
+      const container = fakeNode({ style: "" });
+      const item = pushRun === undefined ? undefined : pushRun(container, "saved", 3200, fakeNode, (key) => key, (fn, ms) => { timers.push({ fn, ms }); return timers.length; });
+      return item !== undefined && container.children.length === 1 && container.children[0] === item && timers.length === 1 && timers[0].ms === 3200;
+    })(), "one auto-dismissed item must land on the container");
+    harness.check("overlay: the toast stack container ignores pointer events", (() => {
+      const pushRun = extractFunction(overlay, "pushToast") === undefined ? undefined : evaluateExpression(`(container, text, ms, makeItem, t, setTimeout) => {\n${extractFunction(overlay, "pushToast")}\nreturn pushToast(container, text, ms, makeItem);\n}`, "pushToast");
+      const container = fakeNode({ style: "" });
+      const item = pushRun === undefined ? undefined : pushRun(container, "saved", 2600, fakeNode, (key) => key, () => 1);
+      return item !== undefined && container.style.pointerEvents === "none";
+    })(), "the stack must not swallow page clicks");
+    harness.check("overlay: each toast item takes pointer events", (() => {
+      const pushRun = extractFunction(overlay, "pushToast") === undefined ? undefined : evaluateExpression(`(container, text, ms, makeItem, t, setTimeout) => {\n${extractFunction(overlay, "pushToast")}\nreturn pushToast(container, text, ms, makeItem);\n}`, "pushToast");
+      const container = fakeNode({ style: "" });
+      const item = pushRun === undefined ? undefined : pushRun(container, "saved", 2600, fakeNode, (key) => key, () => 1);
+      return item !== undefined && item.style.pointerEvents === "auto";
+    })(), "the item must stay clickable for its dismiss control");
+    harness.check("overlay: each toast item carries a dismiss control", (() => {
+      const pushRun = extractFunction(overlay, "pushToast") === undefined ? undefined : evaluateExpression(`(container, text, ms, makeItem, t, setTimeout) => {\n${extractFunction(overlay, "pushToast")}\nreturn pushToast(container, text, ms, makeItem);\n}`, "pushToast");
+      const container = fakeNode("div", { style: "" });
+      const item = pushRun === undefined ? undefined : pushRun(container, "saved", 2600, fakeNode, (key) => key, () => 1);
+      const dismiss = item === undefined ? undefined : item.children.find((child) => child.className === "lr-close");
+      return item !== undefined && dismiss !== undefined && dismiss.children.includes("✕") && dismiss.type === "button";
+    })(), "the ✕ dismiss button is missing");
+    harness.check("overlay: toast items reuse the design system toast classes", (() => {
+      const pushRun = extractFunction(overlay, "pushToast") === undefined ? undefined : evaluateExpression(`(container, text, ms, makeItem, t, setTimeout) => {\n${extractFunction(overlay, "pushToast")}\nreturn pushToast(container, text, ms, makeItem);\n}`, "pushToast");
+      const container = fakeNode({ style: "" });
+      const item = pushRun === undefined ? undefined : pushRun(container, "saved", 2600, fakeNode, (key) => key, () => 1);
+      return item !== undefined && item.className === "toast toast-info";
+    })(), "the item must carry the existing toast / toast-info classes");
+    harness.check("overlay: the toast stack carries the lr-toast-stack class and is created when omitted", (() => {
+      const pushRun = extractFunction(overlay, "pushToast") === undefined ? undefined : evaluateExpression(`(container, text, ms, makeItem, t, setTimeout) => {\n${extractFunction(overlay, "pushToast")}\nreturn pushToast(container, text, ms, makeItem);\n}`, "pushToast");
+      const container = fakeNode("div", { style: "" });
+      const item = pushRun === undefined ? undefined : pushRun(container, "saved", 2600, fakeNode, (key) => key, () => 1);
+      const made = [];
+      const spyFactory = (tag, attrs, ...rest) => { const node = fakeNode(tag, attrs, ...rest); made.push(node); return node; };
+      const created = pushRun === undefined ? undefined : pushRun(null, "again", 2600, spyFactory, (key) => key, () => 1);
+      const stack = made.find((node) => node.className === "lr-toast-stack");
+      return item !== undefined && container.className === "lr-toast-stack" && created !== undefined &&
+        stack !== undefined && stack.style.pointerEvents === "none" && stack.children.includes(created);
+    })(), "the stack class must be pushToast's responsibility");
+    {
+      const toastFn = extractFunction(overlay, "toast") === undefined ? undefined : evaluateExpression(extractFunction(overlay, "toast"), "toast");
+      harness.eq("overlay: the public toast keeps the text-only required signature", toastFn === undefined ? -1 : toastFn.length, 1);
+    }
+    harness.check("overlay: toast(text) schedules dismissal at the 2600ms default via pushToast",
+      overlay.includes("function toast(text, ms = 2600)") && (extractFunction(overlay, "toast") ?? "").includes("pushToast(toastStack, text, ms, el)"),
+      "the default duration or the pushToast call drifted");
+    harness.includes("overlay: the saved hint became a toast", overlay, 'toast(t("savedHint"), 4200)');
+    harness.includes("overlay: the draw-sent hint became a toast", overlay, 'toast(t("drawSentHint"), 3600)');
+    harness.excludes("overlay: the saved hint no longer goes through setHint", overlay, 'setHint(t("savedHint"), 4200)');
+    harness.excludes("overlay: the draw-sent hint no longer goes through setHint", overlay, 'setHint(t("drawSentHint"), 3600)');
+    harness.includes("overlay: the draw hint stays a mode hint", overlay, 'setHint(t("drawHint"), 2600)');
+
+    {
+      const rectFn = extractFunction(overlay, "focusSpotlightRect") === undefined ? undefined : evaluateExpression(extractFunction(overlay, "focusSpotlightRect"), "focusSpotlightRect");
+      const box = rectFn === undefined ? undefined : rectFn({ left: 100, top: 50, width: 200, height: 80 });
+      harness.eq("overlay: the focus spotlight keeps the target's left", box?.left, 100);
+      harness.eq("overlay: the focus spotlight keeps the target's top", box?.top, 50);
+      harness.eq("overlay: the focus spotlight keeps the target's width", box?.width, 200);
+      harness.eq("overlay: the focus spotlight keeps the target's height", box?.height, 80);
+    }
+    harness.check("overlay: the spotlight dims the page with a 100vmax spread", spotlightRule.includes("box-shadow: 0 0 0 100vmax"), spotlightRule.slice(0, 120));
+    harness.check("overlay: the spotlight dim is the rgba(0,0,0,0.55) veil", spotlightRule.includes("rgba(0,0,0,0.55)"), spotlightRule.slice(0, 120));
+    harness.check("overlay: the spotlight never swallows clicks", spotlightRule.includes("pointer-events: none"), spotlightRule.slice(0, 120));
+    harness.includes("overlay: the Escape cascade is a named liftable function", overlay, "function handleEscape(");
+    harness.check("overlay: the keydown listener dispatches Escape to handleEscape", listenerSpan.includes("handleEscape(event)"), JSON.stringify({ keydownAt, span: listenerSpan.length }));
+    {
+      const focusIdx = escapeSource.indexOf("if (focusState.current !== null)");
+      const drawIdx = escapeSource.indexOf("if (drawMode)");
+      harness.check("overlay: the focus branch is the first Escape branch", focusIdx !== -1 && drawIdx !== -1 && focusIdx < drawIdx, JSON.stringify({ focusIdx, drawIdx }));
+    }
+    {
+      const adjustIdx = escapeSource.indexOf("if (adjustPanel !== null)");
+      const bubbleIdx = escapeSource.indexOf("if (openPinId !== null)");
+      harness.check("overlay: the bubble-close branch follows the adjust branch", adjustIdx !== -1 && bubbleIdx > adjustIdx, JSON.stringify({ adjustIdx, bubbleIdx }));
+    }
+    {
+      const bubbleIdx = escapeSource.indexOf("if (openPinId !== null)");
+      const auditIdx = escapeSource.indexOf("if (auditPanelNode !== null)");
+      const draftIdx = escapeSource.indexOf("if (draft !== null)");
+      harness.check("overlay: the bubble-close branch precedes the audit and draft branches", bubbleIdx !== -1 && draftIdx !== -1 && bubbleIdx < auditIdx && auditIdx < draftIdx, JSON.stringify({ bubbleIdx, auditIdx, draftIdx }));
+    }
+    {
+      const dispatch = exitSource === "" || escapeSource === "" ? undefined : evaluateExpression(`(focusState, focusSpotlightNode, focusHintNode, focusRepositionTimer, clearTimeout, drawMode, groupMode, adjustPanel, openPinId, pinPanelNode, auditPanelNode, draft, mode, a11yFixHandler, toggleDraw, setGroupMode, closeAdjustPanel, closeAuditPanel, discardDraft, setMode) => {
+${exitSource}
+${escapeSource}
+return { handleEscape, state: () => ({ focusState, openPinId, pinPanelNode, a11yFixHandler }) };
+}`, "handleEscape");
+      const noops = [() => {}, () => {}, () => {}, () => {}, () => {}, () => {}];
+      const runFocus = dispatch === undefined ? undefined : dispatch({ current: { selector: "#x" } }, null, null, null, () => {}, false, false, null, null, null, null, null, null, { current: null }, ...noops);
+      const consumed = runFocus === undefined ? undefined : runFocus.handleEscape({ key: "Escape" });
+      harness.check("overlay: Escape under focus mode exits focus and is consumed",
+        consumed === true && runFocus !== undefined && runFocus.state().focusState.current === null,
+        JSON.stringify({ consumed, focus: runFocus?.state().focusState.current }));
+      const bubbleNode = fakeNode();
+      const runBubble = dispatch === undefined ? undefined : dispatch({ current: null }, null, null, null, () => {}, false, false, null, "pin-1", bubbleNode, null, null, null, { current: { ensurePin: () => {} } }, ...noops);
+      const consumedBubble = runBubble === undefined ? undefined : runBubble.handleEscape({ key: "Escape" });
+      harness.check("overlay: Escape with the bubble open closes it and is consumed",
+        consumedBubble === true && runBubble !== undefined && runBubble.state().openPinId === null && bubbleNode.removed === true && runBubble.state().a11yFixHandler.current === null,
+        JSON.stringify({ consumed: consumedBubble, openPinId: runBubble?.state().openPinId, removed: bubbleNode.removed }));
+    }
+    {
+      const exitFn = exitSource === "" ? undefined : evaluateExpression(`(focusState, focusSpotlightNode, focusHintNode, focusRepositionTimer, clearTimeout) => {
+${exitSource}
+exitFocusMode();
+return { focusState, timer: focusRepositionTimer };
+}`, "exitFocusMode");
+      const cleared = [];
+      const run = exitFn === undefined ? undefined : exitFn({ current: { selector: "#x" } }, null, null, null, () => {});
+      const runTimer = exitFn === undefined ? undefined : exitFn({ current: { selector: "#y" } }, null, null, 7, (handle) => cleared.push(handle));
+      harness.check("overlay: exitFocusMode clears the focus state and tolerates null handles",
+        run !== undefined && run.focusState.current === null && runTimer !== undefined && runTimer.focusState.current === null && JSON.stringify(cleared) === JSON.stringify([7]),
+        JSON.stringify({ focus: run?.focusState.current, cleared }));
+    }
+    {
+      const resolveIdx = panelSource.indexOf('pin.status = pin.status === "resolvido" ? "queued" : "resolvido";');
+      const resolveSpan = resolveIdx === -1 ? "" : panelSource.slice(resolveIdx, resolveIdx + 300);
+      const deleteIdx = panelSource.indexOf("pins = pins.filter((x) => x !== pin);");
+      const deleteSpan = deleteIdx === -1 ? "" : panelSource.slice(deleteIdx, deleteIdx + 300);
+      const paths = [closePinSource, resolveSpan, deleteSpan, closePanelsSource, setHiddenSource];
+      harness.check("overlay: every focus teardown path calls exitFocusMode and none removes the layer by hand",
+        paths.every((span) => span.includes("exitFocusMode()")) &&
+        [closePinSource, closePanelsSource, setHiddenSource, panelSource].every((span) => !span.includes('class: "lr-focus-spotlight"')) &&
+        (overlay.match(/focusSpotlightNode\?\.remove\(\)/gu) ?? []).length === 1,
+        JSON.stringify(paths.map((span) => span.includes("exitFocusMode()"))));
+    }
+    harness.check("overlay: the bubble close tears down the focus layer", closePinSource.includes("exitFocusMode()"), "closePinPanel must call exitFocusMode");
+    harness.check("overlay: resolving a pin tears down the focus layer", (() => {
+      const resolveIdx = panelSource.indexOf('pin.status = pin.status === "resolvido" ? "queued" : "resolvido";');
+      const resolveSpan = resolveIdx === -1 ? "" : panelSource.slice(resolveIdx, resolveIdx + 300);
+      return resolveSpan.includes("exitFocusMode()");
+    })(), "the resolve handler must call exitFocusMode");
+    harness.check("overlay: deleting a pin tears down the focus layer", (() => {
+      const deleteIdx = panelSource.indexOf("pins = pins.filter((x) => x !== pin);");
+      const deleteSpan = deleteIdx === -1 ? "" : panelSource.slice(deleteIdx, deleteIdx + 300);
+      return deleteSpan.includes("exitFocusMode()");
+    })(), "the delete handler must call exitFocusMode");
+    harness.check("overlay: closePanels tears down the focus layer", closePanelsSource.includes("exitFocusMode()"), "closePanels must call exitFocusMode");
+    harness.check("overlay: hiding the pins tears down the focus layer", setHiddenSource.includes("exitFocusMode()"), "setHidden(true) must call exitFocusMode");
+    {
+      const focusSources = ["enterFocusMode", "toggleFocusMode", "exitFocusMode", "repositionFocus"].map((name) => extractFunction(overlay, name) ?? "").join("");
+      harness.check("overlay: focus mode installs no blocking click handler",
+        focusSources !== "" && !focusSources.includes('addEventListener("click"') && !focusSources.includes("capture"),
+        "the page must stay interactive under the spotlight");
+    }
+    harness.check("overlay: the focus hint bar is inert except for its close control",
+      hintRule.includes("pointer-events: none") && overlay.includes(".lr-focus-hint .lr-close { pointer-events: auto"),
+      JSON.stringify({ hint: hintRule.slice(0, 120) }));
+
+    {
+      const countFn = extractFunction(overlay, "countSelectorMatches") === undefined ? undefined : evaluateExpression(extractFunction(overlay, "countSelectorMatches"), "countSelectorMatches");
+      harness.eq("overlay: countSelectorMatches counts the matches for a valid selector", countFn === undefined ? -1 : countFn("#x", () => [1, 2, 3]), 3);
+      harness.eq("overlay: countSelectorMatches answers 0 instead of throwing on a broken query", countFn === undefined ? -1 : countFn("#x", () => { throw new Error("bad selector"); }), 0);
+    }
+    harness.check("overlay: the bubble warns about an ambiguous selector only above one match",
+      panelSource.includes("countSelectorMatches(pin.selector") && panelSource.includes('ambiguousCount > 1 ? el("div", { class: "pin-bubble-warning" }'),
+      "the warning must key on a count greater than one");
+
+    {
+      const parseColorFn = evaluateExpression(`(${extractFunction(overlay, "parseColor")})`, "parseColor");
+      const hexFn = evaluateExpression(`(${extractFunction(overlay, "hexOf")})`, "hexOf");
+      const lumFn = evaluateExpression(`(${extractFunction(overlay, "relativeLuminance")})`, "relativeLuminance");
+      const ratioFn = evaluateExpression(`(parseColor, relativeLuminance) => {\n${extractFunction(overlay, "contrastRatio")}\nreturn contrastRatio;\n}`, "contrastRatio")(parseColorFn, lumFn);
+      const blendFn = evaluateExpression(`(${extractFunction(overlay, "blendColor")})`, "blendColor");
+      const proposeFn = evaluateExpression(`(parseColor, hexOf, contrastRatio, blendColor, relativeLuminance) => {\n${extractFunction(overlay, "proposeContrastFix")}\nreturn proposeContrastFix;\n}`, "proposeContrastFix")(parseColorFn, hexFn, ratioFn, blendFn, lumFn);
+      const white = parseColorFn("rgb(255, 255, 255)");
+      const proposal = proposeFn === undefined ? undefined : proposeFn("rgb(136, 136, 136)", "rgb(255, 255, 255)");
+      harness.check("overlay: the contrast fix reaches the 4.5 threshold",
+        proposal !== null && proposal !== undefined && proposal.ratioAfter >= 4.5 && ratioFn(parseColorFn(proposal.after), white) >= 4.5,
+        JSON.stringify(proposal ?? null));
+      harness.eq("overlay: the contrast fix records the original colour as before", proposal?.before, "#888888");
+      harness.check("overlay: the contrast fix records the proposed colour as after",
+        proposal !== null && proposal !== undefined && /^#[\da-f]{6}$/iu.test(proposal.after) && proposal.after !== proposal.before,
+        JSON.stringify(proposal ?? null));
+      harness.check("overlay: the contrast fix is the smallest blend that reaches the threshold",
+        proposal !== null && proposal !== undefined && ratioFn(blendFn(parseColorFn(proposal.after), parseColorFn(proposal.before), 0.5), white) < 4.5,
+        "blending the proposal halfway back must fall below the threshold");
+      harness.check("overlay: the contrast fix is refused when no proposal can reach the threshold",
+        proposeFn !== undefined && proposeFn("#888888", "rgba(255, 255, 255, 0.5)") === null && proposeFn("#000000", "#ffffff") === null,
+        "a transparent background and an already-passing pair must yield null");
+      const deriveAlt = extractFunction(overlay, "deriveAltText") === undefined ? undefined : evaluateExpression(extractFunction(overlay, "deriveAltText"), "deriveAltText");
+      harness.eq("overlay: deriveAltText prefers the alt attribute", deriveAlt === undefined ? null : deriveAlt({ alt: "Photo of a bridge", ariaLabel: "", title: "", src: "" }), "Photo of a bridge");
+      harness.check("overlay: deriveAltText falls back through aria-label, title, the src basename and the empty string",
+        deriveAlt !== undefined && deriveAlt({ alt: "", ariaLabel: "Upload", title: "T", src: "" }) === "Upload" &&
+        deriveAlt({ alt: "", ariaLabel: "", title: "T", src: "" }) === "T" &&
+        deriveAlt({ alt: "", ariaLabel: "", title: "", src: "https://x/y/photo.png" }) === "photo.png" &&
+        deriveAlt({}) === "",
+        JSON.stringify({ aria: deriveAlt?.({ alt: "", ariaLabel: "Upload", title: "T", src: "" }), src: deriveAlt?.({ alt: "", ariaLabel: "", title: "", src: "https://x/y/photo.png" }) }));
+      harness.check("overlay: the recorded alt fix carries the imgAlt check",
+        fixSource.includes('pin.fixes.push({ check: "imgAlt"'),
+        "the alt fix entry shape drifted");
+      harness.check("overlay: the recorded alt fix entry has a null prop",
+        fixSource.includes('check: "imgAlt", prop: null'),
+        "an attribute fix must carry prop === null");
+      harness.check("overlay: the recorded alt fix value is derived and non-empty",
+        fixSource.includes("field.value = deriveAltText(") && deriveAlt !== undefined && deriveAlt({ alt: "Photo of a bridge" }).length > 0,
+        "the alt proposal must flow from deriveAltText");
+      harness.check("overlay: the fix affordance exists only for contrast and imgAlt",
+        overlay.includes('const A11Y_FIXABLE_CHECKS = new Set(["contrast", "imgAlt"])') &&
+        (extractFunction(overlay, "a11yAuditSection") ?? "").includes("A11Y_FIXABLE_CHECKS.has(row.check)") &&
+        openAuditSource.includes("A11Y_FIXABLE_CHECKS.has(group.check)"),
+        "name, role and targetSize must stay unfixed");
+      harness.check("overlay: an applied fix is recorded on the pin, not in a session store",
+        (fixSource.match(/pin\.fixes\.push\(\{ check:/gu) ?? []).length === 2 && fixSource.includes("handler.ensurePin("),
+        "both fix paths must push onto the pin's own fixes array");
+      const capturedFixes = [{ check: "contrast", prop: "color", before: "#888888", after: "#767676" }];
+      let fixCaptured = null;
+      const fixBridgeSend = async (type, payload) => { fixCaptured = payload; return { ok: true }; };
+      if (postSource !== undefined) {
+        const post = evaluateExpression(`(bridgeSend, pins, PAGE_URL, document, setHint, updateToolbar, toast, t) => {\n${postSource}\nreturn postSnapshot();\n}`, "postSnapshot");
+        await post(fixBridgeSend, [{ id: "fx", tag: "h1", selector: "#fx", comment: "c", changes: [], status: "queued", fixes: capturedFixes }], "http://page/", { title: "T" }, () => {}, () => {}, () => {}, (key) => key);
+      }
+      harness.check("overlay: the snapshot payload carries no session-level fixes field",
+        fixCaptured !== null && fixCaptured.fixes === undefined && Array.isArray(fixCaptured.pins),
+        JSON.stringify({ topKeys: fixCaptured === null ? null : Object.keys(fixCaptured) }));
+      harness.check("overlay: the fix never touches pin.changes or pin.textChange",
+        !fixSource.includes("pin.changes") && !fixSource.includes("textChange"),
+        "changes renders as CSS and textChange is text only");
+      harness.check("overlay: postSnapshot transmits the pin's fixes",
+        postSource.includes("fixes: p.fixes ?? []") && fixCaptured !== null && JSON.stringify(fixCaptured.pins?.[0]?.fixes) === JSON.stringify(capturedFixes),
+        JSON.stringify(fixCaptured?.pins?.[0]?.fixes ?? null));
+    }
+
+    {
+      const rowLabels = evaluateObjectLiteral(extractObjectLiteral(overlay, "const A11Y_ROW_LABELS"), "A11Y_ROW_LABELS");
+      const groupTitles = evaluateObjectLiteral(extractObjectLiteral(overlay, "const A11Y_GROUP_TITLES"), "A11Y_GROUP_TITLES");
+      const groupFn = rowLabels === undefined || groupTitles === undefined ? undefined : evaluateExpression(`(A11Y_ROW_LABELS, A11Y_GROUP_TITLES) => {\n${extractFunction(overlay, "groupAuditFindings")}\nreturn groupAuditFindings;\n}`, "groupAuditFindings")(rowLabels, groupTitles);
+      const fixture = [
+        { check: "contrast", status: "fail", value: "2.31" },
+        { check: "contrast", status: "warn", value: "none" },
+        { check: "imgAlt", status: "fail", value: "" },
+        { check: "name", status: "fail", value: "" },
+        { check: "role", status: "warn", value: "none" },
+        { check: "targetSize", status: "unknown", value: "?" }
+      ];
+      const groups = groupFn === undefined ? undefined : groupFn(fixture);
+      harness.check("overlay: audit findings group by the five check types",
+        groups !== undefined && JSON.stringify(groups.map((group) => group.check)) === JSON.stringify(["contrast", "imgAlt", "name"]),
+        JSON.stringify(groups?.map((group) => group.check) ?? null));
+      harness.check("overlay: each audit group carries its own count",
+        groups !== undefined && groups.length === 3 && groups.every((group) => group.findings.length > 0 && typeof group.label === "string" && typeof group.title === "string"),
+        JSON.stringify(groups?.map((group) => ({ check: group.check, count: group.findings.length })) ?? null));
+      harness.check("overlay: only fail rows count as findings",
+        groups !== undefined && groups.reduce((total, group) => total + group.findings.length, 0) === 3,
+        "warn, unknown and n/a rows must not be counted");
+      const pickFn = extractFunction(overlay, "pickAuditCandidates") === undefined ? undefined : evaluateExpression(extractFunction(overlay, "pickAuditCandidates"), "pickAuditCandidates");
+      harness.eq("overlay: the audit inspection list truncates to the 400 cap", pickFn === undefined ? -1 : pickFn(Array.from({ length: 500 }, (_, index) => ({ index })), 400).length, 400);
+      harness.check("overlay: the inspected count never exceeds the collected candidates",
+        pickFn !== undefined && pickFn(Array.from({ length: 10 }, (_, index) => ({ index })), 400).length === 10 && pickFn([], 400).length === 0,
+        "a short candidate list must survive the cap");
+      {
+        const ElementClass = class Element {};
+        const makeAuditEl = (childNodes = [], children = []) => {
+          const node = new ElementClass();
+          node.nodeType = 1;
+          node.childNodes = childNodes;
+          node.children = children;
+          return node;
+        };
+        const textNode = (data) => ({ nodeType: 3, data });
+        const direct = makeAuditEl([textNode("  hi  ")]);
+        const deep = makeAuditEl([], [makeAuditEl([textNode("nested")])]);
+        const root = makeAuditEl([], [direct, deep]);
+        const btn = makeAuditEl();
+        const collectFn = extractFunction(overlay, "collectAuditCandidates") === undefined ? undefined : evaluateExpression(`(Element, interactive, images, semantic, textBearing, walkBudget) => {\n${extractFunction(overlay, "collectAuditCandidates")}\nreturn collectAuditCandidates({ interactive, images, semantic, textBearing }, walkBudget);\n}`, "collectAuditCandidates");
+        const candidates = collectFn === undefined ? undefined : collectFn(ElementClass, () => [btn], () => [], () => [btn], () => root, 400);
+        const bounded = collectFn === undefined ? undefined : collectFn(ElementClass, () => [], () => [], () => [], () => root, 2);
+        harness.check("overlay: the text-bearing family reads direct child text nodes, not textContent",
+          candidates !== undefined && candidates.includes(direct) && candidates.includes(deep.children[0]) && !candidates.includes(deep) && !candidates.includes(root),
+          JSON.stringify({ count: candidates?.length }));
+        harness.check("overlay: audit candidates are deduped across the four families",
+          candidates !== undefined && candidates.filter((element) => element === btn).length === 1 && candidates.length === 3,
+          JSON.stringify({ count: candidates?.length, btnCopies: candidates?.filter((element) => element === btn).length }));
+        harness.check("overlay: the text-bearing walk honours its node budget",
+          bounded !== undefined && !bounded.includes(deep.children[0]) && bounded.includes(direct),
+          JSON.stringify({ count: bounded?.length }));
+      }
+      {
+        const familySelectors = evaluateObjectLiteral(extractObjectLiteral(overlay, "const A11Y_AUDIT_FAMILY_SELECTORS"), "A11Y_AUDIT_FAMILY_SELECTORS");
+        const interactiveSelector = "button, a, input, select, textarea, [contenteditable]";
+        harness.check("overlay: the interactive audit family reuses the interactive-target selector",
+          familySelectors !== undefined && familySelectors.interactive === interactiveSelector &&
+          (extractFunction(overlay, "isInteractivePanelTarget") ?? "").includes(interactiveSelector),
+          JSON.stringify(familySelectors ?? null));
+        const semanticTags = JSON.parse(/const A11Y_SEMANTIC_TAGS = new Set\((\[[^\]]*\])\)/.exec(overlay)?.[1] ?? "[]");
+        const semanticList = typeof familySelectors?.semantic === "string" ? familySelectors.semantic.split(",").map((tag) => tag.trim()) : [];
+        harness.check("overlay: the semantic audit family reuses the semantic tag set",
+          semanticTags.length > 0 && semanticList.length > 0 && semanticList.every((tag) => semanticTags.includes(tag)) && familySelectors.images === "img",
+          JSON.stringify({ semantic: semanticList, tags: semanticTags.length }));
+      }
+    }
+    harness.check("overlay: the page audit opens its own panel node, not the pin bubble",
+      openAuditSource.includes("auditPanelNode = panel") && !openAuditSource.includes("pinPanelNode") &&
+      openAuditSource.includes("fixedLayer.append(panel)") && overlay.includes("lr-audit-panel"),
+      "the audit panel must mount on the fixed layer as its own node");
+
+    {
+      const insertFn = extractFunction(overlay, "insertAtCaret") === undefined ? undefined : evaluateExpression(extractFunction(overlay, "insertAtCaret"), "insertAtCaret");
+      const atCaret = insertFn === undefined ? undefined : insertFn({ value: "hello world", selectionStart: 5, selectionEnd: 5 }, "X");
+      harness.check("overlay: a template inserts at the caret", atCaret !== undefined && atCaret.value === "helloX world" && atCaret.selectionStart === 5, JSON.stringify(atCaret ?? null));
+      const replaced = insertFn === undefined ? undefined : insertFn({ value: "abcdef", selectionStart: 2, selectionEnd: 5 }, "Z");
+      harness.check("overlay: a template replaces the selection and brackets it in the returned range",
+        replaced !== undefined && replaced.value === "abZf" && replaced.selectionStart === 2 && replaced.selectionEnd === 3, JSON.stringify(replaced ?? null));
+      const dictionaries = evaluateObjectLiteral(extractObjectLiteral(overlay, "const UI_LOCALES"), "UI_LOCALES");
+      const templateKeys = ["templatesLabel", "templateAlignDesign", "templateReduceSpacing", "templateIncreaseContrast", "templateFixOverflow", "templateExplainWhy"];
+      const templateMissing = [];
+      for (const code of ["en", "pt", "zh"]) {
+        for (const key of templateKeys) {
+          const value = dictionaries?.[code]?.[key];
+          if (typeof value !== "string" || value === "") templateMissing.push(`${code}:${key}`);
+        }
+      }
+      harness.check("overlay: the five comment templates exist in all three languages", templateMissing.length === 0, templateMissing.slice(0, 6).join(", "));
+      const insertSource = extractFunction(overlay, "insertAtCaret") ?? "";
+      harness.check("overlay: insertAtCaret is liftable and returns the one caret shape",
+        insertSource !== "" && !insertSource.includes("document") && !insertSource.includes("window") &&
+        atCaret !== undefined && JSON.stringify(Object.keys(atCaret).sort()) === JSON.stringify(["selectionEnd", "selectionStart", "value"]),
+        JSON.stringify(Object.keys(atCaret ?? {}).sort()));
+    }
+
+    {
+      const buildFn = extractFunction(overlay, "buildDuplicatePin") === undefined ? undefined : evaluateExpression(extractFunction(overlay, "buildDuplicatePin"), "buildDuplicatePin");
+      const source = { id: "src-1", comment: "Align this", changes: [{ prop: "color", before: "#000000", after: "#111111" }, { prop: "font-size", before: "16px", after: "18px" }], pageUrl: "http://page/", selector: "#old", tag: "h1", rect: { x: 0, y: 0, w: 10, h: 10 }, shot: "old-shot" };
+      const target = { selector: "#new", tag: "p", role: "button", label: "New label", text: "Body", component: "Card", rect: { x: 1, y: 2, w: 30, h: 40 }, offsets: { ox: 5, oy: 6 } };
+      const readBeforeCalls = [];
+      const readBefore = (prop) => { readBeforeCalls.push(prop); return prop === "color" ? "#ffffff" : "14px"; };
+      const dup = buildFn === undefined ? undefined : buildFn(source, target, "new-id", readBefore);
+      harness.check("overlay: the duplicate carries the injected fresh id", dup !== undefined && dup.id === "new-id" && dup.id !== source.id, JSON.stringify({ id: dup?.id }));
+      harness.check("overlay: the duplicate takes its own descriptor from the new element",
+        dup !== undefined && dup.selector === "#new" && dup.tag === "p" && dup.label === "New label" && dup.component === "Card" &&
+        JSON.stringify(dup.rect) === JSON.stringify(target.rect) && JSON.stringify(dup.offsets) === JSON.stringify(target.offsets),
+        JSON.stringify(dup ?? null));
+      harness.eq("overlay: the duplicate copies the comment verbatim", dup?.comment, "Align this");
+      harness.check("overlay: the duplicate carries the source after values over",
+        dup !== undefined && dup.changes[0].after === "#111111" && dup.changes[1].after === "18px",
+        JSON.stringify(dup?.changes ?? null));
+      harness.check("overlay: the duplicate re-reads before from the new target",
+        dup !== undefined && dup.changes[0].before === "#ffffff" && dup.changes[1].before === "14px" &&
+        JSON.stringify(readBeforeCalls.slice().sort()) === JSON.stringify(["color", "font-size"]),
+        JSON.stringify({ changes: dup?.changes, read: readBeforeCalls }));
+      harness.check("overlay: the source pin is untouched by a duplicate",
+        source.changes[0].before === "#000000" && source.shot === "old-shot" && source.comment === "Align this" && source.id === "src-1",
+        JSON.stringify(source));
+      const createDupSource = extractFunction(overlay, "createDuplicatePin") ?? "";
+      harness.check("overlay: the duplicate applies no live style and starts with no screenshot",
+        dup !== undefined && dup.shot === null && createDupSource !== "" && !createDupSource.includes(".style"),
+        JSON.stringify({ shot: dup?.shot, mutatesStyle: createDupSource.includes(".style") }));
+      harness.check("overlay: the Duplicate action arms the flag and reuses the picking mode", (() => {
+        const dupIdx = panelSource.indexOf("duplicateArmed = pin;");
+        const dupSpan = dupIdx === -1 ? "" : panelSource.slice(dupIdx, dupIdx + 200);
+        return dupSpan.includes('setMode("picking")') && dupSpan.includes('t("duplicateHint")');
+      })(), "the duplicate must reuse setMode(\"picking\")");
+      harness.check("overlay: the duplicate produces the standard pin shape and never the canvas shape",
+        dup !== undefined && JSON.stringify(Object.keys(dup).sort()) === JSON.stringify(["changes", "comment", "component", "id", "label", "offsets", "pageUrl", "rect", "role", "selector", "shot", "status", "tag", "text"]) &&
+        dup.offsets !== null && overlay.includes('selector: "canvas:drawing"') && !(extractFunction(overlay, "buildDuplicatePin") ?? "").includes("canvas"),
+        JSON.stringify(Object.keys(dup ?? {}).sort()));
+      harness.check("overlay: the duplicate flag is spent before the branch does any work",
+        createDupSource !== "" && createDupSource.indexOf("duplicateArmed = null;") !== -1 &&
+        createDupSource.indexOf("duplicateArmed = null;") < createDupSource.indexOf("if (source === null) return;"),
+        createDupSource.slice(0, 120));
+      harness.check("overlay: Escape clears the duplicate flag through the picking exit",
+        escapeSource.includes("setMode(null)") && setModeSource.includes('duplicateArmed = null') && setModeSource.includes('mode !== "picking"'),
+        "the flag must clear when picking mode ends");
+    }
+
+    harness.check("overlay: the Resolve button posts the snapshot after marking the pin resolved", (() => {
+      const resolveIdx = panelSource.indexOf('pin.status = pin.status === "resolvido" ? "queued" : "resolvido";');
+      const resolveSpan = resolveIdx === -1 ? "" : panelSource.slice(resolveIdx, resolveIdx + 300);
+      return resolveSpan.includes("savePins();") && resolveSpan.indexOf("postSnapshot()") > resolveSpan.indexOf("pin.status =");
+    })(), "the host cannot drop a resolved pin it never receives");
+    {
+      const reconcile = extractFunction(overlay, "reconcileWithHost") === undefined ? undefined : evaluateExpression(`(pins, savePins) => {\n${extractFunction(overlay, "reconcileWithHost")}\nreturn (ids, resolvedIds) => { reconcileWithHost(ids, resolvedIds); return pins; };\n}`, "reconcileWithHost");
+      const savedCalls = [];
+      const keepPins = [{ id: "p1", status: "queued", at: 0 }];
+      const kept = reconcile === undefined ? undefined : reconcile(keepPins, () => savedCalls.push(1));
+      const after = kept === undefined ? undefined : kept(["p1"], ["p1"]);
+      harness.check("overlay: reconcileWithHost keeps a resolved pin instead of deleting it as unknown",
+        after !== undefined && after.length === 1 && after[0].id === "p1" && savedCalls.length === 1,
+        JSON.stringify({ kept: after?.length, saved: savedCalls.length }));
+      harness.eq("overlay: the kept pin's status becomes resolvido", after?.[0]?.status, "resolvido");
+    }
+    harness.check("overlay: pollStatus still removes queued pins by delivered id", pollSource.includes("data.deliveredIds") && pollSource.includes("gone.has(p.id)"), "the delivered-removal rule drifted");
+    harness.check("overlay: pollStatus keys removal on delivered ids, not on a delivered timestamp", pollSource.includes("data.deliveredIds") && pollSource.includes("gone.has(p.id)") && !pollSource.includes("deliveredAt"), "deliveredAt leaked into pollStatus");
+
+    harness.check("overlay: the pin-bubble action row wraps inside the 320px panel", overlay.includes(".pin-bubble-actions { display: flex; flex-wrap: wrap;"), "flex-wrap is missing");
+    harness.check("overlay: the bubble placement measures the rendered panel height", panelSource.includes("panel.offsetHeight") && !panelSource.includes("innerHeight - 280"), "the placement clamp still uses the hard-coded budget");
+    harness.check("overlay: the bubble body scrolls instead of overflowing", bodyRule.includes("max-height") && bodyRule.includes("overflow: auto"), bodyRule);
+    harness.includes("overlay: the bubble close control uses the lr-close class", panelSource, 'class: "lr-close"');
+    harness.includes("overlay: the bubble close control keeps the panelClose title", panelSource, 'title: t("panelClose")');
+    harness.includes("overlay: the bubble close control is a button", panelSource, 'type: "button"');
+    harness.check("overlay: the focus spotlight keeps its class name", spotlightRule !== "" && overlay.includes('class: "lr-focus-spotlight"'), "the spotlight rule or node is missing");
+    harness.check("overlay: the focus hint bar keeps its class name", hintRule !== "" && overlay.includes('class: "lr-focus-hint"'), "the hint rule or node is missing");
+
+    harness.check("overlay: the three original panels keep their drag wiring",
+      ["composerNode, \"composer\"", "panel, \"pin\"", "panel, \"adjust\""].every((call) => overlay.includes(`wirePanelDrag(${call}`)),
+      "one of the pinned drag wirings is gone");
+    harness.check("overlay: the pinned close-button markup is unchanged",
+      overlay.includes('class: "lr-close", title: t("composerClose"), type: "button"') && overlay.includes('class: "lr-close", title: t("panelClose"), type: "button"'),
+      "the pinned close-button shape drifted");
+    {
+      const anchorSource = extractFunction(overlay, "anchorPoint");
+      harness.check("overlay: the pin anchor is still viewport-based", anchorSource !== undefined && !anchorSource.includes("scrollX") && !anchorSource.includes("scrollY"), anchorSource === undefined ? "anchorPoint missing" : "anchorPoint still adds scroll offsets");
+    }
+    {
+      const repositionSource = extractFunction(overlay, "repositionPins");
+      harness.check("overlay: repositioning the page still does not rebuild the comment draft", repositionSource !== undefined && !repositionSource.includes("renderDraft("), repositionSource === undefined ? "repositionPins missing" : "repositionPins still calls renderDraft");
+    }
+    harness.check("overlay: pollStatus keeps its delivered-removal shape",
+      pollSource.includes("data.deliveredIds") && pollSource.includes("gone.has(p.id)") && !pollSource.includes("deliveredAt"),
+      "the pinned pollStatus shape drifted");
+    {
+      const handler = /if \(hotkeyMatches\(event, hotkeyComment\)\)[\s\S]*?else if \(hotkeyMatches\(event, hotkeyHidePins\)\)[^\n]*/.exec(overlay)?.[0] ?? "";
+      const chain = handler.match(/hotkeyMatches\(event, hotkey(Comment|Adjust|Draw|HidePins)\)/gu) ?? [];
+      harness.check("overlay: the keydown hotkey chain keeps its four matches and three else-if arms",
+        chain.length === 4 && (handler.match(/\belse if\b/gu) ?? []).length === 3 && handler.includes("setHidden(!hidden)"),
+        JSON.stringify({ matches: chain.length, arms: (handler.match(/\belse if\b/gu) ?? []).length }));
+    }
+    harness.check("overlay: the keydown handler never compares the hotkey key on its own", !/event\.key === key(Comment|Adjust|Draw)/u.test(overlay), "a raw event.key comparison would ignore the modifiers");
+    harness.check("overlay: the inspector undo shortcut ordering is unchanged", (() => {
+      const undoAt = guardAt === -1 ? -1 : overlay.indexOf("adjustUndo();", guardAt);
+      const closeAdjustSource = extractFunction(overlay, "closeAdjustPanel") ?? "";
+      return guardAt !== -1 && undoAt > guardAt && keydownAt !== -1 && overlay.slice(keydownAt, undoAt).includes("adjustPanel !== null") &&
+        closeAdjustSource.includes("adjustUndoStack = []") && closeAdjustSource.includes("adjustRedoStack = []");
+    })(), JSON.stringify({ guardAt, keydownAt }));
+    {
+      const buildCssPatch = evaluateExpression(extractFunction(overlay, "buildCssPatch"), "buildCssPatch");
+      const copySource = extractFunction(overlay, "copyCssPatch");
+      const copy = copySource === undefined ? undefined : evaluateExpression(`(navigator, toast, t, buildCssPatch, pin) => {\n${copySource}\ncopyCssPatch(pin);\n}`, "copyCssPatch");
+      const written = [];
+      const toasts = [];
+      const failingToasts = [];
+      const pin = { selector: "body h1", changes: [{ prop: "color", before: "#000", after: "red" }] };
+      if (copy !== undefined) copy({ clipboard: { writeText: async (text) => { written.push(text); } } }, (text) => toasts.push(text), (key) => key, buildCssPatch, pin);
+      if (copy !== undefined) copy({ clipboard: { writeText: async () => { throw new Error("denied"); } } }, (text) => failingToasts.push(text), (key) => key, buildCssPatch, pin);
+      await flush();
+      harness.check("overlay: the css copy helper still toasts through the injected toast",
+        copy !== undefined && JSON.stringify(written) === JSON.stringify(["body h1 { color: red; }"]) &&
+        JSON.stringify(toasts) === JSON.stringify(["cssCopied"]) && JSON.stringify(failingToasts) === JSON.stringify(["cssCopyFailed"]),
+        JSON.stringify({ written, toasts, failingToasts }));
+    }
+    {
+      const copySource = extractFunction(overlay, "copySelectorText");
+      const copy = copySource === undefined ? undefined : evaluateExpression(`(navigator, toast, t, pin) => {\n${copySource}\ncopySelectorText(pin);\n}`, "copySelectorText");
+      const written = [];
+      const toasts = [];
+      const failingToasts = [];
+      if (copy !== undefined) copy({ clipboard: { writeText: async (text) => { written.push(text); } } }, (text) => toasts.push(text), (key) => key, { selector: "#target > .card" });
+      if (copy !== undefined) copy({ clipboard: { writeText: async () => { throw new Error("denied"); } } }, (text) => failingToasts.push(text), (key) => key, { selector: "#target > .card" });
+      if (copy !== undefined) copy({ clipboard: undefined }, (text) => failingToasts.push(text), (key) => key, { selector: "#target > .card" });
+      await flush();
+      harness.check("overlay: the selector copy helper still toasts through the injected toast on both failure paths",
+        copy !== undefined && JSON.stringify(written) === JSON.stringify(["#target > .card"]) && JSON.stringify(toasts) === JSON.stringify(["selectorCopied"]) &&
+        JSON.stringify(failingToasts) === JSON.stringify(["cssCopyFailed", "cssCopyFailed"]),
+        JSON.stringify({ written, toasts, failingToasts }));
+    }
+  }
+
+  harness.section("client: dock ux batch 2");
+  {
+    const textWithin = (root, className) => {
+      const hit = findByClass(root, className)[0];
+      return hit === undefined ? "" : findElements(hit, (element) => typeof element.props?.children === "string").map((element) => element.props.children).join(" ");
+    };
+
+    // C1-C4: the bulk selection, the bulk request and the notice strip.
+    {
+      const createdTags = [];
+      const appendedTags = [];
+      const appendedBodies = [];
+      const documentStub = {
+        createElement(tag) {
+          createdTags.push(tag);
+          return { tag, href: "", download: "", click: () => {}, style: {}, setAttribute() {}, appendChild() {}, remove() {} };
+        },
+        documentElement: {},
+        head: { appendChild(node) { appendedTags.push(node?.tag ?? ""); } },
+        body: { appendChild(node) { appendedBodies.push(node?.tag ?? ""); } },
+        readyState: "complete",
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        addEventListener() {},
+        removeEventListener() {}
+      };
+      const fetchCalls = [];
+      let bulkFailing = false;
+      const stub = createReactStub();
+      const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+        react: stub.React,
+        localStorage: makeLocalStorage(),
+        document: documentStub,
+        console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+        fetch: async (url, options) => {
+          const target = String(url);
+          fetchCalls.push({ url: target, headers: options?.headers ?? {}, method: options?.method ?? "GET", body: options?.body ?? null });
+          if (target === "/api/dsh-redline.secret") return jsonResponse({ ok: true, secret: "a".repeat(64) });
+          if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+          if (target.includes("/.lr/pending/bulk")) return bulkFailing ? jsonResponse({ ok: false }, 500) : jsonResponse({ ok: true, applied: 2, ids: ["p1", "p2"] });
+          if (target.includes("/.lr/pending")) return jsonResponse({ ok: true, count: 3, snapshotId: "snap-9", pageTitle: "Demo", pins: [
+            { id: "p1", index: 1, tag: "h1", comment: "first note", selector: "body h1", component: "", text: "", role: "" },
+            { id: "p2", index: 2, tag: "button", comment: "second note", selector: "button#go", component: "", text: "", role: "button" },
+            { id: "p3", index: 3, tag: "p", comment: "third note", selector: "p.note", component: "", text: "", role: "" }
+          ] });
+          return jsonResponse({});
+        }
+      });
+      const clientApi = fakeClientCtx({});
+      module.apply(clientApi.ctx);
+      clientApi.resolve();
+      await flush(4);
+      const card = clientApi.slots.find((slot) => slot.spec.id === "dsh-redline" && slot.spec.name === "conversation.input.dock");
+      const renderCard = (props = { sessionId: "sess-9" }) => renderOnce(stub, card.component, props);
+      let render = renderCard();
+      for (const effect of render.effects) effect();
+      await flush(4);
+      render = renderCard();
+      const summary = findElements(render.tree, (element) => element.props?.className === "lr-summary");
+      if (summary.length === 1) {
+        summary[0].props.onClick();
+        await flush(2);
+      }
+      const open = renderCard();
+      const rows = findByClass(open.tree, "lr-row");
+      const checkboxes = findByClass(open.tree, "lr-select");
+      harness.check("dock: every pending row exposes its own selection checkbox",
+        rows.length === 3 && checkboxes.length === 3 && rows.every((row) => findElements(row, (element) => element.props?.className === "lr-select").length === 1),
+        JSON.stringify({ rows: rows.length, checkboxes: checkboxes.length }));
+      const resolveButton = findByClass(open.tree, "lr-bulk-resolve")[0];
+      const deleteButton = findByClass(open.tree, "lr-bulk-delete")[0];
+      harness.check("dock: both bulk buttons are disabled while nothing is selected",
+        resolveButton?.props?.disabled === true && deleteButton?.props?.disabled === true,
+        JSON.stringify({ resolve: resolveButton?.props?.disabled, delete: deleteButton?.props?.disabled }));
+      const selectable = checkboxes.filter((box) => box.props.disabled !== true);
+      await selectable[0].props.onChange();
+      await selectable[1].props.onChange();
+      const counted = renderCard();
+      harness.check("dock: checking two rows updates the selection count to two",
+        textWithin(counted.tree, "lr-bulk-count") === "2 selected",
+        JSON.stringify(textWithin(counted.tree, "lr-bulk-count")));
+      harness.check("dock: the bulk bar offers Resolve (2) for the two selected rows",
+        findByClass(counted.tree, "lr-bulk-resolve")[0]?.props?.children === "Resolve (2)",
+        JSON.stringify(findByClass(counted.tree, "lr-bulk-resolve")[0]?.props?.children));
+      harness.check("dock: the bulk bar offers Delete (2) for the two selected rows",
+        findByClass(counted.tree, "lr-bulk-delete")[0]?.props?.children === "Delete (2)",
+        JSON.stringify(findByClass(counted.tree, "lr-bulk-delete")[0]?.props?.children));
+      const bulkCalls = () => fetchCalls.filter((call) => call.url.includes("/.lr/pending/bulk"));
+      await findByClass(counted.tree, "lr-bulk-resolve")[0].props.onClick();
+      await flush(6);
+      const resolveCall = bulkCalls()[0];
+      const resolveBody = resolveCall === undefined ? {} : JSON.parse(resolveCall.body ?? "{}");
+      harness.check("dock: resolving the selection posts to the single bulk route",
+        resolveCall !== undefined && resolveCall.method === "POST" && resolveCall.url.includes("/.lr/pending/bulk"),
+        JSON.stringify(bulkCalls().map((call) => ({ url: call.url, method: call.method }))));
+      harness.check("dock: the resolve bulk body carries the session, the selected ids and the resolve action",
+        resolveBody.sessionId === "sess-9" && JSON.stringify(resolveBody.ids) === JSON.stringify(["p1", "p2"]) && resolveBody.action === "resolve",
+        JSON.stringify(resolveBody));
+      const noticed = renderCard();
+      const strip = findByClass(noticed.tree, "lr-notice");
+      harness.check("dock: the notice strip renders inside the pending card", strip.length === 1, JSON.stringify(strip.length));
+      harness.check("dock: a bulk success message renders into the notice strip",
+        strip.length === 1 && strip[0].props.className === "lr-notice lr-notice-ok" && textWithin(noticed.tree, "lr-notice").includes("2 pins resolved."),
+        JSON.stringify({ className: strip[0]?.props?.className, text: textWithin(noticed.tree, "lr-notice") }));
+      const recounted = renderCard();
+      const selectableAgain = findByClass(recounted.tree, "lr-select").filter((box) => box.props.disabled !== true);
+      await selectableAgain[0].props.onChange();
+      await selectableAgain[1].props.onChange();
+      const readyToDelete = renderCard();
+      await findByClass(readyToDelete.tree, "lr-bulk-delete")[0].props.onClick();
+      await flush(6);
+      const deleteCall = bulkCalls()[1];
+      const deleteBody = deleteCall === undefined ? {} : JSON.parse(deleteCall.body ?? "{}");
+      harness.check("dock: deleting the selection posts to the same bulk route",
+        deleteCall !== undefined && deleteCall.method === "POST" && deleteCall.url.includes("/.lr/pending/bulk"),
+        JSON.stringify(bulkCalls().map((call) => ({ url: call.url, method: call.method }))));
+      harness.check("dock: the delete bulk body carries the session, the selected ids and the delete action",
+        deleteBody.sessionId === "sess-9" && JSON.stringify(deleteBody.ids) === JSON.stringify(["p1", "p2"]) && deleteBody.action === "delete",
+        JSON.stringify(deleteBody));
+      bulkFailing = true;
+      const again = renderCard();
+      const selectableFail = findByClass(again.tree, "lr-select").filter((box) => box.props.disabled !== true);
+      await selectableFail[0].props.onChange();
+      await selectableFail[1].props.onChange();
+      const readyToFail = renderCard();
+      await findByClass(readyToFail.tree, "lr-bulk-resolve")[0].props.onClick();
+      await flush(6);
+      const failed = renderCard();
+      const failedStrip = findByClass(failed.tree, "lr-notice");
+      harness.check("dock: a bulk failure message renders into the notice strip",
+        failedStrip.length === 1 && failedStrip[0].props.className === "lr-notice lr-notice-error" && textWithin(failed.tree, "lr-notice").includes("Action failed."),
+        JSON.stringify({ className: failedStrip[0]?.props?.className, text: textWithin(failed.tree, "lr-notice") }));
+      const cleared = await waitFor(() => findByClass(renderCard().tree, "lr-notice").length === 0, 6000, 200);
+      harness.check("dock: the notice strip clears after its timeout", cleared === true, "the strip must auto-dismiss");
+      harness.check("dock: the host notice is not a floating element outside the card",
+        createdTags.every((tag) => tag === "style") && appendedTags.every((tag) => tag === "style") && appendedBodies.length === 0,
+        JSON.stringify({ createdTags, appendedTags, appendedBodies }));
+    }
+
+    // C5 + C6: the preview UI and the visible resolved state.
+    {
+      const fetchCalls = [];
+      let previewEmpty = false;
+      const resolvedIds = new Set();
+      const stub = createReactStub();
+      const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+        react: stub.React,
+        localStorage: makeLocalStorage(),
+        document: {
+          createElement(tag) { return { tag, href: "", download: "", click: () => {}, style: {}, setAttribute() {}, appendChild() {}, remove() {} }; },
+          documentElement: {},
+          head: { appendChild() {} },
+          body: { appendChild() {} },
+          readyState: "complete",
+          querySelector: () => null,
+          querySelectorAll: () => [],
+          addEventListener() {},
+          removeEventListener() {}
+        },
+        console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+        fetch: async (url, options) => {
+          const target = String(url);
+          fetchCalls.push({ url: target, headers: options?.headers ?? {}, method: options?.method ?? "GET", body: options?.body ?? null });
+          if (target === "/api/dsh-redline.secret") return jsonResponse({ ok: true, secret: "a".repeat(64) });
+          if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: Number(new URL(target).port) });
+          if (target.includes("/.lr/pending/bulk")) return jsonResponse({ ok: true, applied: 1, ids: [...resolvedIds] });
+          if (target.includes("/.lr/pending")) return jsonResponse({ ok: true, count: 2, snapshotId: resolvedIds.has("p1") ? "snap-4-resolved" : "snap-4", pageTitle: "Demo", pins: [
+            { id: "p1", index: 1, tag: "h1", comment: "first note", selector: "body h1", component: "", text: "", role: "", ...(resolvedIds.has("p1") ? { status: "resolvido" } : {}) },
+            { id: "p2", index: 2, tag: "button", comment: "second note", selector: "button#go", component: "", text: "", role: "button" }
+          ] });
+          if (target.includes("/.lr/preview")) {
+            return previewEmpty
+              ? jsonResponse({ ok: true, context: "", sections: [], pins: [] })
+              : jsonResponse({ ok: true, context: "PAGE URL: x", sections: [{ name: "Overview", text: "hello overview" }], pins: [{ id: "p1", comment: "first note", screenshot: "1700000000-abcd1234.png" }] });
+          }
+          if (target.includes("/.lr/attachments/")) return new Response(new Blob(["pngbytes"]), { status: 200 });
+          return jsonResponse({});
+        }
+      });
+      const clientApi = fakeClientCtx({});
+      module.apply(clientApi.ctx);
+      clientApi.resolve();
+      await flush(4);
+      const card = clientApi.slots.find((slot) => slot.spec.id === "dsh-redline" && slot.spec.name === "conversation.input.dock");
+      const renderCard = (props = { sessionId: "sess-1" }) => renderOnce(stub, card.component, props);
+      let render = renderCard();
+      for (const effect of render.effects) effect();
+      await flush(4);
+      render = renderCard();
+      findElements(render.tree, (element) => element.props?.className === "lr-summary")[0].props.onClick();
+      await flush(2);
+      const open = renderCard();
+      const suffixBefore = findByClass(open.tree, "lr-bulk-resolved").length;
+      await findByClass(open.tree, "lr-preview")[0].props.onClick();
+      await flush(4);
+      const previewed = renderCard();
+      const previewCalls = fetchCalls.filter((call) => call.url.includes("/.lr/preview"));
+      harness.check("dock: the preview action fetches the session preview route",
+        previewCalls.length === 1 && previewCalls[0].url.includes("/.lr/preview?sessionId=sess-1"),
+        JSON.stringify(previewCalls.map((call) => call.url)));
+      harness.check("dock: the preview fetch carries the secret header",
+        previewCalls[0]?.headers["x-dsh-redline-secret"] === "a".repeat(64),
+        JSON.stringify(Object.keys(previewCalls[0]?.headers ?? {})));
+      for (const effect of previewed.effects) effect();
+      await flush(6);
+      const cropped = renderCard();
+      const cropCalls = fetchCalls.filter((call) => call.url.includes("/.lr/attachments/"));
+      const cropName = cropCalls[0] === undefined ? "" : cropCalls[0].url.split("/.lr/attachments/")[1] ?? "";
+      harness.check("dock: the preview fetches the pin crop from the attachments route",
+        cropCalls.length === 1 && cropName === "1700000000-abcd1234.png",
+        JSON.stringify(cropCalls.map((call) => call.url)));
+      harness.check("dock: the crop fetch carries the secret header",
+        cropCalls[0]?.headers["x-dsh-redline-secret"] === "a".repeat(64),
+        JSON.stringify(Object.keys(cropCalls[0]?.headers ?? {})));
+      const images = findElements(cropped.tree, (element) => element.type === "img");
+      harness.check("dock: the crop renders from an object URL instead of a bare attachment src",
+        images.length === 1 && String(images[0].props.src).startsWith("blob:") && !images.some((image) => String(image.props.src).includes("/.lr/")),
+        JSON.stringify(images.map((image) => String(image.props.src).slice(0, 24))));
+      const sectionDetails = findByClass(cropped.tree, "lr-preview-section");
+      const sectionPres = sectionDetails.length === 1 ? findElements(sectionDetails[0], (element) => element.type === "pre") : [];
+      harness.check("dock: each preview section renders as its own details with its text in a pre",
+        sectionDetails.length === 1 && sectionPres.length === 1 && sectionPres[0].props.children === "hello overview",
+        JSON.stringify({ details: sectionDetails.length, pres: sectionPres.map((pre) => pre.props.children) }));
+      const contextDetails = findByClass(cropped.tree, "lr-preview-context");
+      const contextPres = contextDetails.length === 1 ? findElements(contextDetails[0], (element) => element.type === "pre") : [];
+      harness.check("dock: the full context string renders verbatim inside a pre",
+        contextDetails.length === 1 && contextPres.length === 1 && contextPres[0].props.children === "PAGE URL: x",
+        JSON.stringify(contextPres.map((pre) => pre.props.children)));
+      harness.check("dock: one crop image renders per preview pin using the returned basename",
+        images.length === 1 && cropName === "1700000000-abcd1234.png" && images[0].props.className === "lr-node-img",
+        JSON.stringify({ images: images.length, cropName }));
+      await findByClass(cropped.tree, "lr-preview")[0].props.onClick();
+      await flush(2);
+      previewEmpty = true;
+      await findByClass(renderCard().tree, "lr-preview")[0].props.onClick();
+      await flush(4);
+      const emptyPreview = renderCard();
+      harness.check("dock: an empty preview renders the empty state instead of a broken details list",
+        findByClass(emptyPreview.tree, "lr-preview-panel").length === 0 && findElements(emptyPreview.tree, (element) => element.type === "details").length === 0 &&
+        textWithin(emptyPreview.tree, "lr-notice").includes("Nothing to preview yet."),
+        JSON.stringify({ panels: findByClass(emptyPreview.tree, "lr-preview-panel").length, notice: textWithin(emptyPreview.tree, "lr-notice") }));
+      resolvedIds.add("p1");
+      await waitFor(() => findByClass(renderCard().tree, "lr-row-resolved").length === 1, 4000, 50);
+      const beforeBulk = renderCard();
+      const firstBox = findByClass(beforeBulk.tree, "lr-select").filter((box) => box.props.disabled !== true)[0];
+      await firstBox.props.onChange();
+      const readyToResolve = renderCard();
+      const bulkBefore = fetchCalls.filter((call) => call.url.includes("/.lr/pending/bulk")).length;
+      await findByClass(readyToResolve.tree, "lr-bulk-resolve")[0].props.onClick();
+      await flush(6);
+      await waitFor(() => findByClass(renderCard().tree, "lr-row-resolved").length === 1, 4000, 50);
+      const resolvedView = renderCard();
+      const marker = findByClass(resolvedView.tree, "lr-resolved")[0];
+      harness.check("dock: a resolved row carries the resolved marker with its check glyph",
+        marker !== undefined && marker.props.title === "Resolved" && marker.props.children === "✓ Resolved",
+        JSON.stringify(marker?.props ?? null));
+      const resolvedRows = findByClass(resolvedView.tree, "lr-row-resolved");
+      const allRows = findByClass(resolvedView.tree, "lr-row");
+      const queuedRow = allRows.find((row) => !String(row.props.className).includes("lr-row-resolved"));
+      harness.check("dock: the resolved row renders dimmed and the queued row carries neither marker nor dimming",
+        resolvedRows.length === 1 && String(resolvedRows[0].props.className).includes("lr-row-resolved") &&
+        queuedRow !== undefined && queuedRow.props.className === "lr-row" &&
+        findElements(queuedRow, (element) => element.props?.className === "lr-resolved").length === 0,
+        JSON.stringify(allRows.map((row) => row.props.className)));
+      const resolvedBox = findByClass(resolvedView.tree, "lr-select").find((box) => box.props.disabled === true);
+      const freshEmpty = renderCard();
+      const emptyResolve = findByClass(freshEmpty.tree, "lr-bulk-resolve")[0];
+      await findByClass(freshEmpty.tree, "lr-bulk-select-all")[0].props.onClick();
+      const afterAll = renderCard();
+      const selection = afterAll.states[0]?.selected ?? [];
+      harness.check("dock: the resolved row never enters the selection and the resolve button is disabled while empty",
+        resolvedBox !== undefined && emptyResolve?.props?.disabled === true &&
+        fetchCalls.filter((call) => call.url.includes("/.lr/pending/bulk")).length === bulkBefore + 1 &&
+        JSON.stringify(selection) === JSON.stringify(["p2"]) && findByClass(afterAll.tree, "lr-bulk-resolve")[0]?.props?.disabled === false,
+        JSON.stringify({ resolvedDisabled: resolvedBox?.props?.disabled, emptyDisabled: emptyResolve?.props?.disabled, selection, bulkCalls: fetchCalls.filter((call) => call.url.includes("/.lr/pending/bulk")).length - bulkBefore }));
+      const suffixAfter = findByClass(afterAll.tree, "lr-bulk-resolved");
+      harness.check("dock: the resolved-count suffix appears only when at least one pin is resolved",
+        suffixBefore === 0 && suffixAfter.length === 1 && textWithin(afterAll.tree, "lr-bulk-resolved").includes("1 resolved"),
+        JSON.stringify({ before: suffixBefore, after: textWithin(afterAll.tree, "lr-bulk-resolved") }));
+    }
+  }
+
+  harness.section("client: ux batch 2 integration");
+  {
+    // The two end-to-end paths drive the real host. A fresh module instance per
+    // assertion (the host suite already imported the bare URL, and its module
+    // state must not leak here) inside its own isolated profile, so each path
+    // starts from an empty pending store.
+    const hostModuleUrl = pathToFileURL(path.join(pluginDir, "lib", "index.js")).href;
+    const overlayPostSource = extractFunction(overlay, "postSnapshot");
+
+    // Integration 1: the overlay's transmitted pin fixes reach the rendered context.
+    {
+      const host = await withIsolatedHome(async (home) => {
+        const { startServer, formatContext } = await import(`${hostModuleUrl}?integration=1`);
+        const server = await startServer({ port: await freePort() });
+        return {
+          formatContext,
+          base: `http://127.0.0.1:${server.port}`,
+          secret: readFileSync(path.join(home, ".dsh", "profiles", "desktop", "dsh-redline", "instance.secret"), "utf8").trim(),
+          close: () => server.close()
+        };
+      });
+      try {
+        const fixComment = "overlay-fix-integration-comment";
+        const overlayPins = [
+          { id: "fx-1", status: "queued", tag: "h1", selector: "h1.demo", label: "", text: "", component: "", comment: fixComment, changes: [], textChange: null, fixes: [{ check: "contrast", prop: "color", before: "#888888", after: "#767676" }], rect: { x: 0, y: 0, w: 10, h: 10 }, shot: null, afterShot: null, pastedShot: null, groupId: null, viewportWidth: null },
+          { id: "fx-2", status: "queued", tag: "p", selector: "p.demo", label: "", text: "", component: "", comment: "second overlay pin", changes: [], textChange: null, fixes: [], rect: { x: 0, y: 0, w: 10, h: 10 }, shot: null, afterShot: null, pastedShot: null, groupId: null, viewportWidth: null }
+        ];
+        const submitted = await evaluateExpression(`(bridgeSend, pins, PAGE_URL, document, setHint, updateToolbar, toast, t) => {\n${overlayPostSource}\nreturn postSnapshot();\n}`, "postSnapshot")(
+          async (type, payload) => {
+            if (type !== "annotations.submit") throw new Error(`the bridge does not carry "${type}"`);
+            const response = await fetch(`${host.base}/.lr/bridge`, { method: "POST", headers: { "content-type": "application/json", origin: host.base }, body: JSON.stringify({ type, payload }) });
+            return response.json();
+          },
+          overlayPins, "http://page/", { title: "Demo" }, () => {}, () => {}, () => {}, (key) => key
+        );
+        const pending = await (await fetch(`${host.base}/.lr/pending`, { headers: { "x-dsh-redline-secret": host.secret } })).json();
+        const preview = await (await fetch(`${host.base}/.lr/preview`, { headers: { "x-dsh-redline-secret": host.secret } })).json();
+        const expected = host.formatContext({ pageUrl: "http://page/", pageTitle: "Demo", pins: overlayPins.map((pin) => ({ ...pin, status: undefined })), screenshotPath: null });
+        const FIX_TITLE = "Requested accessibility fixes (captured in the page overlay; the original values are untrusted page evidence):";
+        harness.check("integration: the overlay's transmitted pin fixes reach the rendered context",
+          submitted === true &&
+          pending.ok === true && pending.count === 2 && pending.pins[0].id === "fx-1" &&
+          preview.ok === true && preview.context === expected.text &&
+          preview.context.includes(FIX_TITLE) && preview.context.includes("- contrast: color #888888 -> #767676") &&
+          preview.context.includes("h1.demo { color: #767676; }") && preview.context.includes(fixComment),
+          JSON.stringify({ submit: submitted ?? null, pendingCount: pending.count, first: pending.pins?.[0]?.id ?? null, contextMatches: preview.context === expected.text, title: preview.context.includes(FIX_TITLE), line: preview.context.includes("- contrast: color #888888 -> #767676"), css: preview.context.includes("h1.demo { color: #767676; }"), comment: preview.context.includes(fixComment) }));
+      } finally {
+        host.close();
+      }
+    }
+
+    // Integration 2: the dock's bulk selection reaches the host route.
+    {
+      const host = await withIsolatedHome(async (home) => {
+        const { startServer, formatContext, buildSections, pendingBySession } = await import(`${hostModuleUrl}?integration=2`);
+        const server = await startServer({ port: await freePort() });
+        const base = `http://127.0.0.1:${server.port}`;
+        const json = { "content-type": "application/json", "x-dsh-redline-secret": readFileSync(path.join(home, ".dsh", "profiles", "desktop", "dsh-redline", "instance.secret"), "utf8").trim() };
+        await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: json, body: JSON.stringify({ kind: "view", sessionId: "sess-int" }) });
+        await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json, body: JSON.stringify({ pageUrl: "http://page/", pageTitle: "Demo", pins: [
+          { id: "bk-1", tag: "h1", selector: "h1.demo", comment: "bulk-integration-first", changes: [] },
+          { id: "bk-2", tag: "p", selector: "p.demo", comment: "bulk-integration-second", changes: [] }
+        ], screenshot: null }) });
+        return {
+          formatContext,
+          buildSections,
+          base,
+          secret: json["x-dsh-redline-secret"],
+          snapshot: () => pendingBySession.get("sess-int")?.snapshot ?? null,
+          close: () => server.close()
+        };
+      });
+      try {
+        let clientSecret = "";
+        const stub = createReactStub();
+        const { module } = loadClientModule(path.join(pluginDir, "lib", "client.js"), {
+          react: stub.React,
+          localStorage: makeLocalStorage(),
+          console: { log() {}, warn() {}, error() {}, info() {}, debug() {} },
+          document: {
+            createElement(tag) { return { tag, href: "", download: "", click: () => {}, style: {}, setAttribute() {}, appendChild() {}, remove() {} }; },
+            documentElement: {},
+            head: { appendChild() {} },
+            body: { appendChild() {} },
+            readyState: "complete",
+            querySelector: () => null,
+            querySelectorAll: () => [],
+            addEventListener() {},
+            removeEventListener() {}
+          },
+          fetch: async (url, options) => {
+            const target = String(url);
+            if (target === "/api/dsh-redline.secret") {
+              clientSecret = host.secret;
+              return jsonResponse({ ok: true, secret: host.secret });
+            }
+            if (target === "http://127.0.0.1:47496/.lr/health") return jsonResponse({ ok: true, name: "dsh-redline", port: 47496 });
+            if (target.endsWith("/.lr/health")) return jsonResponse({ ok: true, name: "dsh-redline", port: 999999 });
+            const hostUrl = /^http:\/\/127\.0\.0\.1:\d+\//.test(target) ? target.replace(/^http:\/\/127\.0\.0\.1:\d+/, host.base) : `${host.base}${target}`;
+            const headers = { ...(options?.headers ?? {}) };
+            if (hostUrl.includes("/.lr/")) headers["x-dsh-redline-secret"] = host.secret;
+            return await fetch(hostUrl, { ...options, headers });
+          }
+        });
+        const clientApi = fakeClientCtx({});
+        module.apply(clientApi.ctx);
+        clientApi.resolve();
+        await flush(4);
+        const card = clientApi.slots.find((slot) => slot.spec.id === "dsh-redline" && slot.spec.name === "conversation.input.dock");
+        const renderCard = (props = { sessionId: "sess-int" }) => renderOnce(stub, card.component, props);
+        let render = renderCard();
+        for (const effect of render.effects) effect();
+        await waitFor(() => {
+          const tree = renderCard().tree;
+          return findByClass(tree, "lr-summary").length === 1 && findElements(tree, (element) => element.props?.className === "lr-count").some((element) => String(element.props.children ?? "").startsWith("2 web"));
+        }, 4000, 25);
+        findByClass(renderCard().tree, "lr-summary")[0].props.onClick();
+        await flush(2);
+        const open = renderCard();
+        const boxes = findByClass(open.tree, "lr-select").filter((box) => box.props.disabled !== true);
+        await boxes[0].props.onChange();
+        await boxes[1].props.onChange();
+        const ready = renderCard();
+        await findByClass(ready.tree, "lr-bulk-resolve")[0].props.onClick();
+        await flush(8);
+        const afterBulk = await (await fetch(`${host.base}/.lr/pending?sessionId=sess-int`, { headers: { "x-dsh-redline-secret": host.secret } })).json();
+        const previewAfter = await (await fetch(`${host.base}/.lr/preview?sessionId=sess-int`, { headers: { "x-dsh-redline-secret": host.secret } })).json();
+        const rebuilt = host.buildSections(host.formatContext(host.snapshot()).blocks);
+        harness.check("integration: the dock's bulk selection reaches the host route and the rebuilt context drops the resolved pins",
+          clientSecret !== "" && afterBulk.ok === true && afterBulk.count === 2 &&
+          afterBulk.pins.length === 2 && afterBulk.pins.every((pin) => pin.status === "resolvido") &&
+          previewAfter.ok === true && previewAfter.context !== "" && previewAfter.sections.length === 1 &&
+          JSON.stringify(previewAfter.sections) === JSON.stringify(rebuilt) &&
+          !previewAfter.context.includes("bulk-integration-first") && !previewAfter.context.includes("bulk-integration-second"),
+          JSON.stringify({ secret: clientSecret !== "", count: afterBulk.count, statuses: afterBulk.pins?.map((pin) => pin.status), sections: previewAfter.sections?.length, matchesRebuilt: JSON.stringify(previewAfter.sections) === JSON.stringify(rebuilt), firstGone: !previewAfter.context.includes("bulk-integration-first"), secondGone: !previewAfter.context.includes("bulk-integration-second") }));
+      } finally {
+        host.close();
       }
     }
   }
