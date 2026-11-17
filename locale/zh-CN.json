@@ -254,5 +254,15 @@
   "unsupportedVersion": "该版本不是此插件可安装的版本",
   "unreachable": "Redline 服务不可达",
   "savedNote": "已保存",
-  "panelDrag": "拖动移动 · 双击恢复默认位置"
+  "panelDrag": "拖动移动 · 双击恢复默认位置",
+  "tplTitle": "评论模板",
+  "tplDesc": "一键插入评论输入框的消息。保存后生效。",
+  "tplAdd": "添加模板",
+  "tplEdit": "编辑",
+  "tplRemove": "删除",
+  "tplSave": "保存",
+  "tplCancel": "取消",
+  "tplEmpty": "暂无自定义模板 - 使用内置模板。",
+  "tplReset": "恢复默认",
+  "tplPlaceholder": "模板文本"
 }

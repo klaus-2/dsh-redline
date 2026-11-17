@@ -254,5 +254,15 @@
   "unsupportedVersion": "That release is not a version this plugin can install",
   "unreachable": "Redline service unreachable",
   "savedNote": "Saved",
-  "panelDrag": "Drag to move · double-click to reset"
+  "panelDrag": "Drag to move · double-click to reset",
+  "tplTitle": "Comment templates",
+  "tplDesc": "One-click messages inserted into the comment composer. Changes apply on save.",
+  "tplAdd": "Add template",
+  "tplEdit": "Edit",
+  "tplRemove": "Remove",
+  "tplSave": "Save",
+  "tplCancel": "Cancel",
+  "tplEmpty": "No custom templates - the built-in ones are used.",
+  "tplReset": "Restore defaults",
+  "tplPlaceholder": "Template text"
 }

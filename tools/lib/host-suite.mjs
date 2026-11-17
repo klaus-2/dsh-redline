@@ -283,7 +283,7 @@ export async function runHostSuite(harness, { pluginDir }) {
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "pt", keys: { comment: "x", adjust: "z" }, screenshot: false, cropPad: 96 }) });
       const body = await response.json();
-      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 96, theme: "dark" });
+      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 96, theme: "dark", templates: [] });
     }
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "klingon", keys: { comment: "xx", adjust: "!" }, screenshot: "yes", cropPad: 5 }) });
@@ -301,7 +301,7 @@ export async function runHostSuite(harness, { pluginDir }) {
       const port2 = server2.port ?? server2.address().port;
       const response = await fetch(`http://127.0.0.1:${port2}/.lr/settings`, { headers: { [secretHeader]: secret } });
       const body = await response.json();
-      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200, theme: "dark" });
+      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200, theme: "dark", templates: [] });
       server2.close();
     }
 

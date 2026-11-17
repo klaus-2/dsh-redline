@@ -254,5 +254,15 @@
   "unsupportedVersion": "Essa versão não é uma versão que este plugin consiga instalar",
   "unreachable": "Serviço do Redline inacessível",
   "savedNote": "Salvo",
-  "panelDrag": "Arraste para mover · duplo clique para voltar ao padrão"
+  "panelDrag": "Arraste para mover · duplo clique para voltar ao padrão",
+  "tplTitle": "Modelos de comentário",
+  "tplDesc": "Mensagens inseridas com um clique no compositor. As alterações valem após salvar.",
+  "tplAdd": "Adicionar modelo",
+  "tplEdit": "Editar",
+  "tplRemove": "Remover",
+  "tplSave": "Salvar",
+  "tplCancel": "Cancelar",
+  "tplEmpty": "Nenhum modelo personalizado - os padrão são usados.",
+  "tplReset": "Restaurar padrão",
+  "tplPlaceholder": "Texto do modelo"
 }

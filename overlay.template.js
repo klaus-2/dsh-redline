@@ -1961,6 +1961,25 @@
   // the initial screenshot flag and the crop padding from it: after that the
   // user owns both on this page.
   let hostSettingsApplied = false;
+  let customTemplates = normalizeTemplates(SETTINGS.templates);
+  function normalizeTemplates(value) {
+    const fallback = [t("templateAlignDesign"), t("templateReduceSpacing"), t("templateIncreaseContrast"), t("templateFixOverflow"), t("templateExplainWhy")];
+    if (!Array.isArray(value)) return fallback;
+    const seen = new Set();
+    const result = [];
+    for (const entry of value) {
+      const text = typeof entry === "string" ? entry : (entry !== null && typeof entry === "object" && typeof entry.text === "string" ? entry.text : "");
+      const clean = text.trim().slice(0, 120);
+      if (clean === "" || seen.has(clean)) continue;
+      seen.add(clean);
+      result.push(clean);
+      if (result.length === 20) break;
+    }
+    return result;
+  }
+  function templateItems() {
+    return customTemplates.length > 0 ? customTemplates : [t("templateAlignDesign"), t("templateReduceSpacing"), t("templateIncreaseContrast"), t("templateFixOverflow"), t("templateExplainWhy")];
+  }
   function applySettings(next) {
     if (next === null || typeof next !== "object") return;
     if (!hostSettingsApplied) {
@@ -1969,6 +1988,7 @@
       if (Number.isFinite(Number(next.cropPad))) CROP_PAD = Math.max(16, Math.min(200, Math.round(Number(next.cropPad))));
     }
     rootDiv.className = themeRootClass(next.theme);
+    if (Array.isArray(next.templates)) customTemplates = normalizeTemplates(next.templates);
     if (next.keys === null || typeof next.keys !== "object") return;
     let changed = false;
     const comment = parseHotkey(next.keys.comment);
@@ -2634,17 +2654,16 @@
     textarea.focus({ preventScroll: true });
   }
 
-  const TEMPLATE_KEYS = ["templateAlignDesign", "templateReduceSpacing", "templateIncreaseContrast", "templateFixOverflow", "templateExplainWhy"];
   function renderTemplateRow(textarea) {
     const row = el("div", { class: "lr-template-row" });
     const btn = el("button", { class: "lr-template-btn", type: "button", title: t("templatesLabel") }, `⋯ ${t("templatesLabel")}`);
     btn.addEventListener("click", () => {
       closeDrawMenu();
       drawMenu = el("div", { class: "lr-dmenu" });
-      for (const key of TEMPLATE_KEYS) {
-        const item = el("button", { class: "lr-ditem", type: "button" }, el("span", {}, t(key)));
-        item.addEventListener("click", () => { closeDrawMenu(); applyTemplate(textarea, t(key)); });
-        drawMenu.append(item);
+      for (const item of templateItems()) {
+        const entry = el("button", { class: "lr-ditem", type: "button" }, el("span", {}, item));
+        entry.addEventListener("click", () => { closeDrawMenu(); applyTemplate(textarea, item); });
+        drawMenu.append(entry);
       }
       fixedLayer.append(drawMenu);
       drawMenu.toggleAttribute("data-on", true);
