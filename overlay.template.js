@@ -53,6 +53,7 @@
     arrowUp: Icon(16, '<path d="m5 12 7-7 7 7M12 19V5"/>'),
     camera: Icon(14, '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>', '<circle cx="12" cy="13" r="3"/>'),
     check: Icon(13, '<path d="M20 6 9 17l-5-5"/>'),
+    accessibility: Icon(16, '<circle cx="12" cy="4" r="1.6"/>', '<path d="M5 8h14M12 8v5m0 0-3.5 7M12 13l3.5 7"/>'),
     sliders: Icon(16, '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/>', '<path d="M1 14h6M9 8h6M17 16h6"/>'),
     group: Icon(16, '<rect x="3" y="3" width="7" height="7" rx="1.5"/>', '<rect x="14" y="3" width="7" height="7" rx="1.5"/>', '<rect x="3" y="14" width="7" height="7" rx="1.5"/>', '<path d="M17.5 14v7M14 17.5h7"/>'),
     code: Icon(12, '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>')
@@ -1892,7 +1893,7 @@
     viewportBtn.classList.toggle("tool-active", !vpIsDefault());
   }
   const eyeBtn = el("button", { class: "tool", title: "Mostrar/ocultar pins", html: ICONS.eye });
-  const auditBtn = el("button", { class: "tool", title: t("a11yAuditPage"), "aria-label": t("a11yAuditPage") }, el("span", { class: "tool-label" }, t("a11yAuditPage")));
+  const auditBtn = el("button", { class: "tool", title: t("a11yAuditPage"), "aria-label": t("a11yAuditPage"), html: ICONS.accessibility });
   auditBtn.addEventListener("click", () => {
     if (auditPanelNode !== null) closeAuditPanel();
     else openAuditPanel();
@@ -1929,7 +1930,6 @@
     viewportBtn.setAttribute("aria-label", t("viewportLabel"));
     auditBtn.title = t("a11yAuditPage");
     auditBtn.setAttribute("aria-label", t("a11yAuditPage"));
-    auditBtn.querySelector(".tool-label").textContent = t("a11yAuditPage");
     if (auditPanelNode !== null) {
       const chip = auditPanelNode.querySelector(".chip");
       if (chip !== null) chip.textContent = t("a11yAuditPage");
