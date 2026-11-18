@@ -74,6 +74,8 @@
   "groupCreated": "组已创建",
   "viewportLabel": "预览宽度",
   "viewportReset": "全宽",
+  "layoutGrid": "切换布局网格",
+  "gridColumns": "列数",
   "viewPending": "查看待发送标注",
   "sendNow": "立即把标注发送给智能体",
   "sendBtn": "发送",

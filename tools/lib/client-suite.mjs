@@ -1569,6 +1569,127 @@ return pinPanelNode;
       panelSource === undefined ? "renderPinPanel missing" : "canvas:drawing guard missing");
   }
 
+  harness.section("client: overlay layout grid");
+  {
+    const geometrySource = extractFunction(overlay, "gridGeometry");
+    const stepSource = extractFunction(overlay, "gridStep");
+    const geometry = geometrySource === undefined ? undefined : evaluateExpression(geometrySource, "gridGeometry");
+    harness.check("overlay: gridGeometry computes the column math exactly and the stepper clamps 1-24",
+      geometry !== undefined && stepSource !== undefined &&
+      geometry(12, 1440).margin === 32 && geometry(12, 1440).gutter === 24 && geometry(12, 1440).columns === 12 &&
+      geometry(12, 1440).columnWidth === (1440 - 64 - 11 * 24) / 12 &&
+      geometry(1, 1440).columnWidth === 1376 && geometry(24, 1440).columnWidth === (1440 - 64 - 23 * 24) / 24 &&
+      stepSource.includes("Math.max(1") && stepSource.includes("Math.min(24"),
+      JSON.stringify({ c12: geometry?.(12, 1440).columnWidth, c1: geometry?.(1, 1440).columnWidth, c24: geometry?.(24, 1440).columnWidth }));
+  }
+  {
+    const languageSource = extractFunction(overlay, "applyOverlayLanguage");
+    const updateSource = extractFunction(overlay, "updateToolbar");
+    const gridBtnAt = overlay.indexOf("const gridBtn = el(\"button\", { class: \"tool\", title: t(\"layoutGrid\")");
+    const viewportAt = overlay.indexOf("const viewportBtn = el(\"button\"");
+    const eyeAt = overlay.indexOf("const eyeBtn = el(\"button\"");
+    harness.check("overlay: the layout grid button sits between viewport and eye and tracks gridOn",
+      gridBtnAt > viewportAt && eyeAt > gridBtnAt && overlay.includes("viewportBtn, gridBtn, eyeBtn") &&
+      updateSource !== undefined && updateSource.includes("gridBtn.classList.toggle(\"tool-active\", gridOn)") &&
+      languageSource !== undefined && languageSource.includes("gridBtn.title = t(\"layoutGrid\")"),
+      JSON.stringify({ gridBtnAt, viewportAt, eyeAt, ordered: gridBtnAt > viewportAt && eyeAt > gridBtnAt, activeToggled: updateSource?.includes("gridOn"), retitled: languageSource?.includes("layoutGrid") }));
+  }
+  {
+    const renderSource = extractFunction(overlay, "renderGrid");
+    const geometrySource = extractFunction(overlay, "gridGeometry");
+    const ready = renderSource !== undefined && geometrySource !== undefined;
+    const appended = [];
+    const fixedLayer = { append: (node) => appended.push(node) };
+    const el = (tag, attrs = {}, ...children) => {
+      const node = { tag, props: attrs, children: [], style: {} };
+      for (const kid of children) { if (kid !== null && kid !== undefined) node.children.push(kid); }
+      node.append = (...kids) => { for (const kid of kids) { if (kid !== null && kid !== undefined) node.children.push(kid); } return node; };
+      return node;
+    };
+    const run = ready ? evaluateExpression(`(el, fixedLayer, window) => {
+${geometrySource}
+${renderSource}
+let gridOn = true;
+let gridLayer = null;
+let gridColumns = 4;
+return renderGrid;
+}`, "renderGrid") : undefined;
+    const render = run === undefined ? undefined : run(el, fixedLayer, { innerWidth: 1000 });
+    render?.();
+    const layer = appended[0];
+    const bands = layer?.children ?? [];
+    const columnWidth = (1000 - 64 - 3 * 24) / 4;
+    harness.check("overlay: renderGrid builds the exact column bands with computed geometry",
+      render !== undefined && appended.length === 1 && layer.props.class === "lr-grid" && bands.length === 4 &&
+      bands[0].style.left === "32px" && bands[0].style.width === `${columnWidth}px` &&
+      bands[1].style.left === `${32 + columnWidth + 24}px` && bands[3].style.left === `${32 + 3 * (columnWidth + 24)}px` &&
+      bands.every((band) => band.props.class === "lr-grid-band") &&
+      /\.lr-grid \{[^}]*pointer-events: none/.test(overlay),
+      JSON.stringify({ bands: bands.length, first: bands[0]?.style, secondLeft: bands[1]?.style.left, lastLeft: bands[3]?.style.left }));
+  }
+  {
+    const stepSource = extractFunction(overlay, "gridStep");
+    const run = stepSource === undefined ? undefined : evaluateExpression(`(renderGrid) => {
+let gridColumns = 12;
+let gridStepper = null;
+${stepSource}
+return { step: gridStep, columns: () => gridColumns, setColumns: (value) => { gridColumns = value; } };
+}`, "gridStep");
+    let renders = 0;
+    const sandbox = run === undefined ? undefined : run(() => { renders += 1; });
+    sandbox?.setColumns(1);
+    sandbox?.step(-1);
+    const atMin = sandbox?.columns();
+    sandbox?.step(1);
+    const afterUp = sandbox?.columns();
+    sandbox?.setColumns(24);
+    sandbox?.step(1);
+    const atMax = sandbox?.columns();
+    sandbox?.step(-1);
+    const afterDown = sandbox?.columns();
+    sandbox?.setColumns(12);
+    sandbox?.step(-100);
+    const jumpedMin = sandbox?.columns();
+    sandbox?.setColumns(12);
+    sandbox?.step(100);
+    const jumpedMax = sandbox?.columns();
+    harness.check("overlay: gridStep clamps the columns between 1 and 24 and re-renders on change",
+      sandbox !== undefined && atMin === 1 && afterUp === 2 && atMax === 24 && afterDown === 23 &&
+      jumpedMin === 1 && jumpedMax === 24 && renders === 4,
+      JSON.stringify({ atMin, afterUp, atMax, afterDown, jumpedMin, jumpedMax, renders }));
+  }
+  {
+    const setGridSource = extractFunction(overlay, "setGrid");
+    const run = setGridSource === undefined ? undefined : evaluateExpression(`(updateToolbar, renderGrid, closeGridStepper, window) => {
+let gridOn = false;
+let gridLayer = null;
+let gridStepper = null;
+let gridResize = null;
+${setGridSource}
+return { setGrid, state: () => ({ gridOn, gridLayer, gridResize }), setLayer: (value) => { gridLayer = value; } };
+}`, "setGrid");
+    const added = [];
+    const removed = [];
+    const fakeWindow = { addEventListener: (type, handler) => added.push({ type, handler }), removeEventListener: (type, handler) => removed.push({ type, handler }) };
+    let renders = 0;
+    let stepperCloses = 0;
+    const layerStub = { removed: 0, remove() { this.removed += 1; } };
+    const sandbox = run === undefined ? undefined : run(() => {}, () => { renders += 1; }, () => { stepperCloses += 1; }, fakeWindow);
+    sandbox?.setGrid(true);
+    sandbox?.setGrid(true);
+    const afterEnable = { on: sandbox?.state().gridOn, added: added.length, type: added[0]?.type, renders };
+    sandbox?.setLayer(layerStub);
+    sandbox?.setGrid(false);
+    const afterDisable = { on: sandbox?.state().gridOn, removed: removed.length, layerRemoved: layerStub.removed, stepperCloses, sameHandler: removed[0]?.handler === added[0]?.handler, resizeCleared: sandbox?.state().gridResize === null, layerCleared: sandbox?.state().gridLayer === null };
+    sandbox?.setGrid(true);
+    harness.check("overlay: setGrid wires the resize listener on enable and removes layer, stepper and listener on disable",
+      sandbox !== undefined && afterEnable.on === true && afterEnable.added === 1 && afterEnable.type === "resize" && afterEnable.renders === 1 &&
+      afterDisable.on === false && afterDisable.removed === 1 && afterDisable.layerRemoved === 1 && afterDisable.stepperCloses === 1 &&
+      afterDisable.sameHandler === true && afterDisable.resizeCleared === true && afterDisable.layerCleared === true &&
+      added.length === 2,
+      JSON.stringify({ afterEnable, afterDisable, reAdded: added.length, ready: sandbox !== undefined }));
+  }
+
   harness.section("client: overlay theme derivation");
   {
     const themeClassSource = extractFunction(overlay, "themeRootClass");
@@ -4357,19 +4478,19 @@ return pinPanelNode;
       harness.check("overlay: the bubble-close branch precedes the audit and draft branches", bubbleIdx !== -1 && draftIdx !== -1 && bubbleIdx < auditIdx && auditIdx < draftIdx, JSON.stringify({ bubbleIdx, auditIdx, draftIdx }));
     }
     {
-      const dispatch = exitSource === "" || escapeSource === "" ? undefined : evaluateExpression(`(focusState, focusSpotlightNode, focusHintNode, focusRepositionTimer, clearTimeout, drawMode, groupMode, adjustPanel, openPinId, pinPanelNode, auditPanelNode, draft, mode, a11yFixHandler, toggleDraw, setGroupMode, closeAdjustPanel, closeAuditPanel, discardDraft, setMode) => {
+      const dispatch = exitSource === "" || escapeSource === "" ? undefined : evaluateExpression(`(focusState, focusSpotlightNode, focusHintNode, focusRepositionTimer, clearTimeout, drawMode, groupMode, adjustPanel, openPinId, pinPanelNode, auditPanelNode, draft, mode, a11yFixHandler, toggleDraw, setGroupMode, closeAdjustPanel, closeAuditPanel, discardDraft, setMode, gridStepper, closeGridStepper) => {
 ${exitSource}
 ${escapeSource}
 return { handleEscape, state: () => ({ focusState, openPinId, pinPanelNode, a11yFixHandler }) };
 }`, "handleEscape");
       const noops = [() => {}, () => {}, () => {}, () => {}, () => {}, () => {}];
-      const runFocus = dispatch === undefined ? undefined : dispatch({ current: { selector: "#x" } }, null, null, null, () => {}, false, false, null, null, null, null, null, null, { current: null }, ...noops);
+      const runFocus = dispatch === undefined ? undefined : dispatch({ current: { selector: "#x" } }, null, null, null, () => {}, false, false, null, null, null, null, null, null, { current: null }, ...noops, null, () => {});
       const consumed = runFocus === undefined ? undefined : runFocus.handleEscape({ key: "Escape" });
       harness.check("overlay: Escape under focus mode exits focus and is consumed",
         consumed === true && runFocus !== undefined && runFocus.state().focusState.current === null,
         JSON.stringify({ consumed, focus: runFocus?.state().focusState.current }));
       const bubbleNode = fakeNode();
-      const runBubble = dispatch === undefined ? undefined : dispatch({ current: null }, null, null, null, () => {}, false, false, null, "pin-1", bubbleNode, null, null, null, { current: { ensurePin: () => {} } }, ...noops);
+      const runBubble = dispatch === undefined ? undefined : dispatch({ current: null }, null, null, null, () => {}, false, false, null, "pin-1", bubbleNode, null, null, null, { current: { ensurePin: () => {} } }, ...noops, null, () => {});
       const consumedBubble = runBubble === undefined ? undefined : runBubble.handleEscape({ key: "Escape" });
       harness.check("overlay: Escape with the bubble open closes it and is consumed",
         consumedBubble === true && runBubble !== undefined && runBubble.state().openPinId === null && bubbleNode.removed === true && runBubble.state().a11yFixHandler.current === null,

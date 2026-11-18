@@ -61,6 +61,7 @@ For each pin, one block in a single snapshot:
 - Group comments: toolbar group mode collects N elements and posts one comment copied to every member pin (page-scoped — groups cannot span pages)
 - Comment templates insert a reusable sentence into the composer in one click.
 - Responsive preview presets: constrain the page to 375/768/1280 px or reset to full width; pins created under a preset record its width (note: `100vw` units and `position: fixed` navbars do not respect the constraint)
+- Layout grid overlay: a toolbar button toggles non-interactive column bands over the page (32 px margins, 24 px gutters); a second click opens the column stepper (1–24), outside click or Esc closes the stepper while the grid stays on, and resize re-flows the bands
 - Accessibility audit in the pin popover and across the whole page, grouped by check type.
 - Quick fixes raise text contrast and add image alt text, with a preview before you confirm.
 - A dismissible toast in the page confirms copy and resolve/delete actions; the chat card shows an inline notice for report export and bulk results.

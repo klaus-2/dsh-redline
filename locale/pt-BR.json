@@ -74,6 +74,8 @@
   "groupCreated": "Grupo criado",
   "viewportLabel": "Largura do preview",
   "viewportReset": "Largura total",
+  "layoutGrid": "Alternar grade de layout",
+  "gridColumns": "Colunas",
   "viewPending": "Ver as anotações pendentes",
   "sendNow": "Enviar as anotações ao agente agora",
   "sendBtn": "Enviar",

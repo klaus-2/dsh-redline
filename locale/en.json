@@ -74,6 +74,8 @@
   "groupCreated": "Group created",
   "viewportLabel": "Preview width",
   "viewportReset": "Full width",
+  "layoutGrid": "Toggle layout grid",
+  "gridColumns": "Columns",
   "viewPending": "View pending annotations",
   "sendNow": "Send the annotations to the agent now",
   "sendBtn": "Send",

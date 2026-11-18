@@ -61,6 +61,7 @@ Para cada pin, um bloco em um único snapshot:
 - Comentários em grupo: o modo de grupo da toolbar reúne N elementos e publica um comentário copiado para cada pin do grupo (escopo da página — grupos não atravessam páginas)
 - Modelos de comentário inserem uma frase reutilizável no compositor com um clique.
 - Predefinições de preview responsivo: restringe a página a 375/768/1280 px ou volta à largura total; pins criados sob uma predefinição registram a largura (nota: unidades `100vw` e navbars `position: fixed` não respeitam a restrição)
+- Grade de layout na toolbar: um botão alterna faixas de colunas não interativas sobre a página (margens de 32 px, calhas de 24 px); um segundo clique abre o seletor de colunas (1–24), clique fora ou Esc fecha o seletor com a grade ligada, e o resize reflui as faixas
 - Auditoria de acessibilidade no balão do pin e em toda a página, agrupada por tipo de verificação.
 - Correções rápidas aumentam o contraste do texto e adicionam texto alternativo, com pré-visualização antes de confirmar.
 - Um toast dispensável na página confirma copiar e resolver/excluir; o card do chat mostra um aviso inline para exportar o relatório e para ações em lote.

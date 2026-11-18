@@ -136,6 +136,8 @@
       "groupCreated": "Group created",
       "viewportLabel": "Preview width",
       "viewportReset": "Full width",
+      "layoutGrid": "Toggle layout grid",
+      "gridColumns": "Columns",
       "eyeTitle": "Show/hide pins",
       "statusTitle": "Live Review active",
       "pendingTitle": "Annotations waiting for your next prompt in the chat",
@@ -351,6 +353,8 @@
       "groupCreated": "Grupo criado",
       "viewportLabel": "Largura do preview",
       "viewportReset": "Largura total",
+      "layoutGrid": "Alternar grade de layout",
+      "gridColumns": "Colunas",
       "eyeTitle": "Mostrar/ocultar pins",
       "statusTitle": "Live Review ativo",
       "pendingTitle": "Anotações aguardando seu próximo prompt no chat",
@@ -566,6 +570,8 @@
       "groupCreated": "组已创建",
       "viewportLabel": "预览宽度",
       "viewportReset": "全宽",
+      "layoutGrid": "切换布局网格",
+      "gridColumns": "列数",
       "eyeTitle": "显示/隐藏图钉",
       "statusTitle": "Live Review 运行中",
       "pendingTitle": "标注将随你的下一条消息发送",
@@ -782,6 +788,11 @@
   let screenshotOnSend = SETTINGS.screenshot === false ? false : true;
   let html2canvasReady = null;
   let hidden = false;
+  let gridOn = false;
+  let gridLayer = null;
+  let gridStepper = null;
+  let gridColumns = 12;
+  let gridResize = null;
   let lastAgentActivity = 0;
 
   function loadPins() {
@@ -1134,7 +1145,8 @@
     redo: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0-5.5 5.5v0a5.5 5.5 0 0 0 5.5 5.5H13"/></svg>',
     trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>',
     plus: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>',
-    chev: '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>'
+    chev: '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+    grid: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>'
   };
 
   let drawMode = false;
@@ -1948,6 +1960,12 @@
     viewportBtn.querySelector(".lr-viewport-label").textContent = label;
     viewportBtn.classList.toggle("tool-active", !vpIsDefault());
   }
+  const gridBtn = el("button", { class: "tool", title: t("layoutGrid"), "aria-label": t("layoutGrid"), html: ICONS_CANVAS.grid });
+  gridBtn.addEventListener("click", () => {
+    if (gridStepper !== null) setGrid(false);
+    else if (gridOn) openGridStepper();
+    else setGrid(true);
+  });
   const eyeBtn = el("button", { class: "tool", title: "Mostrar/ocultar pins", html: ICONS.eye });
   const auditBtn = el("button", { class: "tool", title: t("a11yAuditPage"), "aria-label": t("a11yAuditPage"), html: ICONS.accessibility });
   auditBtn.addEventListener("click", () => {
@@ -1956,7 +1974,7 @@
   });
     drawBtn = el("button", { class: "tool", title: t("drawTitle") + " (" + formatHotkey(hotkeyDraw) + ")", html: ICONS_CANVAS.brush }, el("span", { class: "tool-label" }, t("drawTool")), el("kbd", {}, formatHotkey(hotkeyDraw)));
     drawBtn.addEventListener("click", () => toggleDraw());
-    toolbar.append(statusDot, divider, commentBtn, pendingSpan, adjustBtn, drawBtn, groupBtn, viewportBtn, eyeBtn, auditBtn);
+    toolbar.append(statusDot, divider, commentBtn, pendingSpan, adjustBtn, drawBtn, groupBtn, viewportBtn, gridBtn, eyeBtn, auditBtn);
   wrap.append(hint, toolbar);
   rootDiv.append(wrap);
 
@@ -1984,6 +2002,8 @@
     groupBtn.querySelector(".tool-label").textContent = t("groupBtn");
     viewportBtn.title = t("viewportLabel");
     viewportBtn.setAttribute("aria-label", t("viewportLabel"));
+    gridBtn.title = t("layoutGrid");
+    gridBtn.setAttribute("aria-label", t("layoutGrid"));
     auditBtn.title = t("a11yAuditPage");
     auditBtn.setAttribute("aria-label", t("a11yAuditPage"));
     if (auditPanelNode !== null) {
@@ -2064,10 +2084,88 @@
     commentBtn.classList.toggle("tool-active", mode === "picking");
     adjustBtn.classList.toggle("tool-active", mode === "adjust");
     groupBtn.classList.toggle("tool-active", groupMode);
+    gridBtn.classList.toggle("tool-active", gridOn);
     pendingSpan.textContent = pending > 0 ? t("pendingCount").replace("{n}", pending) : "";
     pendingSpan.style.display = pending > 0 ? "" : "none";
     eyeBtn.innerHTML = hidden ? ICONS.eyeOff : ICONS.eye;
     absLayer.style.display = hidden ? "none" : "";
+  }
+
+  function gridGeometry(columns, innerWidth) {
+    return { margin: 32, gutter: 24, columnWidth: (innerWidth - 64 - (columns - 1) * 24) / columns, columns };
+  }
+
+  function renderGrid() {
+    if (!gridOn) return;
+    gridLayer?.remove();
+    const geometry = gridGeometry(gridColumns, window.innerWidth);
+    const bands = [];
+    for (let index = 0; index < geometry.columns; index += 1) {
+      const band = el("div", { class: "lr-grid-band" });
+      band.style.left = `${geometry.margin + index * (geometry.columnWidth + geometry.gutter)}px`;
+      band.style.width = `${geometry.columnWidth}px`;
+      bands.push(band);
+    }
+    gridLayer = el("div", { class: "lr-grid" }, ...bands);
+    fixedLayer.append(gridLayer);
+  }
+
+  function gridStep(delta) {
+    const next = Math.max(1, Math.min(24, gridColumns + delta));
+    if (next === gridColumns) return;
+    gridColumns = next;
+    renderGrid();
+    const value = gridStepper?.querySelector(".lr-grid-step-value");
+    if (value !== undefined && value !== null) value.textContent = `${gridColumns}`;
+  }
+
+  function closeGridStepper() {
+    if (gridStepper === null) return;
+    try { gridStepper.__lrCleanup?.(); } catch {}
+    gridStepper.remove();
+    gridStepper = null;
+  }
+
+  function openGridStepper() {
+    closeGridStepper();
+    gridStepper = el("div", { class: "lr-grid-step" }, el("span", { class: "lr-grid-step-label" }, t("gridColumns")), el("button", { class: "lr-grid-step-btn", type: "button", onclick: () => gridStep(-1) }, "−"), el("span", { class: "lr-grid-step-value" }, `${gridColumns}`), el("button", { class: "lr-grid-step-btn", type: "button", onclick: () => gridStep(1) }, "+"));
+    fixedLayer.append(gridStepper);
+    const place = () => {
+      if (gridStepper === null || !gridStepper.isConnected) return;
+      const r = gridBtn.getBoundingClientRect();
+      gridStepper.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - 160))}px`;
+      gridStepper.style.top = `${Math.max(8, r.top - gridStepper.offsetHeight - 6)}px`;
+    };
+    place();
+    requestAnimationFrame(place);
+    const dismiss = (event) => {
+      if (gridStepper === null) return;
+      if (gridStepper.contains(event.target) || gridBtn.contains(event.target)) return;
+      closeGridStepper();
+    };
+    document.addEventListener("pointerdown", dismiss, true);
+    gridStepper.__lrCleanup = () => {
+      document.removeEventListener("pointerdown", dismiss, true);
+    };
+  }
+
+  function setGrid(on) {
+    if (on === gridOn) return;
+    gridOn = on;
+    updateToolbar();
+    if (on) {
+      renderGrid();
+      gridResize = () => renderGrid();
+      window.addEventListener("resize", gridResize);
+    } else {
+      gridLayer?.remove();
+      gridLayer = null;
+      closeGridStepper();
+      if (gridResize !== null) {
+        window.removeEventListener("resize", gridResize);
+        gridResize = null;
+      }
+    }
   }
 
   function setHidden(next) {
@@ -2215,6 +2313,10 @@
   );
 
   function handleEscape(event) {
+    if (gridStepper !== null) {
+      closeGridStepper();
+      return true;
+    }
     if (focusState.current !== null) {
       exitFocusMode();
       return true;
