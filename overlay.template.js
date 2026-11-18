@@ -153,6 +153,7 @@
     "drawTitle": "Free canvas",
     "drawHint": "Canvas mode — draw over the page · Esc exits",
     "drawBrush": "Brush",
+    "drawErase": "Erase",
     "drawText": "Text",
     "drawRect": "Rectangle",
     "drawCircle": "Ellipse",
@@ -366,6 +367,7 @@
     "drawTitle": "Canvas livre",
     "drawHint": "Modo canvas — desenhe sobre a página · Esc sai",
     "drawBrush": "Pincel",
+    "drawErase": "Apagar",
     "drawText": "Texto",
     "drawRect": "Retângulo",
     "drawCircle": "Elipse",
@@ -579,6 +581,7 @@
     "drawTitle": "自由画布",
     "drawHint": "画布模式 — 在页面上绘制 · Esc 退出",
     "drawBrush": "画笔",
+    "drawErase": "擦除",
     "drawText": "文本",
     "drawRect": "矩形",
     "drawCircle": "椭圆",
@@ -1106,6 +1109,7 @@
 
   const ICONS_CANVAS = {
     brush: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>',
+    eraser: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>',
     text: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>',
     rect: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>',
     circle: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>',
@@ -1198,6 +1202,22 @@
     saveDrawings();
     redrawDrawings();
     updateDrawBarState();
+  }
+
+  function drawUndoKeydown(event) {
+    if (!drawMode || !(event.ctrlKey || event.metaKey) || event.altKey) return false;
+    const key = event.key.toLowerCase();
+    if (key === "z" && !event.shiftKey) {
+      event.preventDefault();
+      undoDraw();
+      return true;
+    }
+    if ((key === "z" && event.shiftKey) || key === "y") {
+      event.preventDefault();
+      redoDraw();
+      return true;
+    }
+    return false;
   }
 
   function itemBBox(item) {
@@ -1309,6 +1329,18 @@
       if (drawHit(drawItems[i], x, y)) return drawItems[i];
     }
     return null;
+  }
+
+  function eraseDrawItemAt(x, y) {
+    if (drawTyping !== null) return false;
+    const hit = hitTestDraw(x, y);
+    if (hit === null) return false;
+    snapshotDraw();
+    drawItems.splice(drawItems.indexOf(hit), 1);
+    saveDrawings();
+    redrawDrawings();
+    updateDrawBarState();
+    return true;
   }
 
   function renderDrawItem(ctx, item, previewTo) {
@@ -1577,6 +1609,7 @@
     const shapeBtn = addTool("shapes", "drawShapes", ICONS_CANVAS.rect, (btn) => openShapesMenu(btn));
     drawShapeIcon = shapeBtn.querySelector(".lr-dicon");
     shapeBtn.append(el("span", { class: "lr-dchev" }, ICONS_CANVAS.chev));
+    addTool("eraser", "drawErase", ICONS_CANVAS.eraser);
     addTool("text", "drawText", ICONS_CANVAS.text);
     const colorBtn = addTool("color", "drawColor", "", (btn) => openColorMenu(btn));
     drawColorDot = el("span", { class: "lr-dcolor" });
@@ -1679,6 +1712,11 @@
       redrawDrawings();
       return;
     }
+    if (drawTool === "eraser") {
+      drawCanvas.setPointerCapture?.(e.pointerId);
+      eraseDrawItemAt(x, y);
+      return;
+    }
     if (drawTool === "text") {
       e.preventDefault();
       if (drawTyping !== null) commitDrawTyping();
@@ -1733,6 +1771,10 @@
       drawDrag.x = e.clientX;
       drawDrag.y = e.clientY;
       redrawDrawings();
+      return;
+    }
+    if (drawTool === "eraser" && e.buttons === 1) {
+      eraseDrawItemAt(e.clientX, e.clientY);
       return;
     }
     if (drawLive === null) {
@@ -2204,6 +2246,7 @@
           return;
         }
       }
+      if (drawUndoKeydown(event)) return;
       if (drawMode && drawTyping === null && drawSel !== null && (event.key === "Delete" || event.key === "Backspace")) {
         event.preventDefault();
         snapshotDraw();

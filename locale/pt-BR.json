@@ -173,6 +173,7 @@
   "drawTitle": "Canvas livre",
   "drawHint": "Modo canvas — desenhe sobre a página · Esc sai",
   "drawBrush": "Pincel",
+  "drawErase": "Apagar",
   "drawText": "Texto",
   "drawRect": "Retângulo",
   "drawCircle": "Elipse",

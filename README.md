@@ -53,6 +53,7 @@ For each pin, one block in a single snapshot:
 - Focus mode dims the page and keeps the selected element interactive; Esc exits it.
 - Overlay themes: dark (default), light and a high-contrast variant, chosen in the plugin settings and persisted
 - Inspector undo/redo: Ctrl+Z / Ctrl+Shift+Z (or the panel buttons) step the uncommitted adjustments and text back and forward while the panel is open
+- Drawing eraser and keyboard undo: the canvas gains an eraser tool that deletes the drawing under the cursor (click or drag across several), and Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y undo and redo the drawings while the canvas is open (when focus is not in an input)
 - Clicking a pin in the chat card scrolls the page to its element and highlights it for a moment
 - Paste an image into the comment composer: it is downscaled (max 1600px, JPEG), shown as a removable chip, and delivered with the pin for the agent to read
 - Before/after screenshots per adjusted pin: the after crop is captured live, then the page is restored and the before crop is captured from the same frame

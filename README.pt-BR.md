@@ -53,6 +53,7 @@ Para cada pin, um bloco em um único snapshot:
 - O modo de foco escurece a página e mantém o elemento selecionado interativo; Esc sai.
 - Temas do overlay: escuro (padrão), claro e uma variante de alto contraste, escolhidos nas configurações do plugin e persistidos
 - Desfazer/refazer no inspetor: Ctrl+Z / Ctrl+Shift+Z (ou os botões do painel) retrocedem e avançam os ajustes e o texto não confirmados enquanto o painel está aberto
+- Apagador e desfazer por teclado no canvas: a barra de desenho ganha uma ferramenta de apagar que remove o desenho sob o cursor (clique ou arraste por vários), e Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y desfazem e refazem os desenhos enquanto o canvas está aberto (quando o foco não está em um campo de texto)
 - Clicar em um pin no card do chat rola a página até o elemento e o destaca por alguns instantes
 - Cole uma imagem no composer do comentário: ela é reduzida (máx. 1600px, JPEG), mostrada como um chip removível e entregue junto do pin para o agente ler
 - Screenshots antes/depois por pin ajustado: o recorte "depois" é capturado ao vivo e, então, a página é restaurada para capturar o recorte "antes" do mesmo enquadramento

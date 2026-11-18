@@ -173,6 +173,7 @@
   "drawTitle": "Free canvas",
   "drawHint": "Canvas mode — draw over the page · Esc exits",
   "drawBrush": "Brush",
+  "drawErase": "Erase",
   "drawText": "Text",
   "drawRect": "Rectangle",
   "drawCircle": "Ellipse",

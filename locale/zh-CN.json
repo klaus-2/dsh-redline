@@ -173,6 +173,7 @@
   "drawTitle": "自由画布",
   "drawHint": "画布模式 — 在页面上绘制 · Esc 退出",
   "drawBrush": "画笔",
+  "drawErase": "擦除",
   "drawText": "文本",
   "drawRect": "矩形",
   "drawCircle": "椭圆",

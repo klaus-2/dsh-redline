@@ -1335,6 +1335,132 @@ return (pin, textarea, event) => {
       draftSource === undefined ? "renderDraft missing" : "draft keydown condition drifted");
   }
 
+  harness.section("client: overlay draw eraser and undo");
+  {
+    const barSource = extractFunction(overlay, "buildDrawBar");
+    const iconsSource = extractObjectLiteral(overlay, "ICONS_CANVAS");
+    const icons = iconsSource === undefined ? undefined : evaluateObjectLiteral(iconsSource, "ICONS_CANVAS");
+    const shapesAt = barSource?.indexOf("addTool(\"shapes\", \"drawShapes\"") ?? -1;
+    const eraseAt = barSource?.indexOf("addTool(\"eraser\", \"drawErase\", ICONS_CANVAS.eraser)") ?? -1;
+    const textAt = barSource?.indexOf("addTool(\"text\", \"drawText\"") ?? -1;
+    harness.check("overlay: the eraser tool sits between shapes and text in the draw bar with its own icon",
+      barSource !== undefined && icons !== undefined && typeof icons.eraser === "string" && icons.eraser.startsWith("<svg") &&
+      shapesAt !== -1 && eraseAt > shapesAt && textAt > eraseAt,
+      JSON.stringify({ shapesAt, eraseAt, textAt, hasIcon: typeof icons?.eraser === "string" }));
+  }
+  {
+    const cluster = ["itemBBox", "drawHit", "hitTestDraw", "snapshotDraw", "eraseDrawItemAt"].map((name) => extractFunction(overlay, name));
+    const cloneSource = extractArrowConst(overlay, "cloneItems");
+    const ready = cloneSource !== undefined && cluster.every((source) => source !== undefined);
+    const build = () => ready ? evaluateExpression(`(saveDrawings, redrawDrawings, updateDrawBarState) => {
+${cluster.join("\n")}
+${cloneSource}
+let drawTyping = null;
+let drawItems = [];
+let drawUndo = [];
+let drawRedo = [];
+return {
+  erase: eraseDrawItemAt,
+  seed: (items) => { drawItems = items; },
+  items: () => drawItems,
+  undo: () => drawUndo,
+  redo: () => drawRedo,
+  setTyping: (value) => { drawTyping = value; }
+};
+}`, "eraseDrawItemAt") : undefined;
+    const bottom = { type: "path", color: "#111111", w: 2, points: [{ x: 100, y: 100 }, { x: 140, y: 100 }] };
+    const top = { type: "path", color: "#e5484d", w: 2, points: [{ x: 102, y: 100 }, { x: 140, y: 120 }] };
+    let saveCalls = 0;
+    let redrawCalls = 0;
+    let stateCalls = 0;
+    const sandbox = build()?.(() => { saveCalls += 1; }, () => { redrawCalls += 1; }, () => { stateCalls += 1; });
+    sandbox?.seed([bottom, top]);
+    const erased = sandbox?.erase(103, 101) === true;
+    harness.check("overlay: eraseDrawItemAt removes the topmost hit drawing with exactly one undo snapshot",
+      sandbox !== undefined && erased && sandbox.items().length === 1 && sandbox.items()[0] === bottom &&
+      sandbox.undo().length === 1 && sandbox.undo()[0].length === 2 && sandbox.redo().length === 0 &&
+      saveCalls === 1 && redrawCalls === 1 && stateCalls === 1,
+      JSON.stringify({ erased, left: sandbox?.items().length, undo: sandbox?.undo().length, undoDepth: sandbox?.undo()[0]?.length, redo: sandbox?.redo().length, saveCalls, redrawCalls, stateCalls, ready }));
+  }
+  {
+    const cluster = ["itemBBox", "drawHit", "hitTestDraw", "snapshotDraw", "eraseDrawItemAt"].map((name) => extractFunction(overlay, name));
+    const cloneSource = extractArrowConst(overlay, "cloneItems");
+    const ready = cloneSource !== undefined && cluster.every((source) => source !== undefined);
+    const run = ready ? evaluateExpression(`(saveDrawings, redrawDrawings, updateDrawBarState) => {
+${cluster.join("\n")}
+${cloneSource}
+let drawTyping = null;
+let drawItems = [];
+let drawUndo = [];
+let drawRedo = [];
+return {
+  erase: eraseDrawItemAt,
+  seed: (items) => { drawItems = items; },
+  items: () => drawItems,
+  undo: () => drawUndo,
+  redo: () => drawRedo,
+  setTyping: (value) => { drawTyping = value; }
+};
+}`, "eraseDrawItemAt") : undefined;
+    const first = { type: "path", color: "#111111", w: 2, points: [{ x: 100, y: 100 }, { x: 140, y: 100 }] };
+    const second = { type: "path", color: "#3b82f6", w: 2, points: [{ x: 200, y: 200 }, { x: 240, y: 200 }] };
+    let saveCalls = 0;
+    let redrawCalls = 0;
+    let stateCalls = 0;
+    const sandbox = run === undefined ? undefined : run(() => { saveCalls += 1; }, () => { redrawCalls += 1; }, () => { stateCalls += 1; });
+    sandbox?.seed([first, second]);
+    const emptyHit = sandbox?.erase(300, 300);
+    const afterEmpty = { undo: sandbox?.undo().length, redo: sandbox?.redo().length, items: sandbox?.items().length, saveCalls };
+    sandbox?.setTyping({ x: 100, y: 100, color: "#111111", text: "a" });
+    const typingHit = sandbox?.erase(103, 101);
+    harness.check("overlay: erasing an empty point or while typing pushes no undo snapshot",
+      sandbox !== undefined && emptyHit === false && typingHit === false &&
+      afterEmpty.undo === 0 && afterEmpty.redo === 0 && afterEmpty.items === 2 && afterEmpty.saveCalls === 0 &&
+      sandbox.items().length === 2 && sandbox.undo().length === 0 && sandbox.redo().length === 0 &&
+      saveCalls === 0 && redrawCalls === 0 && stateCalls === 0,
+      JSON.stringify({ emptyHit, typingHit, afterEmpty, finalItems: sandbox?.items().length, ready }));
+  }
+  {
+    const keydownSource = extractFunction(overlay, "drawUndoKeydown");
+    const run = keydownSource === undefined ? undefined : evaluateExpression(`(undoDraw, redoDraw) => {
+let drawMode = true;
+${keydownSource}
+return { keydown: drawUndoKeydown, setDrawMode: (value) => { drawMode = value; } };
+}`, "drawUndoKeydown");
+    let undoCalls = 0;
+    let redoCalls = 0;
+    const sandbox = run === undefined ? undefined : run(() => { undoCalls += 1; }, () => { redoCalls += 1; });
+    const mk = (props) => ({ prevented: false, preventDefault() { this.prevented = true; }, ...props });
+    const undoEvent = mk({ ctrlKey: true, key: "z" });
+    const metaUndoEvent = mk({ metaKey: true, key: "z" });
+    const shiftZEvent = mk({ ctrlKey: true, shiftKey: true, key: "z" });
+    const yEvent = mk({ ctrlKey: true, key: "Y" });
+    const plainEvent = mk({ key: "z" });
+    const altEvent = mk({ ctrlKey: true, altKey: true, key: "z" });
+    const handled = sandbox === undefined ? [] : [undoEvent, metaUndoEvent, shiftZEvent, yEvent, plainEvent, altEvent].map((event) => sandbox.keydown(event));
+    sandbox?.setDrawMode(false);
+    const offEvent = mk({ ctrlKey: true, key: "z" });
+    const off = sandbox?.keydown(offEvent);
+    harness.check("overlay: draw-mode undo keydown maps ctrl/cmd+z and ctrl+shift+z / ctrl+y",
+      sandbox !== undefined && handled[0] === true && handled[1] === true && handled[2] === true && handled[3] === true &&
+      handled[4] === false && handled[5] === false && off === false &&
+      undoCalls === 2 && redoCalls === 2 &&
+      undoEvent.prevented === true && metaUndoEvent.prevented === true && shiftZEvent.prevented === true && yEvent.prevented === true &&
+      plainEvent.prevented === false && altEvent.prevented === false && offEvent.prevented === false,
+      JSON.stringify({ handled, off, undoCalls, redoCalls, prevented: [undoEvent.prevented, metaUndoEvent.prevented, shiftZEvent.prevented, yEvent.prevented, plainEvent.prevented, altEvent.prevented, offEvent.prevented] }));
+  }
+  {
+    const guardAt = overlay.indexOf("if (tag === \"INPUT\" || tag === \"TEXTAREA\" || from?.isContentEditable === true) return;");
+    const keydownAt = guardAt === -1 ? -1 : overlay.lastIndexOf("\"keydown\"", guardAt);
+    const listenerSpan = keydownAt === -1 ? "" : overlay.slice(keydownAt, keydownAt + 3000);
+    const adjustAt = listenerSpan.indexOf("adjustPanel !== null && (event.ctrlKey || event.metaKey)");
+    const drawUndoAt = listenerSpan.indexOf("drawUndoKeydown(event)");
+    const deleteAt = listenerSpan.indexOf("event.key === \"Delete\"");
+    harness.check("overlay: the draw undo wiring sits after the adjust undo branch and before the delete branch",
+      listenerSpan !== "" && adjustAt !== -1 && drawUndoAt > adjustAt && deleteAt > drawUndoAt,
+      JSON.stringify({ adjustAt, drawUndoAt, deleteAt }));
+  }
+
   harness.section("client: overlay theme derivation");
   {
     const themeClassSource = extractFunction(overlay, "themeRootClass");
