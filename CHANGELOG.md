@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The layout grid follows the design-tool convention.** Column bands render at 10% opacity with hairline column edges (Figma's default), and the settings popover gains gutter (medianiz), margin and fill/outline controls. Outline mode strips the fill and keeps only the column hairlines.
+
 - **Interface copy reads cleaner.** The overlay's toasts, hints and tooltips no longer use em dashes; the drawing hint is now "Draw over the page. Esc exits." and the stale-pin warning says "Target not found. The pin is stale. Drag the marker to re-anchor." in all three languages.
 
 ### Added

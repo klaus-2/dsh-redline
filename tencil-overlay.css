@@ -34,6 +34,8 @@
   --warn: #b7791f;
   --error: #d93036;
   --measure: #f24822;
+  --lr-grid-fill: hsl(0 72% 51% / 0.1);
+  --lr-grid-line: hsl(0 72% 51% / 0.35);
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-text: cubic-bezier(0.22, 1, 0.36, 1);
@@ -397,11 +399,17 @@ kbd {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .lr-grid { position: fixed; inset: 0; pointer-events: none; }
-.lr-grid-band { position: absolute; top: 0; bottom: 0; background: var(--accent-soft); }
-.lr-grid-step { position: fixed; display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 8px;
-  background: var(--surface); box-shadow: var(--shadow); pointer-events: auto; }
-.lr-grid-step-label { color: var(--n-500); font-size: 11px; }
-.lr-grid-step-value { min-width: 20px; text-align: center; font: 500 12px/16px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--n-950); }
+.lr-grid-band { position: absolute; top: 0; bottom: 0; background: var(--lr-grid-fill); border-left: 1px solid var(--lr-grid-line); border-right: 1px solid var(--lr-grid-line); }
+.lr-grid.lr-outline .lr-grid-band { background: none; }
+.lr-grid-step { position: fixed; display: grid; gap: 6px; padding: 10px 12px; border-radius: 10px;
+  background: var(--surface); box-shadow: var(--shadow); pointer-events: auto; z-index: 2147483602; }
+.lr-grid-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.lr-grid-row-label { color: var(--n-500); font-size: 11px; }
+.lr-grid-stepper { display: inline-flex; align-items: center; gap: 6px; }
+.lr-grid-step-value { min-width: 24px; text-align: center; font: 500 12px/16px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--n-950); }
+.lr-grid-style { display: inline-flex; gap: 4px; }
+.lr-grid-style-btn { all: unset; padding: 3px 10px; border-radius: 999px; font-size: 11px; color: var(--n-600); cursor: pointer; }
+.lr-grid-style-btn[data-on] { background: var(--accent); color: #fff; }
 .lr-grid-step-btn { all: unset; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;
   border-radius: 6px; background: var(--accent-soft); color: var(--accent-text); font-weight: 600; cursor: pointer; }
 

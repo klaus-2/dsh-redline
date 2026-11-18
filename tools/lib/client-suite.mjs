@@ -1580,20 +1580,27 @@ return pinPanelNode;
   harness.section("client: overlay layout grid");
   {
     const geometrySource = extractFunction(overlay, "gridGeometry");
-    const stepSource = extractFunction(overlay, "gridStep");
+    const boundsSource = extractObjectLiteral(overlay, "const GRID_BOUNDS = {");
     const stepperSource = extractFunction(overlay, "openGridStepper");
-    harness.check("overlay: the grid stepper dismiss resolves shadow-retargeted events through composedPath",
+    harness.check("overlay: the grid settings dismiss resolves shadow-retargeted events through composedPath",
       stepperSource !== undefined && stepperSource.includes("composedPath?.()") &&
       !stepperSource.includes("contains(event.target)"),
       stepperSource === undefined ? "openGridStepper missing" : "dismiss still keys on event.target");
+    harness.check("overlay: the grid settings panel exposes columns, gutter, margin and fill/outline",
+      stepperSource !== undefined && boundsSource !== undefined &&
+      stepperSource.includes("row(\"gridColumns\", \"columns\")") && stepperSource.includes("row(\"gridGutter\", \"gutter\")") &&
+      stepperSource.includes("row(\"gridMargin\", \"margin\")") && stepperSource.includes("styleButton(\"fill\", \"gridFill\")") &&
+      stepperSource.includes("styleButton(\"outline\", \"gridOutline\")") &&
+      JSON.stringify(boundsSource ? evaluateObjectLiteral(boundsSource, "GRID_BOUNDS") : null) === JSON.stringify({ columns: [1, 24, 1], gutter: [0, 64, 4], margin: [0, 160, 8] }),
+      stepperSource === undefined ? "openGridStepper missing" : "settings rows or bounds drifted");
     const geometry = geometrySource === undefined ? undefined : evaluateExpression(geometrySource, "gridGeometry");
-    harness.check("overlay: gridGeometry computes the column math exactly and the stepper clamps 1-24",
-      geometry !== undefined && stepSource !== undefined &&
-      geometry(12, 1440).margin === 32 && geometry(12, 1440).gutter === 24 && geometry(12, 1440).columns === 12 &&
-      geometry(12, 1440).columnWidth === (1440 - 64 - 11 * 24) / 12 &&
-      geometry(1, 1440).columnWidth === 1376 && geometry(24, 1440).columnWidth === (1440 - 64 - 23 * 24) / 24 &&
-      stepSource.includes("Math.max(1") && stepSource.includes("Math.min(24"),
-      JSON.stringify({ c12: geometry?.(12, 1440).columnWidth, c1: geometry?.(1, 1440).columnWidth, c24: geometry?.(24, 1440).columnWidth }));
+    harness.check("overlay: gridGeometry computes the column math exactly from gutter and margin",
+      geometry !== undefined &&
+      geometry(12, 1440, 24, 32).margin === 32 && geometry(12, 1440, 24, 32).gutter === 24 && geometry(12, 1440, 24, 32).columns === 12 &&
+      geometry(12, 1440, 24, 32).columnWidth === (1440 - 64 - 11 * 24) / 12 &&
+      geometry(1, 1440, 24, 32).columnWidth === 1376 && geometry(24, 1440, 24, 32).columnWidth === (1440 - 64 - 23 * 24) / 24 &&
+      geometry(1, 1440, 0, 0).columnWidth === 1440,
+      JSON.stringify({ c12: geometry?.(12, 1440, 24, 32).columnWidth, c1: geometry?.(1, 1440, 24, 32).columnWidth, c24: geometry?.(24, 1440, 24, 32).columnWidth, full: geometry?.(1, 1440, 0, 0).columnWidth }));
   }
   {
     const languageSource = extractFunction(overlay, "applyOverlayLanguage");
@@ -1625,6 +1632,9 @@ ${renderSource}
 let gridOn = true;
 let gridLayer = null;
 let gridColumns = 4;
+let gridGutter = 24;
+let gridMargin = 32;
+let gridOutline = false;
 return renderGrid;
 }`, "renderGrid") : undefined;
     const render = run === undefined ? undefined : run(el, fixedLayer, { innerWidth: 1000 });
@@ -1641,35 +1651,39 @@ return renderGrid;
       JSON.stringify({ bands: bands.length, first: bands[0]?.style, secondLeft: bands[1]?.style.left, lastLeft: bands[3]?.style.left }));
   }
   {
-    const stepSource = extractFunction(overlay, "gridStep");
-    const run = stepSource === undefined ? undefined : evaluateExpression(`(renderGrid) => {
+    const adjustSource = extractFunction(overlay, "gridAdjust");
+    const boundsSource = extractArrowConst(overlay, "GRID_BOUNDS");
+    const run = adjustSource === undefined || boundsSource === undefined ? undefined : evaluateExpression(`(renderGrid) => {
 let gridColumns = 12;
+let gridGutter = 24;
+let gridMargin = 32;
 let gridStepper = null;
-${stepSource}
-return { step: gridStep, columns: () => gridColumns, setColumns: (value) => { gridColumns = value; } };
-}`, "gridStep");
+const GRID_BOUNDS = { columns: [1, 24, 1], gutter: [0, 64, 4], margin: [0, 160, 8] };
+${adjustSource}
+return { adjust: gridAdjust, state: () => ({ gridColumns, gridGutter, gridMargin }), set: (key, value) => { if (key === "columns") gridColumns = value; else if (key === "gutter") gridGutter = value; else gridMargin = value; } };
+}`, "gridAdjust");
     let renders = 0;
     const sandbox = run === undefined ? undefined : run(() => { renders += 1; });
-    sandbox?.setColumns(1);
-    sandbox?.step(-1);
-    const atMin = sandbox?.columns();
-    sandbox?.step(1);
-    const afterUp = sandbox?.columns();
-    sandbox?.setColumns(24);
-    sandbox?.step(1);
-    const atMax = sandbox?.columns();
-    sandbox?.step(-1);
-    const afterDown = sandbox?.columns();
-    sandbox?.setColumns(12);
-    sandbox?.step(-100);
-    const jumpedMin = sandbox?.columns();
-    sandbox?.setColumns(12);
-    sandbox?.step(100);
-    const jumpedMax = sandbox?.columns();
-    harness.check("overlay: gridStep clamps the columns between 1 and 24 and re-renders on change",
-      sandbox !== undefined && atMin === 1 && afterUp === 2 && atMax === 24 && afterDown === 23 &&
-      jumpedMin === 1 && jumpedMax === 24 && renders === 4,
-      JSON.stringify({ atMin, afterUp, atMax, afterDown, jumpedMin, jumpedMax, renders }));
+    sandbox?.set("columns", 1);
+    sandbox?.adjust("columns", -1);
+    const colMin = sandbox?.state().gridColumns;
+    sandbox?.adjust("columns", 1);
+    const colUp = sandbox?.state().gridColumns;
+    sandbox?.set("columns", 24);
+    sandbox?.adjust("columns", 1);
+    const colMax = sandbox?.state().gridColumns;
+    sandbox?.adjust("gutter", -100);
+    const gutterMin = sandbox?.state().gridGutter;
+    sandbox?.adjust("gutter", 3);
+    const gutterStep = sandbox?.state().gridGutter;
+    sandbox?.adjust("margin", 100);
+    const marginMax = sandbox?.state().gridMargin;
+    sandbox?.adjust("margin", 2);
+    const marginStep = sandbox?.state().gridMargin;
+    harness.check("overlay: gridAdjust clamps columns, gutter and margin through GRID_BOUNDS",
+      sandbox !== undefined && colMin === 1 && colUp === 2 && colMax === 24 && gutterMin === 0 &&
+      gutterStep === 12 && marginMax === 160 && marginStep === 160 && renders === 4,
+      JSON.stringify({ colMin, colUp, colMax, gutterMin, gutterStep, marginMax, marginStep, renders }));
   }
   {
     const setGridSource = extractFunction(overlay, "setGrid");

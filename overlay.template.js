@@ -138,6 +138,10 @@
       "viewportReset": "Full width",
       "layoutGrid": "Toggle layout grid",
       "gridColumns": "Columns",
+      "gridGutter": "Gutter",
+      "gridMargin": "Margin",
+      "gridFill": "Fill",
+      "gridOutline": "Outline",
       "distanceMeter": "Hold Alt with a panel open to measure distances",
       "inspectorStates": "States",
       "eyeTitle": "Show/hide pins",
@@ -357,6 +361,10 @@
       "viewportReset": "Largura total",
       "layoutGrid": "Alternar grade de layout",
       "gridColumns": "Colunas",
+      "gridGutter": "Medianiz",
+      "gridMargin": "Margem",
+      "gridFill": "Preenchimento",
+      "gridOutline": "Contorno",
       "distanceMeter": "Segure Alt com um painel aberto para medir distâncias",
       "inspectorStates": "Estados",
       "eyeTitle": "Mostrar/ocultar pins",
@@ -576,6 +584,10 @@
       "viewportReset": "全宽",
       "layoutGrid": "切换布局网格",
       "gridColumns": "列数",
+      "gridGutter": "栏间距",
+      "gridMargin": "边距",
+      "gridFill": "填充",
+      "gridOutline": "轮廓",
       "distanceMeter": "按住 Alt 并打开面板以测量距离",
       "inspectorStates": "状态",
       "eyeTitle": "显示/隐藏图钉",
@@ -798,6 +810,9 @@
   let gridLayer = null;
   let gridStepper = null;
   let gridColumns = 12;
+  let gridGutter = 24;
+  let gridMargin = 32;
+  let gridOutline = false;
   let gridResize = null;
   let meterAlt = false;
   let meterRef = null;
@@ -2104,14 +2119,17 @@
     absLayer.style.display = hidden ? "none" : "";
   }
 
-  function gridGeometry(columns, innerWidth) {
-    return { margin: 32, gutter: 24, columnWidth: (innerWidth - 64 - (columns - 1) * 24) / columns, columns };
+  const GRID_BOUNDS = { columns: [1, 24, 1], gutter: [0, 64, 4], margin: [0, 160, 8] };
+
+  function gridGeometry(columns, innerWidth, gutter, margin) {
+    const columnWidth = Math.max(0, (innerWidth - margin * 2 - (columns - 1) * gutter) / columns);
+    return { margin, gutter, columnWidth, columns };
   }
 
   function renderGrid() {
     if (!gridOn) return;
     gridLayer?.remove();
-    const geometry = gridGeometry(gridColumns, window.innerWidth);
+    const geometry = gridGeometry(gridColumns, window.innerWidth, gridGutter, gridMargin);
     const bands = [];
     for (let index = 0; index < geometry.columns; index += 1) {
       const band = el("div", { class: "lr-grid-band" });
@@ -2119,17 +2137,21 @@
       band.style.width = `${geometry.columnWidth}px`;
       bands.push(band);
     }
-    gridLayer = el("div", { class: "lr-grid" }, ...bands);
+    gridLayer = el("div", { class: gridOutline ? "lr-grid lr-outline" : "lr-grid" }, ...bands);
     fixedLayer.append(gridLayer);
   }
 
-  function gridStep(delta) {
-    const next = Math.max(1, Math.min(24, gridColumns + delta));
-    if (next === gridColumns) return;
-    gridColumns = next;
+  function gridAdjust(key, delta) {
+    const bounds = GRID_BOUNDS[key];
+    const current = key === "columns" ? gridColumns : key === "gutter" ? gridGutter : gridMargin;
+    const next = Math.max(bounds[0], Math.min(bounds[1], current + delta * bounds[2]));
+    if (next === current) return;
+    if (key === "columns") gridColumns = next;
+    else if (key === "gutter") gridGutter = next;
+    else gridMargin = next;
     renderGrid();
-    const value = gridStepper?.querySelector(".lr-grid-step-value");
-    if (value !== undefined && value !== null) value.textContent = `${gridColumns}`;
+    const value = gridStepper?.querySelector(`[data-grid-value="${key}"]`);
+    if (value !== undefined && value !== null) value.textContent = `${next}`;
   }
 
   function closeGridStepper() {
@@ -2141,12 +2163,18 @@
 
   function openGridStepper() {
     closeGridStepper();
-    gridStepper = el("div", { class: "lr-grid-step" }, el("span", { class: "lr-grid-step-label" }, t("gridColumns")), el("button", { class: "lr-grid-step-btn", type: "button", onclick: () => gridStep(-1) }, "−"), el("span", { class: "lr-grid-step-value" }, `${gridColumns}`), el("button", { class: "lr-grid-step-btn", type: "button", onclick: () => gridStep(1) }, "+"));
+    const row = (label, key) => el("div", { class: "lr-grid-row" }, el("span", { class: "lr-grid-row-label" }, t(label)), el("span", { class: "lr-grid-stepper" }, el("button", { class: "lr-grid-step-btn", type: "button", onclick: () => gridAdjust(key, -1) }, "−"), el("span", { class: "lr-grid-step-value", "data-grid-value": key }, `${key === "columns" ? gridColumns : key === "gutter" ? gridGutter : gridMargin}`), el("button", { class: "lr-grid-step-btn", type: "button", onclick: () => gridAdjust(key, 1) }, "+")));
+    const styleButton = (key, label) => el("button", { class: "lr-grid-style-btn", type: "button", "data-grid-style": key, "data-on": gridOutline === (key === "outline") ? "" : null, onclick: () => { gridOutline = key === "outline"; renderGrid(); gridStepper?.querySelectorAll(".lr-grid-style-btn").forEach((b) => b.toggleAttribute("data-on", b.dataset.gridStyle === key)); } }, t(label));
+    gridStepper = el("div", { class: "lr-grid-step" },
+      row("gridColumns", "columns"),
+      row("gridGutter", "gutter"),
+      row("gridMargin", "margin"),
+      el("div", { class: "lr-grid-row" }, el("span", { class: "lr-grid-row-label" }, " "), el("span", { class: "lr-grid-style" }, styleButton("fill", "gridFill"), styleButton("outline", "gridOutline"))));
     fixedLayer.append(gridStepper);
     const place = () => {
       if (gridStepper === null || !gridStepper.isConnected) return;
       const r = gridBtn.getBoundingClientRect();
-      gridStepper.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - 160))}px`;
+      gridStepper.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - 224))}px`;
       gridStepper.style.top = `${Math.max(8, r.top - gridStepper.offsetHeight - 6)}px`;
     };
     place();
