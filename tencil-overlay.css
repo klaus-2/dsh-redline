@@ -405,6 +405,13 @@ kbd {
 .lr-grid-step-btn { all: unset; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;
   border-radius: 6px; background: var(--accent-soft); color: var(--accent-text); font-weight: 600; cursor: pointer; }
 
+.lr-meter { position: fixed; inset: 0; pointer-events: none; }
+.lr-meter-line { position: fixed; border-top: 1px dashed var(--measure); }
+.lr-meter-line-v { border-top: 0; border-left: 1px dashed var(--measure); }
+.lr-meter-label { position: fixed; transform: translate(-50%, -50%); padding: 0 4px; border-radius: 4px;
+  background: var(--measure); color: white; font: 500 10px/15px ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+.lr-meter-box { position: fixed; border: 1px dashed var(--measure); border-radius: 4px; }
+
 .lr-a11y { display: grid; gap: 3px; padding: 6px 8px; border-radius: 8px; background: var(--n-100); }
 .lr-a11y-title { color: var(--n-500); font-size: 11px; font-weight: 600; }
 .lr-a11y-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--n-600); }

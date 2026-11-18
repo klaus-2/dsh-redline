@@ -76,6 +76,7 @@
   "viewportReset": "Full width",
   "layoutGrid": "Toggle layout grid",
   "gridColumns": "Columns",
+  "distanceMeter": "Hold Alt with a panel open to measure distances",
   "viewPending": "View pending annotations",
   "sendNow": "Send the annotations to the agent now",
   "sendBtn": "Send",

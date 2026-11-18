@@ -138,6 +138,7 @@
       "viewportReset": "Full width",
       "layoutGrid": "Toggle layout grid",
       "gridColumns": "Columns",
+      "distanceMeter": "Hold Alt with a panel open to measure distances",
       "eyeTitle": "Show/hide pins",
       "statusTitle": "Live Review active",
       "pendingTitle": "Annotations waiting for your next prompt in the chat",
@@ -355,6 +356,7 @@
       "viewportReset": "Largura total",
       "layoutGrid": "Alternar grade de layout",
       "gridColumns": "Colunas",
+      "distanceMeter": "Segure Alt com um painel aberto para medir distâncias",
       "eyeTitle": "Mostrar/ocultar pins",
       "statusTitle": "Live Review ativo",
       "pendingTitle": "Anotações aguardando seu próximo prompt no chat",
@@ -572,6 +574,7 @@
       "viewportReset": "全宽",
       "layoutGrid": "切换布局网格",
       "gridColumns": "列数",
+      "distanceMeter": "按住 Alt 并打开面板以测量距离",
       "eyeTitle": "显示/隐藏图钉",
       "statusTitle": "Live Review 运行中",
       "pendingTitle": "标注将随你的下一条消息发送",
@@ -793,6 +796,10 @@
   let gridStepper = null;
   let gridColumns = 12;
   let gridResize = null;
+  let meterAlt = false;
+  let meterRef = null;
+  let meterLayer = null;
+  let meterRaf = 0;
   let lastAgentActivity = 0;
 
   function loadPins() {
@@ -2168,6 +2175,99 @@
     }
   }
 
+  function meterReference() {
+    if (adjustPanel !== null && adjustTarget !== null) return adjustTarget;
+    if (openPinId !== null) {
+      const pin = pins.find((candidate) => candidate.id === openPinId);
+      if (pin !== undefined) return locate(pin.selector);
+    }
+    return null;
+  }
+
+  function meterGaps(aRect, bRect) {
+    let horizontal = null;
+    if (bRect.left >= aRect.right) horizontal = bRect.left - aRect.right;
+    else if (aRect.left >= bRect.right) horizontal = aRect.left - bRect.right;
+    let vertical = null;
+    if (bRect.top >= aRect.bottom) vertical = bRect.top - aRect.bottom;
+    else if (aRect.top >= bRect.bottom) vertical = aRect.top - bRect.bottom;
+    return { horizontal, vertical };
+  }
+
+  function clearMeter() {
+    if (meterRaf !== 0) {
+      cancelAnimationFrame(meterRaf);
+      meterRaf = 0;
+    }
+    meterLayer?.remove();
+    meterLayer = null;
+  }
+
+  function renderMeter(target) {
+    if (!meterAlt || meterRef === null || target === null || target === meterRef) {
+      clearMeter();
+      return;
+    }
+    if (meterRaf !== 0) return;
+    meterRaf = requestAnimationFrame(() => {
+      meterRaf = 0;
+      if (!meterAlt || meterRef === null || target === null || target === meterRef) {
+        clearMeter();
+        return;
+      }
+      const refRect = meterRef.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const gaps = meterGaps(refRect, targetRect);
+      meterLayer?.remove();
+      const parts = [];
+      if (gaps.horizontal !== null) {
+        const bRightOfA = targetRect.left >= refRect.right;
+        const x1 = bRightOfA ? refRect.right : targetRect.right;
+        const x2 = bRightOfA ? targetRect.left : refRect.left;
+        const y = (Math.max(refRect.top, targetRect.top) + Math.min(refRect.bottom, targetRect.bottom)) / 2;
+        parts.push(el("div", { class: "lr-meter-line", style: `left:${Math.min(x1, x2)}px;top:${y}px;width:${Math.abs(x2 - x1)}px;height:0` }));
+        parts.push(el("span", { class: "lr-meter-label", style: `left:${(x1 + x2) / 2}px;top:${y}px` }, `${Math.round(gaps.horizontal)}px`));
+      }
+      if (gaps.vertical !== null) {
+        const bBelowA = targetRect.top >= refRect.bottom;
+        const y1 = bBelowA ? refRect.bottom : targetRect.bottom;
+        const y2 = bBelowA ? targetRect.top : refRect.top;
+        const x = (Math.max(refRect.left, targetRect.left) + Math.min(refRect.right, targetRect.right)) / 2;
+        parts.push(el("div", { class: "lr-meter-line lr-meter-line-v", style: `left:${x}px;top:${Math.min(y1, y2)}px;width:0;height:${Math.abs(y2 - y1)}px` }));
+        parts.push(el("span", { class: "lr-meter-label", style: `left:${x}px;top:${(y1 + y2) / 2}px` }, `${Math.round(gaps.vertical)}px`));
+      }
+      parts.push(el("div", { class: "lr-meter-box", style: `left:${refRect.left}px;top:${refRect.top}px;width:${refRect.width}px;height:${refRect.height}px` }));
+      parts.push(el("div", { class: "lr-meter-box", style: `left:${targetRect.left}px;top:${targetRect.top}px;width:${targetRect.width}px;height:${targetRect.height}px` }));
+      meterLayer = el("div", { class: "lr-meter" }, ...parts);
+      fixedLayer.append(meterLayer);
+    });
+  }
+
+  function resetMeter() {
+    meterAlt = false;
+    meterRef = null;
+    clearMeter();
+  }
+
+  function meterAltKeydown(event) {
+    if (event.key !== "Alt") return false;
+    event.preventDefault();
+    if (!meterAlt) {
+      meterAlt = true;
+      meterRef = meterReference();
+      if (meterRef === null) setHint(t("distanceMeter"));
+    }
+    return true;
+  }
+
+  function meterAltKeyup(event) {
+    if (event.key !== "Alt") return false;
+    event.preventDefault();
+    meterAlt = false;
+    clearMeter();
+    return true;
+  }
+
   function setHidden(next) {
     hidden = next;
     if (hidden) {
@@ -2277,8 +2377,12 @@
   document.addEventListener(
     "mousemove",
     (event) => {
+      const inHost = event.composedPath().some((n) => n === host || (n instanceof Node && host.contains(n)));
+      if (meterAlt && meterRef !== null && !inHost) {
+        renderMeter(event.target instanceof Element ? event.target : null);
+      }
       if ((mode === null && !groupMode) || draft !== null) return;
-      if (event.composedPath().some((n) => n === host || (n instanceof Node && host.contains(n)))) return;
+      if (inHost) return;
       const target = event.target instanceof Element ? event.target : null;
       if (!target || target === hovered) return;
       showHighlight(target);
@@ -2317,6 +2421,7 @@
       closeGridStepper();
       return true;
     }
+    resetMeter();
     if (focusState.current !== null) {
       exitFocusMode();
       return true;
@@ -2381,6 +2486,7 @@
         else if (event.key.length === 1) { drawTyping.text += event.key; redrawDrawings(); }
         return;
       }
+      if (meterAltKeydown(event)) return;
       // One key arms one mode: the first match wins, so a settings file that names the same key
       // for two modes cannot arm both at once.
       if (hotkeyMatches(event, hotkeyComment)) { if (drawMode) toggleDraw(false); setMode(mode === "picking" ? null : "picking"); }
@@ -2395,6 +2501,14 @@
         event.preventDefault();
         openGroupComposer();
       }
+    },
+    true
+  );
+
+  document.addEventListener(
+    "keyup",
+    (event) => {
+      meterAltKeyup(event);
     },
     true
   );
@@ -5025,6 +5139,7 @@
   }
 
   function closePanels() {
+    resetMeter();
     pinPanelNode?.remove();
     pinPanelNode = null;
     a11yFixHandler.current = null;

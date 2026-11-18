@@ -1690,6 +1690,150 @@ return { setGrid, state: () => ({ gridOn, gridLayer, gridResize }), setLayer: (v
       JSON.stringify({ afterEnable, afterDisable, reAdded: added.length, ready: sandbox !== undefined }));
   }
 
+  harness.section("client: overlay alt distance meter");
+  {
+    const gapsSource = extractFunction(overlay, "meterGaps");
+    const gaps = gapsSource === undefined ? undefined : evaluateExpression(gapsSource, "meterGaps");
+    const sideA = { left: 0, right: 100, top: 0, bottom: 50 };
+    const sideB = { left: 150, right: 250, top: 0, bottom: 50 };
+    const stackedB = { left: 0, right: 100, top: 80, bottom: 130 };
+    const diagonalB = { left: 150, right: 250, top: 100, bottom: 150 };
+    const overlappingB = { left: 50, right: 150, top: 25, bottom: 75 };
+    harness.check("overlay: meterGaps measures the facing gaps exactly",
+      gaps !== undefined &&
+      gaps(sideA, sideB).horizontal === 50 && gaps(sideA, sideB).vertical === null &&
+      gaps(sideB, sideA).horizontal === 50 && gaps(sideB, sideA).vertical === null &&
+      gaps(sideA, stackedB).horizontal === null && gaps(sideA, stackedB).vertical === 30 &&
+      gaps(sideA, diagonalB).horizontal === 50 && gaps(sideA, diagonalB).vertical === 50 &&
+      gaps(sideA, overlappingB).horizontal === null && gaps(sideA, overlappingB).vertical === null,
+      JSON.stringify({ side: gaps?.(sideA, sideB), stacked: gaps?.(sideA, stackedB), diagonal: gaps?.(sideA, diagonalB), overlapping: gaps?.(sideA, overlappingB) }));
+  }
+  {
+    const refSource = extractFunction(overlay, "meterReference");
+    const run = refSource === undefined ? undefined : evaluateExpression(`(adjustPanel, adjustTarget, openPinId, pins, locate) => {
+${refSource}
+return meterReference;
+}`, "meterReference");
+    const adjustEl = { tag: "adjust" };
+    const pinEl = { tag: "pin" };
+    const pin = { id: "p1", selector: "#pin-el" };
+    const withBoth = run === undefined ? undefined : run({ open: true }, adjustEl, "p1", [pin], () => pinEl);
+    const pinOnly = run === undefined ? undefined : run(null, null, "p1", [pin], () => pinEl);
+    const adjustWithoutTarget = run === undefined ? undefined : run({ open: true }, null, "p1", [pin], () => pinEl);
+    const nothing = run === undefined ? undefined : run(null, null, null, [], () => pinEl);
+    const stalePin = run === undefined ? undefined : run(null, null, "pX", [pin], () => pinEl);
+    harness.check("overlay: meterReference prefers the adjust target and falls back to the open pin",
+      run !== undefined && withBoth?.() === adjustEl && pinOnly?.() === pinEl && adjustWithoutTarget?.() === pinEl &&
+      nothing?.() === null && stalePin?.() === null,
+      JSON.stringify({ both: withBoth?.()?.tag, pinOnly: pinOnly?.()?.tag, adjustWithoutTarget: adjustWithoutTarget?.()?.tag, nothing: nothing?.() ?? "null", stale: stalePin?.() ?? "null" }));
+  }
+  {
+    const renderSource = extractFunction(overlay, "renderMeter");
+    const clearSource = extractFunction(overlay, "clearMeter");
+    const gapsSource = extractFunction(overlay, "meterGaps");
+    const ready = renderSource !== undefined && clearSource !== undefined && gapsSource !== undefined;
+    const appended = [];
+    const pending = [];
+    const cancelled = [];
+    const fixedLayer = { append: (node) => appended.push(node) };
+    const el = (tag, attrs = {}, ...children) => {
+      const node = { tag, props: attrs, children: [], style: {} };
+      for (const kid of children) { if (kid !== null && kid !== undefined) node.children.push(kid); }
+      node.append = (...kids) => { for (const kid of kids) { if (kid !== null && kid !== undefined) node.children.push(kid); } return node; };
+      node.remove = () => { node.removed = (node.removed ?? 0) + 1; };
+      return node;
+    };
+    const run = ready ? evaluateExpression(`(el, fixedLayer, requestAnimationFrame, cancelAnimationFrame) => {
+${gapsSource}
+let meterAlt = true;
+let meterRef = null;
+let meterLayer = null;
+let meterRaf = 0;
+${clearSource}
+${renderSource}
+return { render: renderMeter, clear: clearMeter, setRef: (value) => { meterRef = value; }, layer: () => meterLayer, raf: () => meterRaf };
+}`, "renderMeter") : undefined;
+    const sandbox = run === undefined ? undefined : run(el, fixedLayer, (fn) => { pending.push(fn); return 42; }, (handle) => cancelled.push(handle));
+    const refEl = { getBoundingClientRect: () => ({ left: 0, top: 0, right: 100, bottom: 50, width: 100, height: 50 }) };
+    const targetEl = { getBoundingClientRect: () => ({ left: 150, top: 0, right: 250, bottom: 50, width: 100, height: 50 }) };
+    sandbox?.setRef(refEl);
+    sandbox?.render(targetEl);
+    sandbox?.render(targetEl);
+    const scheduled = pending.length;
+    pending[0]?.();
+    const layer = appended[0];
+    const parts = layer?.children ?? [];
+    sandbox?.clear();
+    const afterClear = { removed: layer?.removed, layer: sandbox?.layer(), raf: sandbox?.raf() };
+    sandbox?.render(targetEl);
+    sandbox?.clear();
+    harness.check("overlay: renderMeter draws the facing gap lines, labels and boxes and clearMeter tears it all down",
+      sandbox !== undefined && scheduled === 1 && sandbox.raf() === 0 && appended.length === 1 &&
+      layer?.props?.class === "lr-meter" && parts.length === 4 &&
+      parts[0].props.class === "lr-meter-line" && parts[0].props.style === "left:100px;top:25px;width:50px;height:0" &&
+      parts[1].props.class === "lr-meter-label" && parts[1].children[0] === "50px" && parts[1].props.style === "left:125px;top:25px" &&
+      parts[2].props.class === "lr-meter-box" && parts[2].props.style === "left:0px;top:0px;width:100px;height:50px" &&
+      parts[3].props.class === "lr-meter-box" && parts[3].props.style === "left:150px;top:0px;width:100px;height:50px" &&
+      afterClear.removed === 1 && afterClear.layer === null && afterClear.raf === 0 &&
+      cancelled.length === 1 && cancelled[0] === 42 && appended.length === 1,
+      JSON.stringify({ scheduled, parts: parts.map((part) => part.props.class), label: parts[1]?.children[0], styles: parts.map((part) => part.props.style), afterClear, cancelled, appended: appended.length }));
+  }
+  {
+    const keydownSource = extractFunction(overlay, "meterAltKeydown");
+    const keyupSource = extractFunction(overlay, "meterAltKeyup");
+    const run = keydownSource === undefined || keyupSource === undefined ? undefined : evaluateExpression(`(meterReference, clearMeter, setHint, t) => {
+let meterAlt = false;
+let meterRef = null;
+${keydownSource}
+${keyupSource}
+return { keydown: meterAltKeydown, keyup: meterAltKeyup, state: () => ({ meterAlt, meterRef }) };
+}`, "meterAltKeydown");
+    const mk = (props) => ({ prevented: false, preventDefault() { this.prevented = true; }, ...props });
+    let referenceCalls = 0;
+    let clearCalls = 0;
+    let hints = [];
+    const adjustEl = { tag: "adjust" };
+    const sandbox = run === undefined ? undefined : run(() => { referenceCalls += 1; return adjustEl; }, () => { clearCalls += 1; }, (text) => { hints.push(text); }, (key) => key);
+    const altDown1 = mk({ key: "Alt" });
+    const down1 = sandbox?.keydown(altDown1);
+    const afterFirst = sandbox?.state();
+    const altDown2 = mk({ key: "Alt" });
+    const down2 = sandbox?.keydown(altDown2);
+    const afterSecond = sandbox?.state();
+    const plainDown = mk({ key: "z" });
+    const downPlain = sandbox?.keydown(plainDown);
+    const altUp = mk({ key: "Alt" });
+    const up = sandbox?.keyup(altUp);
+    const afterUp = sandbox?.state();
+    const hintsBefore = hints.length;
+    const nullSandbox = run === undefined ? undefined : run(() => null, () => { clearCalls += 1; }, (text) => { hints.push(text); }, (key) => key);
+    const nullDown = mk({ key: "Alt" });
+    nullSandbox?.keydown(nullDown);
+    const hintsAfterNull = hints.length;
+    harness.check("overlay: alt keydown arms the meter once and keyup disarms it",
+      sandbox !== undefined && down1 === true && altDown1.prevented === true && afterFirst.meterAlt === true &&
+      afterFirst.meterRef === adjustEl && referenceCalls === 1 &&
+      down2 === true && afterSecond.meterAlt === true && referenceCalls === 1 &&
+      downPlain === false && plainDown.prevented === false &&
+      up === true && altUp.prevented === true && afterUp.meterAlt === false && clearCalls === 1 &&
+      nullSandbox !== undefined && nullDown.prevented === true && hintsBefore === 0 && hintsAfterNull === 1 &&
+      hints[0] === "distanceMeter" && nullSandbox.state().meterAlt === true && nullSandbox.state().meterRef === null &&
+      overlay.includes("if (meterAltKeydown(event)) return;") &&
+      /document\.addEventListener\(\s*"keyup"/.test(overlay) && overlay.includes("meterAltKeyup(event);"),
+      JSON.stringify({ down1, down2, downPlain, up, referenceCalls, clearCalls, hints, prevented: [altDown1.prevented, altDown2.prevented, plainDown.prevented, altUp.prevented] }));
+  }
+  {
+    const mousemoveAt = overlay.indexOf("\"mousemove\"");
+    const span = mousemoveAt === -1 ? "" : overlay.slice(mousemoveAt, mousemoveAt + 900);
+    const inHostAt = span.indexOf("const inHost = event.composedPath()");
+    const meterAt = span.indexOf("if (meterAlt && meterRef !== null && !inHost)");
+    const modeAt = span.indexOf("(mode === null && !groupMode) || draft !== null");
+    harness.check("overlay: the meter mousemove branch runs before the mode gate and skips host-shadow events",
+      span !== "" && inHostAt !== -1 && meterAt > inHostAt && modeAt > meterAt &&
+      span.includes("renderMeter(event.target instanceof Element ? event.target : null)"),
+      JSON.stringify({ inHostAt, meterAt, modeAt }));
+  }
+
   harness.section("client: overlay theme derivation");
   {
     const themeClassSource = extractFunction(overlay, "themeRootClass");
@@ -4478,19 +4622,19 @@ return { setGrid, state: () => ({ gridOn, gridLayer, gridResize }), setLayer: (v
       harness.check("overlay: the bubble-close branch precedes the audit and draft branches", bubbleIdx !== -1 && draftIdx !== -1 && bubbleIdx < auditIdx && auditIdx < draftIdx, JSON.stringify({ bubbleIdx, auditIdx, draftIdx }));
     }
     {
-      const dispatch = exitSource === "" || escapeSource === "" ? undefined : evaluateExpression(`(focusState, focusSpotlightNode, focusHintNode, focusRepositionTimer, clearTimeout, drawMode, groupMode, adjustPanel, openPinId, pinPanelNode, auditPanelNode, draft, mode, a11yFixHandler, toggleDraw, setGroupMode, closeAdjustPanel, closeAuditPanel, discardDraft, setMode, gridStepper, closeGridStepper) => {
+      const dispatch = exitSource === "" || escapeSource === "" ? undefined : evaluateExpression(`(focusState, focusSpotlightNode, focusHintNode, focusRepositionTimer, clearTimeout, drawMode, groupMode, adjustPanel, openPinId, pinPanelNode, auditPanelNode, draft, mode, a11yFixHandler, toggleDraw, setGroupMode, closeAdjustPanel, closeAuditPanel, discardDraft, setMode, gridStepper, closeGridStepper, resetMeter) => {
 ${exitSource}
 ${escapeSource}
 return { handleEscape, state: () => ({ focusState, openPinId, pinPanelNode, a11yFixHandler }) };
 }`, "handleEscape");
       const noops = [() => {}, () => {}, () => {}, () => {}, () => {}, () => {}];
-      const runFocus = dispatch === undefined ? undefined : dispatch({ current: { selector: "#x" } }, null, null, null, () => {}, false, false, null, null, null, null, null, null, { current: null }, ...noops, null, () => {});
+      const runFocus = dispatch === undefined ? undefined : dispatch({ current: { selector: "#x" } }, null, null, null, () => {}, false, false, null, null, null, null, null, null, { current: null }, ...noops, null, () => {}, () => {});
       const consumed = runFocus === undefined ? undefined : runFocus.handleEscape({ key: "Escape" });
       harness.check("overlay: Escape under focus mode exits focus and is consumed",
         consumed === true && runFocus !== undefined && runFocus.state().focusState.current === null,
         JSON.stringify({ consumed, focus: runFocus?.state().focusState.current }));
       const bubbleNode = fakeNode();
-      const runBubble = dispatch === undefined ? undefined : dispatch({ current: null }, null, null, null, () => {}, false, false, null, "pin-1", bubbleNode, null, null, null, { current: { ensurePin: () => {} } }, ...noops, null, () => {});
+      const runBubble = dispatch === undefined ? undefined : dispatch({ current: null }, null, null, null, () => {}, false, false, null, "pin-1", bubbleNode, null, null, null, { current: { ensurePin: () => {} } }, ...noops, null, () => {}, () => {});
       const consumedBubble = runBubble === undefined ? undefined : runBubble.handleEscape({ key: "Escape" });
       harness.check("overlay: Escape with the bubble open closes it and is consumed",
         consumedBubble === true && runBubble !== undefined && runBubble.state().openPinId === null && bubbleNode.removed === true && runBubble.state().a11yFixHandler.current === null,
