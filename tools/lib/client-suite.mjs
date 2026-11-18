@@ -1347,6 +1347,10 @@ return (pin, textarea, event) => {
       barSource !== undefined && icons !== undefined && typeof icons.eraser === "string" && icons.eraser.startsWith("<svg") &&
       shapesAt !== -1 && eraseAt > shapesAt && textAt > eraseAt,
       JSON.stringify({ shapesAt, eraseAt, textAt, hasIcon: typeof icons?.eraser === "string" }));
+    harness.check("overlay: the draw bar chevrons render as icons, not text",
+      barSource !== undefined && barSource.includes("{ class: \"lr-dchev\", html: ICONS_CANVAS.chev }") &&
+      !barSource.includes("}, ICONS_CANVAS.chev)"),
+      barSource === undefined ? "buildDrawBar missing" : "chevron still inserted as a text child");
   }
   {
     const cluster = ["itemBBox", "drawHit", "hitTestDraw", "snapshotDraw", "eraseDrawItemAt"].map((name) => extractFunction(overlay, name));
@@ -1573,6 +1577,11 @@ return pinPanelNode;
   {
     const geometrySource = extractFunction(overlay, "gridGeometry");
     const stepSource = extractFunction(overlay, "gridStep");
+    const stepperSource = extractFunction(overlay, "openGridStepper");
+    harness.check("overlay: the grid stepper dismiss resolves shadow-retargeted events through composedPath",
+      stepperSource !== undefined && stepperSource.includes("composedPath?.()") &&
+      !stepperSource.includes("contains(event.target)"),
+      stepperSource === undefined ? "openGridStepper missing" : "dismiss still keys on event.target");
     const geometry = geometrySource === undefined ? undefined : evaluateExpression(geometrySource, "gridGeometry");
     harness.check("overlay: gridGeometry computes the column math exactly and the stepper clamps 1-24",
       geometry !== undefined && stepSource !== undefined &&
@@ -4959,6 +4968,11 @@ return { focusState, timer: focusRepositionTimer };
         }
       }
       harness.check("overlay: the five comment templates exist in all three languages", templateMissing.length === 0, templateMissing.slice(0, 6).join(", "));
+      const templateRowSource = extractFunction(overlay, "renderTemplateRow");
+      harness.check("overlay: the template popup dismiss resolves shadow-retargeted events through composedPath",
+        templateRowSource !== undefined && templateRowSource.includes("composedPath?.()") &&
+        !templateRowSource.includes("contains(event.target)"),
+        templateRowSource === undefined ? "renderTemplateRow missing" : "dismiss still keys on event.target");
       const insertSource = extractFunction(overlay, "insertAtCaret") ?? "";
       harness.check("overlay: insertAtCaret is liftable and returns the one caret shape",
         insertSource !== "" && !insertSource.includes("document") && !insertSource.includes("window") &&
