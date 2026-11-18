@@ -952,7 +952,7 @@ kbd {
 }
 .tool-active { background: var(--accent); color: white; }
 .tool-active kbd { background: rgba(255, 255, 255, 0.22); color: white; }
-.tool-label { font-weight: 500; color: inherit; }
+.tool-label { font-weight: 500; color: inherit; white-space: nowrap; }
 
 .lr-viewport-btn { font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .lr-viewport-btn.tool-active { padding: 0 12px; }

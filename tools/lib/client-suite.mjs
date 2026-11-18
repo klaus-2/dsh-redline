@@ -140,7 +140,7 @@ export async function runClientSuite(harness, { pluginDir }) {
 
   harness.section("client: overlay paint order");
   {
-    const popoverZ = Number(/\.popover, \.toolbar-wrap \{ z-index: (\d+)/.exec(overlay)?.[1] ?? 0);
+    const popoverZ = Number(/\.popover \{ z-index: (\d+)/.exec(overlay)?.[1] ?? 0);
     const absZ = Number(/absLayer\.style\.cssText = "[^"]*z-index:(\d+)/.exec(overlay)?.[1] ?? 0);
     const fixedZ = Number(/fixedLayer\.style\.cssText = "[^"]*z-index:(\d+)/.exec(overlay)?.[1] ?? 0);
     harness.check("overlay: popovers paint above the pin and fixed layers",
@@ -1846,6 +1846,28 @@ return { keydown: meterAltKeydown, keyup: meterAltKeyup, state: () => ({ meterAl
       span !== "" && inHostAt !== -1 && meterAt > inHostAt && modeAt > meterAt &&
       span.includes("renderMeter(event.target instanceof Element ? event.target : null)"),
       JSON.stringify({ inHostAt, meterAt, modeAt }));
+  }
+
+  harness.section("client: overlay ui polish");
+  {
+    const panelSource = extractFunction(overlay, "renderPinPanel");
+    harness.check("overlay: the ancestor trail chips carry the styled chip class",
+      panelSource !== undefined && panelSource.includes("{ type: \"button\", class: \"lr-trail-chip\"") &&
+      overlay.includes(".lr-trail-chip { all: unset"),
+      panelSource === undefined ? "renderPinPanel missing" : "chips render unstyled");
+    harness.check("overlay: the states row leads the inspector body",
+      overlay.includes("body.prepend(inspectorRow(t(\"inspectorStates\")"),
+      "states row must be prepended, not appended");
+    harness.check("overlay: the toolbar stacks above dragged panels",
+      overlay.includes(".popover { z-index: 2147483601; }") && overlay.includes(".toolbar-wrap { z-index: 2147483602; }"),
+      "toolbar must out-stack panels");
+    harness.check("overlay: pin markers pass clicks through while drawing",
+      overlay.includes("rootDiv.classList.toggle(\"lr-drawing\", drawMode)") &&
+      overlay.includes(".root.lr-drawing .pin { pointer-events: none; }"),
+      "draw mode must silence marker clicks");
+    harness.check("overlay: toolbar labels never wrap",
+      overlay.includes(".tool-label { font-weight: 500; color: inherit; white-space: nowrap; }"),
+      "pending count wraps to two lines without nowrap");
   }
 
   harness.section("client: overlay inspector force states");

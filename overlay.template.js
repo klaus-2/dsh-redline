@@ -1111,7 +1111,9 @@
 .lr-draw-canvas { position: fixed; inset: 0; pointer-events: none; touch-action: none; z-index: 2147483590; }
 .lr-draw-canvas[data-on] { pointer-events: auto; cursor: crosshair; }
 .lr-draw-canvas[data-tool="none"] { cursor: default; }
-.popover, .toolbar-wrap { z-index: 2147483601; }
+.popover { z-index: 2147483601; }
+.toolbar-wrap { z-index: 2147483602; }
+.root.lr-drawing .pin { pointer-events: none; }
 .lr-drawbar { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); display: none; flex-direction: row; align-items: center; gap: 2px; background: var(--n-100); border: 1px solid var(--line); border-radius: 12px; padding: 4px 6px; box-shadow: var(--shadow); z-index: 2147483601; max-width: calc(100vw - 16px); overflow-x: auto; }
 .lr-drawbar[data-on] { display: flex; }
 .lr-dicon { display: inline-flex; width: 14px; height: 14px; }
@@ -1505,6 +1507,7 @@
     if (!drawMode && drawTyping !== null) commitDrawTyping();
     drawCanvas.toggleAttribute("data-on", drawMode);
     drawBar.toggleAttribute("data-on", drawMode);
+    rootDiv.classList.toggle("lr-drawing", drawMode);
     if (drawBtn !== null) drawBtn.classList.toggle("tool-active", drawMode);
     if (drawMode) {
       resizeDrawCanvas();
@@ -3866,7 +3869,7 @@
       }
     };
     const trailAncestors = auditTarget === null || pin.selector === "canvas:drawing" ? [] : ancestorTrail(auditTarget);
-    const trail = trailAncestors.length === 0 ? null : el("div", { class: "lr-trail", title: t("ancestorTrail"), "aria-label": t("ancestorTrail") }, ...trailAncestors.map((ancestor) => el("button", { type: "button", onclick: () => { reanchorPin(pin, ancestor); renderPinPanel(pin); } }, quickLabel(ancestor))));
+    const trail = trailAncestors.length === 0 ? null : el("div", { class: "lr-trail", title: t("ancestorTrail"), "aria-label": t("ancestorTrail") }, ...trailAncestors.map((ancestor) => el("button", { type: "button", class: "lr-trail-chip", onclick: () => { reanchorPin(pin, ancestor); renderPinPanel(pin); } }, quickLabel(ancestor))));
     const focusBtn = el("button", {
       onclick: () => {
         toggleFocusMode(pin);
@@ -5109,7 +5112,7 @@
       sec.append(shadowRowEl, transformRowEl);
     }));
 
-    body.append(inspectorRow(t("inspectorStates"), el("span", { class: "lr-row-ctl" }, ...["hover", "focus", "active"].map((pseudo) => {
+    body.prepend(inspectorRow(t("inspectorStates"), el("span", { class: "lr-row-ctl" }, ...["hover", "focus", "active"].map((pseudo) => {
       const chip = el("button", { type: "button", class: "lr-tgl", "data-lr-pseudo": pseudo }, `:${pseudo}`);
       chip.toggleAttribute("data-on", forceStates.has(pseudo));
       chip.addEventListener("click", () => toggleForceState(pseudo));
