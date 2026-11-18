@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Ctrl/Cmd+Enter saves the comment of an open pin.** The pin popover's comment box confirms with Ctrl+Enter (Cmd+Enter on macOS), running the same save routine as the popover's submit button — the comment is stored, the pin re-enters the queue and the pending snapshot is reposted. Plain Enter keeps inserting a newline, and the comment composer still sends on plain Enter.
+
 ## [1.5.0] - 2026-11-17
 
 ### Added

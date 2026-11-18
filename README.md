@@ -94,6 +94,7 @@ dsh plugin --profile web add ./dsh-redline
 | `H` | Show or hide the pins — markers, popovers and the comment composer disappear, the toolbar stays |
 | `Esc` | Cancel the current mode, popover or preview |
 | `Enter` | Save the annotation from the popover |
+| `Ctrl/Cmd+Enter` | Save the comment in an open pin's popover |
 
 Every one of the three mode keys can be changed in the plugin settings, and a shortcut can carry
 modifiers: `Ctrl+Shift+A` is a shortcut too. The modifiers must match exactly — `Ctrl+A` does

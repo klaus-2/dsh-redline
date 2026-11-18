@@ -3568,15 +3568,8 @@
     const textarea = el("textarea", { placeholder: t("editComment") });
     textarea.value = pin.comment;
     const submit = el("button", { class: "send", title: t("saveEdit") }, ICONS.arrowUp);
-    submit.addEventListener("click", () => {
-      pin.comment = textarea.value.trim() || pin.comment;
-      pin.status = "queued";
-      savePins();
-      postSnapshot();
-      openPinId = null;
-      renderPinPanel(pin);
-      renderPins();
-    });
+    submit.addEventListener("click", () => savePinComment(pin, textarea));
+    textarea.addEventListener("keydown", (event) => pinCommentKeydown(pin, textarea, event));
     const auditTarget = locate(pin.selector);
     a11yFixHandler.current = auditTarget === null || pin.tag === "canvas" ? null : {
       ensurePin: () => {
@@ -3647,6 +3640,23 @@
     panel.style.top = `${top}px`;
     applyPanelPosition(panel, "pin");
     wirePanelDrag(panel, "pin", placePinDefault);
+  }
+
+  function savePinComment(pin, textarea) {
+    pin.comment = textarea.value.trim() || pin.comment;
+    pin.status = "queued";
+    savePins();
+    postSnapshot();
+    openPinId = null;
+    renderPinPanel(pin);
+    renderPins();
+  }
+
+  function pinCommentKeydown(pin, textarea, event) {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      savePinComment(pin, textarea);
+    }
   }
 
 

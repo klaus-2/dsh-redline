@@ -1277,6 +1277,64 @@ export async function runClientSuite(harness, { pluginDir }) {
       JSON.stringify({ failingToasts }));
   }
 
+  harness.section("client: overlay pin comment ctrl+enter");
+  {
+    const keydownSource = extractFunction(overlay, "pinCommentKeydown");
+    const saveSource = extractFunction(overlay, "savePinComment");
+    const panel = extractFunction(overlay, "renderPinPanel");
+    let saveCalls = 0;
+    let snapshotCalls = 0;
+    const run = keydownSource === undefined || saveSource === undefined ? undefined : evaluateExpression(`(savePins, postSnapshot, renderPinPanel, renderPins) => {
+${saveSource}
+${keydownSource}
+let openPinId = "p1";
+return (pin, textarea, event) => {
+  pinCommentKeydown(pin, textarea, event);
+  return openPinId;
+};
+}`, "pinCommentKeydown");
+    const keydown = run === undefined ? undefined : run(() => { saveCalls += 1; }, () => { snapshotCalls += 1; }, () => {}, () => {});
+    const pin = { id: "p1", comment: "old", status: "open", changes: [] };
+    const event = { ctrlKey: true, key: "Enter", prevented: false, preventDefault() { this.prevented = true; } };
+    const afterId = keydown === undefined ? undefined : keydown(pin, { value: "  note  " }, event);
+    harness.check("overlay: ctrl+enter on the pin comment textarea runs the save routine exactly once",
+      panel !== undefined && keydown !== undefined &&
+      panel.includes("textarea.addEventListener(\"keydown\", (event) => pinCommentKeydown(pin, textarea, event))") &&
+      panel.includes("savePinComment(pin, textarea)") &&
+      saveCalls === 1 && snapshotCalls === 1 && pin.comment === "note" && pin.status === "queued" &&
+      afterId === null && event.prevented === true,
+      JSON.stringify({ saveCalls, snapshotCalls, comment: pin.comment, status: pin.status, afterId, prevented: event.prevented, wired: panel?.includes("pinCommentKeydown(pin, textarea, event)") }));
+  }
+  {
+    const keydownSource = extractFunction(overlay, "pinCommentKeydown");
+    const saveSource = extractFunction(overlay, "savePinComment");
+    let saveCalls = 0;
+    let snapshotCalls = 0;
+    const run = keydownSource === undefined || saveSource === undefined ? undefined : evaluateExpression(`(savePins, postSnapshot, renderPinPanel, renderPins) => {
+${saveSource}
+${keydownSource}
+let openPinId = "p2";
+return (pin, textarea, event) => {
+  pinCommentKeydown(pin, textarea, event);
+  return openPinId;
+};
+}`, "pinCommentKeydown");
+    const keydown = run === undefined ? undefined : run(() => { saveCalls += 1; }, () => { snapshotCalls += 1; }, () => {}, () => {});
+    const pin = { id: "p2", comment: "keep", status: "open", changes: [] };
+    const event = { key: "Enter", prevented: false, preventDefault() { this.prevented = true; } };
+    const afterId = keydown === undefined ? undefined : keydown(pin, { value: "  draft  " }, event);
+    harness.check("overlay: plain enter on the pin comment textarea does not save",
+      keydown !== undefined && saveCalls === 0 && snapshotCalls === 0 && pin.comment === "keep" &&
+      pin.status === "open" && afterId === "p2" && event.prevented === false,
+      JSON.stringify({ saveCalls, snapshotCalls, comment: pin.comment, status: pin.status, afterId, prevented: event.prevented }));
+  }
+  {
+    const draftSource = extractFunction(overlay, "renderDraft");
+    harness.check("overlay: the draft composer keydown still submits on ctrl+enter",
+      draftSource !== undefined && draftSource.includes("e.key === \"Enter\" && !e.shiftKey"),
+      draftSource === undefined ? "renderDraft missing" : "draft keydown condition drifted");
+  }
+
   harness.section("client: overlay theme derivation");
   {
     const themeClassSource = extractFunction(overlay, "themeRootClass");
