@@ -139,6 +139,7 @@
       "layoutGrid": "Toggle layout grid",
       "gridColumns": "Columns",
       "distanceMeter": "Hold Alt with a panel open to measure distances",
+      "inspectorStates": "States",
       "eyeTitle": "Show/hide pins",
       "statusTitle": "Live Review active",
       "pendingTitle": "Annotations waiting for your next prompt in the chat",
@@ -357,6 +358,7 @@
       "layoutGrid": "Alternar grade de layout",
       "gridColumns": "Colunas",
       "distanceMeter": "Segure Alt com um painel aberto para medir distâncias",
+      "inspectorStates": "Estados",
       "eyeTitle": "Mostrar/ocultar pins",
       "statusTitle": "Live Review ativo",
       "pendingTitle": "Anotações aguardando seu próximo prompt no chat",
@@ -575,6 +577,7 @@
       "layoutGrid": "切换布局网格",
       "gridColumns": "列数",
       "distanceMeter": "按住 Alt 并打开面板以测量距离",
+      "inspectorStates": "状态",
       "eyeTitle": "显示/隐藏图钉",
       "statusTitle": "Live Review 运行中",
       "pendingTitle": "标注将随你的下一条消息发送",
@@ -4307,6 +4310,131 @@
     applyAdjustEntry(entry);
   }
 
+  const FORCE_STATE_CLASSES = { hover: "lr-fh", focus: "lr-ff", active: "lr-fa" };
+  let forceTarget = null;
+  let forceStates = new Set();
+
+  function forceSubjectSplit(part) {
+    let depth = 0;
+    let boundary = -1;
+    for (let i = 0; i < part.length; i += 1) {
+      const char = part[i];
+      if (char === "[" || char === "(") depth += 1;
+      else if (char === "]" || char === ")") depth -= 1;
+      else if (depth === 0 && (char === " " || char === ">" || char === "+" || char === "~")) boundary = i;
+    }
+    if (boundary === -1) return ["", part];
+    return [part.slice(0, boundary + 1), part.slice(boundary + 1).trim()];
+  }
+
+  function notPseudoSpans(part) {
+    const spans = [];
+    let i = part.indexOf(":not(");
+    while (i !== -1) {
+      let depth = 0;
+      for (let j = i + 5; j < part.length; j += 1) {
+        if (part[j] === "(") depth += 1;
+        else if (part[j] === ")") {
+          if (depth === 0) { spans.push([i + 5, j]); break; }
+          depth -= 1;
+        }
+      }
+      i = part.indexOf(":not(", i + 1);
+    }
+    return spans;
+  }
+
+  function buildForceRules(target, pseudo) {
+    const token = `:${pseudo}`;
+    const marker = `.${FORCE_STATE_CLASSES[pseudo]}`;
+    const rules = [];
+    const walk = (ruleList) => {
+      for (const rule of ruleList) {
+        if (rule.selectorText === undefined && rule.cssRules !== undefined && rule.cssRules !== null) {
+          walk(rule.cssRules);
+          continue;
+        }
+        if (typeof rule.selectorText !== "string" || rule.style === null || rule.style === undefined) continue;
+        for (const rawPart of rule.selectorText.split(",")) {
+          const part = rawPart.trim();
+          if (part === "") continue;
+          const spans = notPseudoSpans(part);
+          const occurrences = [];
+          let at = part.indexOf(token);
+          while (at !== -1) {
+            const next = part[at + token.length];
+            if (!(next !== undefined && /[a-zA-Z-]/.test(next))) occurrences.push(at);
+            at = part.indexOf(token, at + 1);
+          }
+          if (occurrences.length === 0) continue;
+          if (occurrences.some((at) => spans.some(([start, end]) => at >= start && at < end))) continue;
+          const [prefix, subject] = forceSubjectSplit(part);
+          if (!occurrences.some((at) => at >= prefix.length)) continue;
+          const subjectWithout = subject.split(token).join("");
+          let matched = false;
+          try { matched = target.matches(subjectWithout); } catch {}
+          if (matched) rules.push(`${prefix}${subject.split(token).join(marker)}{${rule.style.cssText}}`);
+        }
+      }
+    };
+    for (const sheet of document.styleSheets) {
+      try {
+        walk(sheet.cssRules);
+      } catch {}
+    }
+    return rules;
+  }
+
+  function applyForceStates() {
+    if (forceTarget === null) return;
+    let css = "";
+    for (const pseudo of Object.keys(FORCE_STATE_CLASSES)) {
+      const on = forceStates.has(pseudo);
+      forceTarget.classList.toggle(FORCE_STATE_CLASSES[pseudo], on);
+      if (on) {
+        for (const rule of buildForceRules(forceTarget, pseudo)) css += rule;
+      }
+    }
+    if (forceStates.size === 0) {
+      clearForceStates();
+      return;
+    }
+    let tag = document.getElementById("lr-force-states");
+    if (css === "") {
+      tag?.remove();
+      return;
+    }
+    if (tag === null) {
+      tag = document.createElement("style");
+      tag.id = "lr-force-states";
+      (document.head ?? document.documentElement).append(tag);
+    }
+    tag.textContent = css;
+  }
+
+  function clearForceStates() {
+    if (forceTarget !== null) {
+      for (const marker of Object.values(FORCE_STATE_CLASSES)) forceTarget.classList.remove(marker);
+    }
+    document.getElementById("lr-force-states")?.remove();
+    forceTarget = null;
+    forceStates = new Set();
+  }
+
+  function refreshForceChips() {
+    if (adjustPanel === null) return;
+    for (const chip of adjustPanel.querySelectorAll("[data-lr-pseudo]")) {
+      chip.toggleAttribute("data-on", forceStates.has(chip.dataset.lrPseudo));
+    }
+  }
+
+  function toggleForceState(pseudo) {
+    if (forceStates.has(pseudo)) forceStates.delete(pseudo);
+    else forceStates.add(pseudo);
+    applyForceStates();
+    refreshForceChips();
+  }
+
 
   function secHead(label, open) {
     const head = el("button", { class: "lr-sec-head", type: "button" }, el("span", {}, label), el("span", { class: "lr-sec-chev" }, "▾"));
@@ -4819,6 +4947,7 @@
   let adjustTargetSelector = "";
 
   function closeAdjustPanel(restore) {
+    clearForceStates();
     if (adjustPanel !== null && restore && adjustPatch !== null) restoreAll(adjustPatch);
     adjustPanel?.remove();
     adjustPanel = null;
@@ -4837,6 +4966,8 @@
   function openAdjustPanel(target) {
     closePanels();
     adjustTarget = target ?? document.body;
+    forceTarget = adjustTarget;
+    forceStates = new Set();
     adjustTargetSelector = cssPath(adjustTarget);
 
 
@@ -4975,6 +5106,13 @@
       const transformRowEl = inspectorRow(t("prop.transform"), transformWrap, { wide: true, staticLabel: true, changed: () => adjustChanged("transform"), onReset: () => { adjustReset("transform"); transformWrap.__render(); }, rerender: adjustRerender });
       sec.append(shadowRowEl, transformRowEl);
     }));
+
+    body.append(inspectorRow(t("inspectorStates"), el("span", { class: "lr-row-ctl" }, ...["hover", "focus", "active"].map((pseudo) => {
+      const chip = el("button", { type: "button", class: "lr-tgl", "data-lr-pseudo": pseudo }, `:${pseudo}`);
+      chip.toggleAttribute("data-on", forceStates.has(pseudo));
+      chip.addEventListener("click", () => toggleForceState(pseudo));
+      return chip;
+    }))));
 
     panel.append(body);
 

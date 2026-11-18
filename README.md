@@ -63,6 +63,7 @@ For each pin, one block in a single snapshot:
 - Responsive preview presets: constrain the page to 375/768/1280 px or reset to full width; pins created under a preset record its width (note: `100vw` units and `position: fixed` navbars do not respect the constraint)
 - Layout grid overlay: a toolbar button toggles non-interactive column bands over the page (32 px margins, 24 px gutters); a second click opens the column stepper (1–24), outside click or Esc closes the stepper while the grid stays on, and resize re-flows the bands
 - Alt distance meter: hold Alt with the adjust panel or a pin open and the page shows dashed px-gap guides from that reference to whatever is under the cursor, outlining both elements; releasing Alt clears everything
+- Inspector States (preview-only): :hover / :focus / :active chips in the adjust panel force those states on the page target by emulation — a marker class plus one stylesheet of rewritten rules, never a real focus() — so hover, focus and active styles can be previewed before committing; only rules whose last selector compound carries the pseudo are rewritten (ancestor rules like `.menu:hover .item` and :focus-within are skipped) and the marker class may slightly raise specificity
 - Accessibility audit in the pin popover and across the whole page, grouped by check type.
 - Quick fixes raise text contrast and add image alt text, with a preview before you confirm.
 - A dismissible toast in the page confirms copy and resolve/delete actions; the chat card shows an inline notice for report export and bulk results.

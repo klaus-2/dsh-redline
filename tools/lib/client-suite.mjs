@@ -1834,6 +1834,112 @@ return { keydown: meterAltKeydown, keyup: meterAltKeyup, state: () => ({ meterAl
       JSON.stringify({ inHostAt, meterAt, modeAt }));
   }
 
+  harness.section("client: overlay inspector force states");
+  {
+    const classesSource = extractArrowConst(overlay, "FORCE_STATE_CLASSES");
+    const splitSource = extractFunction(overlay, "forceSubjectSplit");
+    const spansSource = extractFunction(overlay, "notPseudoSpans");
+    const buildSource = extractFunction(overlay, "buildForceRules");
+    const ready = classesSource !== undefined && splitSource !== undefined && spansSource !== undefined && buildSource !== undefined;
+    const buildRun = ready ? evaluateExpression(`(document, target, pseudo) => {
+${classesSource}
+${spansSource}
+${splitSource}
+${buildSource}
+return buildForceRules(target, pseudo);
+}`, "buildForceRules") : undefined;
+    const matchingTarget = { matches: (selector) => selector === ".btn" };
+    const itemTarget = { matches: (selector) => selector === ".item" };
+    const plainSheet = (selectorText, cssText) => ({ cssRules: [{ selectorText, style: { cssText } }] });
+    const docWith = (sheets) => ({ styleSheets: sheets });
+    const basic = buildRun === undefined ? undefined : buildRun(docWith([plainSheet(".btn:hover", "color:red")]), matchingTarget, "hover");
+    const multi = buildRun === undefined ? undefined : buildRun(docWith([plainSheet(".btn:hover:hover", "color:red")]), matchingTarget, "hover");
+    harness.check("overlay: buildForceRules rewrites the subject compound exactly",
+      buildRun !== undefined && JSON.stringify(basic) === JSON.stringify([".btn.lr-fh{color:red}"]) &&
+      JSON.stringify(multi) === JSON.stringify([".btn.lr-fh.lr-fh{color:red}"]),
+      JSON.stringify({ basic, multi }));
+    const nonSubject = buildRun === undefined ? undefined : buildRun(docWith([plainSheet(".menu:hover .item", "color:red")]), itemTarget, "hover");
+    harness.check("overlay: buildForceRules skips rules whose pseudo sits in a non-subject compound",
+      buildRun !== undefined && JSON.stringify(nonSubject) === JSON.stringify([]),
+      JSON.stringify({ nonSubject }));
+    const comma = buildRun === undefined ? undefined : buildRun(docWith([plainSheet(".btn:hover, .card:hover .inner, .x:not(:hover)", "color:red")]), matchingTarget, "hover");
+    harness.check("overlay: buildForceRules emits only the matching comma part and skips :not-wrapped pseudos",
+      buildRun !== undefined && JSON.stringify(comma) === JSON.stringify([".btn.lr-fh{color:red}"]),
+      JSON.stringify({ comma }));
+    const mediaRule = { conditionText: "screen", cssRules: [{ selectorText: ".btn:hover", style: { cssText: "color:red" } }] };
+    const throwingSheet = { get cssRules() { throw new Error("cross-origin"); } };
+    let recursion = null;
+    try { recursion = buildRun === undefined ? undefined : buildRun(docWith([throwingSheet, { cssRules: [mediaRule] }, plainSheet(".btn:hover", "outline:solid red")]), matchingTarget, "hover"); } catch (error) { recursion = `threw: ${error}`; }
+    harness.check("overlay: buildForceRules recurses into grouping rules and skips throwing sheets",
+      Array.isArray(recursion) && JSON.stringify(recursion) === JSON.stringify([".btn.lr-fh{color:red}", ".btn.lr-fh{outline:solid red}"]),
+      JSON.stringify({ recursion }));
+  }
+  {
+    const classesSource = extractArrowConst(overlay, "FORCE_STATE_CLASSES");
+    const splitSource = extractFunction(overlay, "forceSubjectSplit");
+    const spansSource = extractFunction(overlay, "notPseudoSpans");
+    const buildSource = extractFunction(overlay, "buildForceRules");
+    const applySource = extractFunction(overlay, "applyForceStates");
+    const clearSource = extractFunction(overlay, "clearForceStates");
+    const ready = [classesSource, splitSource, spansSource, buildSource, applySource, clearSource].every((source) => source !== undefined);
+    const created = [];
+    const fakeDocument = {
+      styleSheets: [{ cssRules: [{ selectorText: ".btn:hover", style: { cssText: "color:red" } }, { selectorText: ".btn:focus", style: { cssText: "outline:2px solid red" } }] }],
+      head: { append: (node) => created.push(node) },
+      createElement: (tag) => ({ tag, textContent: "", id: null, removed: 0, remove() { this.removed += 1; } }),
+      getElementById: (id) => created.find((node) => node.id === id) ?? null,
+      documentElement: { append() {} }
+    };
+    const target = {
+      matches: (selector) => selector === ".btn",
+      classList: { toggles: [], removed: [], toggle(name, on) { this.toggles.push([name, on]); }, remove(name) { this.removed.push(name); } }
+    };
+    const run = ready ? evaluateExpression(`(document, target) => {
+${classesSource}
+${spansSource}
+${splitSource}
+${buildSource}
+${clearSource}
+${applySource}
+let forceTarget = null;
+let forceStates = new Set();
+forceTarget = target;
+return { apply: applyForceStates, clear: clearForceStates, force: (pseudo) => forceStates.add(pseudo), states: () => [...forceStates], target: () => forceTarget };
+}`, "applyForceStates") : undefined;
+    const sandbox = run === undefined ? undefined : run(fakeDocument, target);
+    sandbox?.force("hover");
+    sandbox?.force("focus");
+    sandbox?.apply();
+    const tag = created[0];
+    sandbox?.apply();
+    harness.check("overlay: applyForceStates markers the target and writes one style tag for all forced states",
+      sandbox !== undefined &&
+      JSON.stringify(target.classList.toggles.slice(0, 3)) === JSON.stringify([["lr-fh", true], ["lr-ff", true], ["lr-fa", false]]) &&
+      tag !== undefined && tag.id === "lr-force-states" && created.length === 1 &&
+      tag.textContent === ".btn.lr-fh{color:red}.btn.lr-ff{outline:2px solid red}",
+      JSON.stringify({ toggles: target.classList.toggles, tags: created.length, text: tag?.textContent }));
+    sandbox?.clear();
+    const cleared = { removed: target.classList.removed, tagRemoved: tag?.removed, target: sandbox?.target(), states: sandbox?.states() };
+    sandbox?.apply();
+    harness.check("overlay: clearForceStates removes the markers, the style tag and resets the state",
+      sandbox !== undefined && JSON.stringify(cleared.removed) === JSON.stringify(["lr-fh", "lr-ff", "lr-fa"]) &&
+      cleared.tagRemoved === 1 && cleared.target === null && JSON.stringify(cleared.states) === JSON.stringify([]) &&
+      created.length === 1,
+      JSON.stringify({ cleared, tags: created.length }));
+  }
+  {
+    const closeSource = extractFunction(overlay, "closeAdjustPanel");
+    const openSource = extractFunction(overlay, "openAdjustPanel");
+    harness.check("overlay: the force-state lifecycle hooks the adjust panel close and confirm paths",
+      closeSource !== undefined && closeSource.includes("clearForceStates();") &&
+      closeSource.indexOf("clearForceStates();") < closeSource.indexOf("restoreAll") &&
+      openSource !== undefined && openSource.includes("closeAdjustPanel(false)") &&
+      openSource.includes("t(\"inspectorStates\")") &&
+      ["\"hover\"", "\"focus\"", "\"active\""].every((literal) => openSource.includes(literal)) &&
+      openSource.includes("forceTarget = adjustTarget") && openSource.includes("forceStates = new Set()"),
+      JSON.stringify({ clearFirst: closeSource !== undefined && closeSource.indexOf("clearForceStates();") < closeSource.indexOf("restoreAll"), confirm: openSource?.includes("closeAdjustPanel(false)"), chips: openSource?.includes("inspectorStates") }));
+  }
+
   harness.section("client: overlay theme derivation");
   {
     const themeClassSource = extractFunction(overlay, "themeRootClass");
