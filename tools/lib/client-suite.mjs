@@ -1351,6 +1351,10 @@ return (pin, textarea, event) => {
       barSource !== undefined && barSource.includes("{ class: \"lr-dchev\", html: ICONS_CANVAS.chev }") &&
       !barSource.includes("}, ICONS_CANVAS.chev)"),
       barSource === undefined ? "buildDrawBar missing" : "chevron still inserted as a text child");
+    harness.check("overlay: the draw send button renders its icon, not text",
+      barSource !== undefined && barSource.includes("html: ICONS_CANVAS.plus") &&
+      !barSource.includes("}, ICONS_CANVAS.plus)"),
+      barSource === undefined ? "buildDrawBar missing" : "send icon still inserted as a text child");
   }
   {
     const cluster = ["itemBBox", "drawHit", "hitTestDraw", "snapshotDraw", "eraseDrawItemAt"].map((name) => extractFunction(overlay, name));
