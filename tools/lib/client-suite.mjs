@@ -1819,6 +1819,7 @@ return { keydown: meterAltKeydown, keyup: meterAltKeyup, state: () => ({ meterAl
       nullSandbox !== undefined && nullDown.prevented === true && hintsBefore === 0 && hintsAfterNull === 1 &&
       hints[0] === "distanceMeter" && nullSandbox.state().meterAlt === true && nullSandbox.state().meterRef === null &&
       overlay.includes("if (meterAltKeydown(event)) return;") &&
+      overlay.indexOf("if (meterAltKeydown(event)) return;") < overlay.indexOf("if (tag === \"INPUT\"") &&
       /document\.addEventListener\(\s*"keyup"/.test(overlay) && overlay.includes("meterAltKeyup(event);"),
       JSON.stringify({ down1, down2, downPlain, up, referenceCalls, clearCalls, hints, prevented: [altDown1.prevented, altDown2.prevented, plainDown.prevented, altUp.prevented] }));
   }
