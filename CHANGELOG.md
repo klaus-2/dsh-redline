@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Interface copy reads cleaner.** The overlay's toasts, hints and tooltips no longer use em dashes; the drawing hint is now "Draw over the page. Esc exits." and the stale-pin warning says "Target not found. The pin is stale. Drag the marker to re-anchor." in all three languages.
+
 ### Added
 
 - **Ctrl/Cmd+Enter saves the comment of an open pin.** The pin popover's comment box confirms with Ctrl+Enter (Cmd+Enter on macOS), running the same save routine as the popover's submit button — the comment is stored, the pin re-enters the queue and the pending snapshot is reposted. Plain Enter keeps inserting a newline, and the comment composer still sends on plain Enter.
