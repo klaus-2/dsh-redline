@@ -102,6 +102,7 @@
       "duplicateHint": "Click an element to duplicate this pin. Press Esc to cancel.",
       "duplicateDone": "Pin duplicated.",
       "pinDimensions": "Dimensions",
+      "ancestorTrail": "Ancestors — click to re-anchor",
       "copyCss": "Copy CSS",
       "cssCopied": "CSS copied to clipboard",
       "cssCopyFailed": "Could not copy CSS",
@@ -316,6 +317,7 @@
       "duplicateHint": "Clique em um elemento para duplicar este pin. Pressione Esc para cancelar.",
       "duplicateDone": "Pin duplicado.",
       "pinDimensions": "Dimensões",
+      "ancestorTrail": "Ancestrais — clique para reancorar",
       "copyCss": "Copiar CSS",
       "cssCopied": "CSS copiado para a área de transferência",
       "cssCopyFailed": "Não foi possível copiar o CSS",
@@ -530,6 +532,7 @@
       "duplicateHint": "点击某个元素以复制此 pin。按 Esc 取消。",
       "duplicateDone": "Pin 已复制。",
       "pinDimensions": "尺寸",
+      "ancestorTrail": "祖先元素 — 点击重新锚定",
       "copyCss": "复制 CSS",
       "cssCopied": "CSS 已复制到剪贴板",
       "cssCopyFailed": "无法复制 CSS",
@@ -841,6 +844,17 @@
       node = node.parentElement;
     }
     return parts.length === 0 ? "body" : `body ${parts.join(" > ")}`;
+  }
+
+  function ancestorTrail(element) {
+    const trail = [];
+    let node = element.parentElement;
+    while (node !== null && node !== host && node !== document.documentElement && trail.length < 12) {
+      trail.push(node);
+      if (node === document.body) break;
+      node = node.parentElement;
+    }
+    return trail;
   }
 
   function locate(selector) {
@@ -2486,6 +2500,16 @@
     });
   }
 
+  function reanchorPin(pin, element) {
+    pin.selector = cssPath(element);
+    pin.stale = false;
+    const rect = element.getBoundingClientRect();
+    pin.offsets = { ox: rect.width / 2, oy: rect.height / 2 };
+    pin.rect = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
+    savePins();
+    renderPins();
+  }
+
   function insidePage(point) {
     return {
       x: Math.max(0, Math.min(point.x, document.documentElement.clientWidth - 1)),
@@ -3620,6 +3644,8 @@
         return pin;
       }
     };
+    const trailAncestors = auditTarget === null || pin.selector === "canvas:drawing" ? [] : ancestorTrail(auditTarget);
+    const trail = trailAncestors.length === 0 ? null : el("div", { class: "lr-trail", title: t("ancestorTrail"), "aria-label": t("ancestorTrail") }, ...trailAncestors.map((ancestor) => el("button", { type: "button", onclick: () => { reanchorPin(pin, ancestor); renderPinPanel(pin); } }, quickLabel(ancestor))));
     const focusBtn = el("button", {
       onclick: () => {
         toggleFocusMode(pin);
@@ -3628,7 +3654,7 @@
     }, focusState.current !== null ? t("focusModeExit") : t("focusMode"));
     panel.append(
       el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, `${pins.filter((p) => p.status !== "resolvido").indexOf(pin) + 1} · ${quickLabel(locate(pin.selector) ?? pin.tag)}`), el("button", { class: "lr-close", title: t("panelClose"), type: "button", onclick: () => closePinPanel() }, "✕")),
-      el("div", { class: "pin-bubble-body" }, el("div", { class: "pin-bubble-meta" }, `${pin.selector.slice(0, 90)}${pin.component ? ` · ${pin.component}` : ""}`), el("div", { class: "pin-bubble-meta" }, `${t("pinDimensions")}: ${pinDimensions(pin)} px`), pin.stale === true ? el("div", { class: "pin-bubble-stale" }, t("pinStale")) : null, ambiguousCount > 1 ? el("div", { class: "pin-bubble-warning" }, `${t("ambiguousSelectorWarning").replace("{n}", ambiguousCount)} ${t("ambiguousSelectorDetail").replace("{selector}", pin.selector)}`) : null, changesText !== "" ? el("div", { class: "pin-bubble-changes" }, changesText) : null, textChangeText !== "" ? el("div", { class: "pin-bubble-changes" }, textChangeText) : null),
+      el("div", { class: "pin-bubble-body" }, trail, el("div", { class: "pin-bubble-meta" }, `${pin.selector.slice(0, 90)}${pin.component ? ` · ${pin.component}` : ""}`), el("div", { class: "pin-bubble-meta" }, `${t("pinDimensions")}: ${pinDimensions(pin)} px`), pin.stale === true ? el("div", { class: "pin-bubble-stale" }, t("pinStale")) : null, ambiguousCount > 1 ? el("div", { class: "pin-bubble-warning" }, `${t("ambiguousSelectorWarning").replace("{n}", ambiguousCount)} ${t("ambiguousSelectorDetail").replace("{selector}", pin.selector)}`) : null, changesText !== "" ? el("div", { class: "pin-bubble-changes" }, changesText) : null, textChangeText !== "" ? el("div", { class: "pin-bubble-changes" }, textChangeText) : null),
       auditTarget === null || pin.tag === "canvas" ? null : a11yAuditSection(auditTarget),
       el("div", { class: "prompt-input" }, renderTemplateRow(textarea), textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }), submit)),
       el(

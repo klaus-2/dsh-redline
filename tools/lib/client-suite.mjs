@@ -1461,6 +1461,114 @@ return { keydown: drawUndoKeydown, setDrawMode: (value) => { drawMode = value; }
       JSON.stringify({ adjustAt, drawUndoAt, deleteAt }));
   }
 
+  harness.section("client: overlay pin ancestor trail");
+  {
+    const trailSource = extractFunction(overlay, "ancestorTrail");
+    const run = trailSource === undefined ? undefined : evaluateExpression(`(document, host) => {
+${trailSource}
+return ancestorTrail;
+}`, "ancestorTrail");
+    const fakeBody = { localName: "body", parentElement: null };
+    const fakeDocument = { body: fakeBody };
+    const fakeHost = { localName: "dsh-redline-host", parentElement: fakeBody };
+    const trail = run === undefined ? undefined : run(fakeDocument, fakeHost);
+    const ancestorA = { localName: "div", parentElement: fakeBody };
+    const ancestorB = { localName: "span", parentElement: ancestorA };
+    const leaf = { localName: "p", parentElement: ancestorB };
+    const ordered = trail === undefined ? undefined : trail(leaf);
+    const chain13 = [];
+    let cursor = fakeBody;
+    for (let i = 13; i >= 1; i -= 1) { const node = { localName: `n${i}`, parentElement: cursor }; chain13.unshift(node); cursor = node; }
+    const capped = trail === undefined ? undefined : trail(chain13[0]);
+    const insideHostChild = { localName: "aside", parentElement: fakeHost };
+    const insideHostParent = { localName: "section", parentElement: insideHostChild };
+    const hostTrail = trail === undefined ? undefined : trail(insideHostParent);
+    harness.check("overlay: ancestorTrail walks deepest-first to the body, caps at 12 and skips the overlay host",
+      trail !== undefined && ordered !== undefined && ordered.length === 3 &&
+      ordered[0] === ancestorB && ordered[1] === ancestorA && ordered[2] === fakeBody &&
+      capped !== undefined && capped.length === 12 && capped[0] === chain13[1] && capped[11] === chain13[12] &&
+      !capped.includes(fakeBody) && hostTrail !== undefined && hostTrail.length === 1 &&
+      hostTrail[0] === insideHostChild && !hostTrail.includes(fakeHost) && !hostTrail.includes(fakeBody),
+      JSON.stringify({ ordered: ordered?.length, capped: capped?.length, cappedLast: capped?.[11]?.localName, hostTrail: hostTrail?.length, ready: trail !== undefined }));
+  }
+  {
+    const reanchorSource = extractFunction(overlay, "reanchorPin");
+    const run = reanchorSource === undefined ? undefined : evaluateExpression(`(cssPath, savePins, renderPins, postSnapshot) => {
+${reanchorSource}
+return reanchorPin;
+}`, "reanchorPin");
+    const element = { getBoundingClientRect: () => ({ left: 10, top: 20, width: 100, height: 50 }) };
+    const pin = { selector: "body > p:nth-of-type(2)", stale: true, offsets: { ox: 1, oy: 2 }, rect: { x: 0, y: 0, w: 0, h: 0 } };
+    const order = [];
+    let cssPathArg = null;
+    const reanchor = run === undefined ? undefined : run((arg) => { cssPathArg = arg; return "body > section:nth-of-type(1)"; }, () => { order.push("savePins"); }, () => { order.push("renderPins"); }, () => { order.push("postSnapshot"); });
+    reanchor?.(pin, element);
+    harness.check("overlay: reanchorPin applies the drag-drop mutation set without a snapshot",
+      reanchor !== undefined && cssPathArg === element && pin.selector === "body > section:nth-of-type(1)" &&
+      pin.stale === false && pin.offsets.ox === 50 && pin.offsets.oy === 25 &&
+      pin.rect.x === 10 && pin.rect.y === 20 && pin.rect.w === 100 && pin.rect.h === 50 &&
+      JSON.stringify(order) === JSON.stringify(["savePins", "renderPins"]),
+      JSON.stringify({ selector: pin.selector, stale: pin.stale, offsets: pin.offsets, rect: pin.rect, order }));
+  }
+  {
+    const sources = ["quickLabel", "reactComponentName", "ancestorTrail", "renderPinPanel"].map((name) => extractFunction(overlay, name));
+    const ready = sources.every((source) => source !== undefined);
+    const fakeBody = { localName: "body", parentElement: null };
+    const ancestorA = { localName: "div", parentElement: fakeBody };
+    const ancestorB = { localName: "section", parentElement: ancestorA };
+    const leaf = { localName: "p", id: "lead", parentElement: ancestorB };
+    const fakeHost = { localName: "dsh-redline-host", parentElement: fakeBody };
+    const fakeWindow = { innerWidth: 1000, innerHeight: 800 };
+    const el = (tag, attrs = {}, ...children) => {
+      const node = { tag, props: attrs, children: [], style: {} };
+      for (const kid of children) { if (kid !== null && kid !== undefined) node.children.push(kid); }
+      node.append = (...kids) => { for (const kid of kids) { if (kid !== null && kid !== undefined) node.children.push(kid); } return node; };
+      node.addEventListener = () => {};
+      return node;
+    };
+    const baseStubs = [el, (key) => key, { arrowUp: "icon-arrow", code: "icon-code" }, () => {}, () => null, () => 1];
+    const run = ready ? evaluateExpression(`(el, t, ICONS, mountShadow, anchorPoint, countSelectorMatches, locate, pinDimensions, renderTemplateRow, a11yAuditSection, a11yFixHandler, focusState, rootDiv, applyPanelPosition, wirePanelDrag, window, document, host, pin) => {
+${sources.join("\n")}
+let pinPanelNode = null;
+let openPinId = pin.id;
+const pins = [pin];
+renderPinPanel(pin);
+return pinPanelNode;
+}`, "renderPinPanel") : undefined;
+    const render = (locateStub, pin) => run === undefined ? undefined : run(...baseStubs, locateStub, () => "10×10", () => null, () => null, { current: null }, { current: null }, el("div", {}), () => {}, () => {}, fakeWindow, { body: fakeBody }, fakeHost, pin);
+    const positivePin = { id: "p1", comment: "", changes: [], textChange: null, selector: "p#lead", tag: "p", stale: false, component: "", rect: { x: 5, y: 6 }, status: "queued" };
+    const negativePin = { id: "p1", comment: "", changes: [], textChange: null, selector: "p.gone", tag: "p", stale: true, component: "", rect: { x: 5, y: 6 }, status: "queued" };
+    const positivePanel = render(() => leaf, positivePin);
+    const positiveBody = positivePanel?.children.find((child) => child?.props?.class === "pin-bubble-body");
+    const trailNode = positiveBody?.children[0];
+    const chips = trailNode?.children ?? [];
+    const negativePanel = render(() => null, negativePin);
+    const negativeBody = negativePanel?.children.find((child) => child?.props?.class === "pin-bubble-body");
+    harness.check("overlay: the pin popover renders the ancestor trail only when the target resolves",
+      positivePanel !== undefined && positiveBody !== undefined &&
+      trailNode?.props?.class === "lr-trail" && trailNode.props.title === "ancestorTrail" && trailNode.props["aria-label"] === "ancestorTrail" &&
+      chips.length === 3 && chips.every((chip) => chip.props.type === "button") &&
+      JSON.stringify(chips.map((chip) => chip.children[0])) === JSON.stringify(["section", "div", "body"]) &&
+      negativePanel !== undefined && negativeBody !== undefined && negativeBody.children[0].props.class === "pin-bubble-meta" &&
+      !negativeBody.children.some((child) => child?.props?.class === "lr-trail"),
+      JSON.stringify({ trail: trailNode?.props?.class, chips: chips.map((chip) => chip.children[0]), negativeFirst: negativeBody?.children[0]?.props?.class, ready }));
+  }
+  {
+    const panelSource = extractFunction(overlay, "renderPinPanel");
+    harness.check("overlay: the trail chips re-anchor through reanchorPin and the row carries the ancestorTrail label",
+      panelSource !== undefined &&
+      panelSource.includes("onclick: () => { reanchorPin(pin, ancestor); renderPinPanel(pin); }") &&
+      panelSource.includes("title: t(\"ancestorTrail\"), \"aria-label\": t(\"ancestorTrail\")") &&
+      panelSource.includes("quickLabel(ancestor)"),
+      panelSource === undefined ? "renderPinPanel missing" : "trail wiring drifted");
+  }
+  {
+    const panelSource = extractFunction(overlay, "renderPinPanel");
+    harness.check("overlay: the ancestor trail is skipped for canvas drawing pseudo-targets",
+      panelSource !== undefined && panelSource.includes("pin.selector === \"canvas:drawing\""),
+      panelSource === undefined ? "renderPinPanel missing" : "canvas:drawing guard missing");
+  }
+
   harness.section("client: overlay theme derivation");
   {
     const themeClassSource = extractFunction(overlay, "themeRootClass");

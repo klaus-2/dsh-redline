@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Ctrl/Cmd+Enter saves the comment of an open pin.** The pin popover's comment box confirms with Ctrl+Enter (Cmd+Enter on macOS), running the same save routine as the popover's submit button — the comment is stored, the pin re-enters the queue and the pending snapshot is reposted. Plain Enter keeps inserting a newline, and the comment composer still sends on plain Enter.
 - **An eraser tool and keyboard undo for the drawing canvas.** The draw bar gains an eraser between shapes and text: clicking or dragging with it deletes the topmost drawing under the cursor, one undo snapshot per removed item and nothing recorded when the cursor hits empty space. While the canvas is open and focus is not in an input, Ctrl+Z undoes the last drawing mutation and Ctrl+Shift+Z or Ctrl+Y redoes it; the inspector panel keeps its own undo when both are open.
+- **An ancestor trail in the pin popover re-anchors pins with one click.** When the pin's target resolves, the popover lists its ancestors up to and including `<body>` (deepest first, capped at 12 entries) as clickable chips. Clicking a chip re-anchors the pin to that container with the same mutation set as dragging the marker — new selector, cleared stale flag, snapshot rect and offsets at the container's center — then persists and re-renders the panel without posting a snapshot, matching marker drags. Unresolved targets and `canvas:drawing` pseudo-targets show no trail.
 
 ## [1.5.0] - 2026-11-17
 

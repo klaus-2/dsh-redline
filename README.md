@@ -47,6 +47,7 @@ For each pin, one block in a single snapshot:
 - CSS patch export: the committed adjustments render as a copyable `selector { prop: value; }` rule in the overlay and as a `Requested CSS:` block in the agent context
 - Copy selector button in the pin popover: puts the pin's CSS selector on the clipboard verbatim
 - Stale pin re-anchoring: when the target element leaves the DOM the pin is flagged and the popover warns, and dragging the marker re-binds it
+- Ancestor trail in the pin popover: the popover lists the target's ancestors up to `<body>` as clickable chips — clicking one re-anchors the pin (marker and panel) to that container
 - Pin popover shows the target's live dimensions (W×H px), falling back to the pinned snapshot when the element is gone
 - The pin bubble warns when a selector matches more than one element, with the count.
 - Duplicate a pin to reuse its comment and adjustments on another element.

@@ -40,6 +40,7 @@
   "duplicateHint": "点击某个元素以复制此 pin。按 Esc 取消。",
   "duplicateDone": "Pin 已复制。",
   "pinDimensions": "尺寸",
+  "ancestorTrail": "祖先元素 — 点击重新锚定",
   "copyCss": "复制 CSS",
   "cssCopied": "CSS 已复制到剪贴板",
   "cssCopyFailed": "无法复制 CSS",

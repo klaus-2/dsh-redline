@@ -40,6 +40,7 @@
   "duplicateHint": "Clique em um elemento para duplicar este pin. Pressione Esc para cancelar.",
   "duplicateDone": "Pin duplicado.",
   "pinDimensions": "Dimensões",
+  "ancestorTrail": "Ancestrais — clique para reancorar",
   "copyCss": "Copiar CSS",
   "cssCopied": "CSS copiado para a área de transferência",
   "cssCopyFailed": "Não foi possível copiar o CSS",

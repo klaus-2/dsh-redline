@@ -47,6 +47,7 @@ Para cada pin, um bloco em um único snapshot:
 - Exportação de patch CSS: os ajustes confirmados viram uma regra `selector { prop: value; }` copiável no overlay e um bloco `Requested CSS:` no contexto do agente
 - Botão de copiar seletor no popover do pin: coloca o seletor CSS do pin na área de transferência verbatim
 - Reancoragem de pins obsoletos: quando o elemento alvo sai do DOM, o pin é marcado e o popover avisa; arrastar o marcador religa o pin
+- Trilha de ancestrais no popover do pin: o popover lista os ancestrais do alvo até `<body>` como chips clicáveis — clicar em um reancora o pin (marcador e painel) naquele contêiner
 - O popover do pin mostra as dimensões em tempo real do alvo (L×A px), recaindo para o snapshot fixado quando o elemento não existe mais
 - O balão do pin avisa quando um seletor corresponde a mais de um elemento, com a contagem.
 - Duplique um pin para reaproveitar o comentário e os ajustes em outro elemento.
