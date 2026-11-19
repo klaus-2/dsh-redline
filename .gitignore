@@ -14,3 +14,4 @@ docs/capture.md
 .npmrc
 .agents/
 /.playwright-cli
+/.devflow
