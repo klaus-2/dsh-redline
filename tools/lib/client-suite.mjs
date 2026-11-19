@@ -140,7 +140,7 @@ export async function runClientSuite(harness, { pluginDir }) {
 
   harness.section("client: overlay paint order");
   {
-    const popoverZ = Number(/\.popover, \.toolbar-wrap \{ z-index: (\d+)/.exec(overlay)?.[1] ?? 0);
+    const popoverZ = Number(/\.popover \{ z-index: (\d+)/.exec(overlay)?.[1] ?? 0);
     const absZ = Number(/absLayer\.style\.cssText = "[^"]*z-index:(\d+)/.exec(overlay)?.[1] ?? 0);
     const fixedZ = Number(/fixedLayer\.style\.cssText = "[^"]*z-index:(\d+)/.exec(overlay)?.[1] ?? 0);
     harness.check("overlay: popovers paint above the pin and fixed layers",
@@ -1275,6 +1275,719 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("overlay: the copy-selector failure path toasts instead of throwing",
       copy !== undefined && JSON.stringify(failingToasts) === JSON.stringify(["cssCopyFailed", "cssCopyFailed"]),
       JSON.stringify({ failingToasts }));
+  }
+
+  harness.section("client: overlay pin comment ctrl+enter");
+  {
+    const keydownSource = extractFunction(overlay, "pinCommentKeydown");
+    const saveSource = extractFunction(overlay, "savePinComment");
+    const panel = extractFunction(overlay, "renderPinPanel");
+    let saveCalls = 0;
+    let snapshotCalls = 0;
+    const run = keydownSource === undefined || saveSource === undefined ? undefined : evaluateExpression(`(savePins, postSnapshot, renderPinPanel, renderPins) => {
+${saveSource}
+${keydownSource}
+let openPinId = "p1";
+return (pin, textarea, event) => {
+  pinCommentKeydown(pin, textarea, event);
+  return openPinId;
+};
+}`, "pinCommentKeydown");
+    const keydown = run === undefined ? undefined : run(() => { saveCalls += 1; }, () => { snapshotCalls += 1; }, () => {}, () => {});
+    const pin = { id: "p1", comment: "old", status: "open", changes: [] };
+    const event = { ctrlKey: true, key: "Enter", prevented: false, preventDefault() { this.prevented = true; } };
+    const afterId = keydown === undefined ? undefined : keydown(pin, { value: "  note  " }, event);
+    harness.check("overlay: ctrl+enter on the pin comment textarea runs the save routine exactly once",
+      panel !== undefined && keydown !== undefined &&
+      panel.includes("textarea.addEventListener(\"keydown\", (event) => pinCommentKeydown(pin, textarea, event))") &&
+      panel.includes("savePinComment(pin, textarea)") &&
+      saveCalls === 1 && snapshotCalls === 1 && pin.comment === "note" && pin.status === "queued" &&
+      afterId === null && event.prevented === true,
+      JSON.stringify({ saveCalls, snapshotCalls, comment: pin.comment, status: pin.status, afterId, prevented: event.prevented, wired: panel?.includes("pinCommentKeydown(pin, textarea, event)") }));
+  }
+  {
+    const keydownSource = extractFunction(overlay, "pinCommentKeydown");
+    const saveSource = extractFunction(overlay, "savePinComment");
+    let saveCalls = 0;
+    let snapshotCalls = 0;
+    const run = keydownSource === undefined || saveSource === undefined ? undefined : evaluateExpression(`(savePins, postSnapshot, renderPinPanel, renderPins) => {
+${saveSource}
+${keydownSource}
+let openPinId = "p2";
+return (pin, textarea, event) => {
+  pinCommentKeydown(pin, textarea, event);
+  return openPinId;
+};
+}`, "pinCommentKeydown");
+    const keydown = run === undefined ? undefined : run(() => { saveCalls += 1; }, () => { snapshotCalls += 1; }, () => {}, () => {});
+    const pin = { id: "p2", comment: "keep", status: "open", changes: [] };
+    const event = { key: "Enter", prevented: false, preventDefault() { this.prevented = true; } };
+    const afterId = keydown === undefined ? undefined : keydown(pin, { value: "  draft  " }, event);
+    harness.check("overlay: plain enter on the pin comment textarea does not save",
+      keydown !== undefined && saveCalls === 0 && snapshotCalls === 0 && pin.comment === "keep" &&
+      pin.status === "open" && afterId === "p2" && event.prevented === false,
+      JSON.stringify({ saveCalls, snapshotCalls, comment: pin.comment, status: pin.status, afterId, prevented: event.prevented }));
+  }
+  {
+    const draftSource = extractFunction(overlay, "renderDraft");
+    harness.check("overlay: the draft composer keydown still submits on ctrl+enter",
+      draftSource !== undefined && draftSource.includes("e.key === \"Enter\" && !e.shiftKey"),
+      draftSource === undefined ? "renderDraft missing" : "draft keydown condition drifted");
+  }
+
+  harness.section("client: overlay draw eraser and undo");
+  {
+    const barSource = extractFunction(overlay, "buildDrawBar");
+    const iconsSource = extractObjectLiteral(overlay, "ICONS_CANVAS");
+    const icons = iconsSource === undefined ? undefined : evaluateObjectLiteral(iconsSource, "ICONS_CANVAS");
+    const shapesAt = barSource?.indexOf("addTool(\"shapes\", \"drawShapes\"") ?? -1;
+    const eraseAt = barSource?.indexOf("addTool(\"eraser\", \"drawErase\", ICONS_CANVAS.eraser)") ?? -1;
+    const textAt = barSource?.indexOf("addTool(\"text\", \"drawText\"") ?? -1;
+    harness.check("overlay: the eraser tool sits between shapes and text in the draw bar with its own icon",
+      barSource !== undefined && icons !== undefined && typeof icons.eraser === "string" && icons.eraser.startsWith("<svg") &&
+      shapesAt !== -1 && eraseAt > shapesAt && textAt > eraseAt,
+      JSON.stringify({ shapesAt, eraseAt, textAt, hasIcon: typeof icons?.eraser === "string" }));
+    harness.check("overlay: the draw bar chevrons render as icons, not text",
+      barSource !== undefined && barSource.includes("{ class: \"lr-dchev\", html: ICONS_CANVAS.chev }") &&
+      !barSource.includes("}, ICONS_CANVAS.chev)"),
+      barSource === undefined ? "buildDrawBar missing" : "chevron still inserted as a text child");
+    harness.check("overlay: the draw send button renders its icon, not text",
+      barSource !== undefined && barSource.includes("html: ICONS_CANVAS.plus") &&
+      !barSource.includes("}, ICONS_CANVAS.plus)"),
+      barSource === undefined ? "buildDrawBar missing" : "send icon still inserted as a text child");
+  }
+  {
+    const cluster = ["itemBBox", "drawHit", "hitTestDraw", "snapshotDraw", "eraseDrawItemAt"].map((name) => extractFunction(overlay, name));
+    const cloneSource = extractArrowConst(overlay, "cloneItems");
+    const ready = cloneSource !== undefined && cluster.every((source) => source !== undefined);
+    const build = () => ready ? evaluateExpression(`(saveDrawings, redrawDrawings, updateDrawBarState) => {
+${cluster.join("\n")}
+${cloneSource}
+let drawTyping = null;
+let drawItems = [];
+let drawUndo = [];
+let drawRedo = [];
+return {
+  erase: eraseDrawItemAt,
+  seed: (items) => { drawItems = items; },
+  items: () => drawItems,
+  undo: () => drawUndo,
+  redo: () => drawRedo,
+  setTyping: (value) => { drawTyping = value; }
+};
+}`, "eraseDrawItemAt") : undefined;
+    const bottom = { type: "path", color: "#111111", w: 2, points: [{ x: 100, y: 100 }, { x: 140, y: 100 }] };
+    const top = { type: "path", color: "#e5484d", w: 2, points: [{ x: 102, y: 100 }, { x: 140, y: 120 }] };
+    let saveCalls = 0;
+    let redrawCalls = 0;
+    let stateCalls = 0;
+    const sandbox = build()?.(() => { saveCalls += 1; }, () => { redrawCalls += 1; }, () => { stateCalls += 1; });
+    sandbox?.seed([bottom, top]);
+    const erased = sandbox?.erase(103, 101) === true;
+    harness.check("overlay: eraseDrawItemAt removes the topmost hit drawing with exactly one undo snapshot",
+      sandbox !== undefined && erased && sandbox.items().length === 1 && sandbox.items()[0] === bottom &&
+      sandbox.undo().length === 1 && sandbox.undo()[0].length === 2 && sandbox.redo().length === 0 &&
+      saveCalls === 1 && redrawCalls === 1 && stateCalls === 1,
+      JSON.stringify({ erased, left: sandbox?.items().length, undo: sandbox?.undo().length, undoDepth: sandbox?.undo()[0]?.length, redo: sandbox?.redo().length, saveCalls, redrawCalls, stateCalls, ready }));
+  }
+  {
+    const cluster = ["itemBBox", "drawHit", "hitTestDraw", "snapshotDraw", "eraseDrawItemAt"].map((name) => extractFunction(overlay, name));
+    const cloneSource = extractArrowConst(overlay, "cloneItems");
+    const ready = cloneSource !== undefined && cluster.every((source) => source !== undefined);
+    const run = ready ? evaluateExpression(`(saveDrawings, redrawDrawings, updateDrawBarState) => {
+${cluster.join("\n")}
+${cloneSource}
+let drawTyping = null;
+let drawItems = [];
+let drawUndo = [];
+let drawRedo = [];
+return {
+  erase: eraseDrawItemAt,
+  seed: (items) => { drawItems = items; },
+  items: () => drawItems,
+  undo: () => drawUndo,
+  redo: () => drawRedo,
+  setTyping: (value) => { drawTyping = value; }
+};
+}`, "eraseDrawItemAt") : undefined;
+    const first = { type: "path", color: "#111111", w: 2, points: [{ x: 100, y: 100 }, { x: 140, y: 100 }] };
+    const second = { type: "path", color: "#3b82f6", w: 2, points: [{ x: 200, y: 200 }, { x: 240, y: 200 }] };
+    let saveCalls = 0;
+    let redrawCalls = 0;
+    let stateCalls = 0;
+    const sandbox = run === undefined ? undefined : run(() => { saveCalls += 1; }, () => { redrawCalls += 1; }, () => { stateCalls += 1; });
+    sandbox?.seed([first, second]);
+    const emptyHit = sandbox?.erase(300, 300);
+    const afterEmpty = { undo: sandbox?.undo().length, redo: sandbox?.redo().length, items: sandbox?.items().length, saveCalls };
+    sandbox?.setTyping({ x: 100, y: 100, color: "#111111", text: "a" });
+    const typingHit = sandbox?.erase(103, 101);
+    harness.check("overlay: erasing an empty point or while typing pushes no undo snapshot",
+      sandbox !== undefined && emptyHit === false && typingHit === false &&
+      afterEmpty.undo === 0 && afterEmpty.redo === 0 && afterEmpty.items === 2 && afterEmpty.saveCalls === 0 &&
+      sandbox.items().length === 2 && sandbox.undo().length === 0 && sandbox.redo().length === 0 &&
+      saveCalls === 0 && redrawCalls === 0 && stateCalls === 0,
+      JSON.stringify({ emptyHit, typingHit, afterEmpty, finalItems: sandbox?.items().length, ready }));
+  }
+  {
+    const keydownSource = extractFunction(overlay, "drawUndoKeydown");
+    const run = keydownSource === undefined ? undefined : evaluateExpression(`(undoDraw, redoDraw) => {
+let drawMode = true;
+${keydownSource}
+return { keydown: drawUndoKeydown, setDrawMode: (value) => { drawMode = value; } };
+}`, "drawUndoKeydown");
+    let undoCalls = 0;
+    let redoCalls = 0;
+    const sandbox = run === undefined ? undefined : run(() => { undoCalls += 1; }, () => { redoCalls += 1; });
+    const mk = (props) => ({ prevented: false, preventDefault() { this.prevented = true; }, ...props });
+    const undoEvent = mk({ ctrlKey: true, key: "z" });
+    const metaUndoEvent = mk({ metaKey: true, key: "z" });
+    const shiftZEvent = mk({ ctrlKey: true, shiftKey: true, key: "z" });
+    const yEvent = mk({ ctrlKey: true, key: "Y" });
+    const plainEvent = mk({ key: "z" });
+    const altEvent = mk({ ctrlKey: true, altKey: true, key: "z" });
+    const handled = sandbox === undefined ? [] : [undoEvent, metaUndoEvent, shiftZEvent, yEvent, plainEvent, altEvent].map((event) => sandbox.keydown(event));
+    sandbox?.setDrawMode(false);
+    const offEvent = mk({ ctrlKey: true, key: "z" });
+    const off = sandbox?.keydown(offEvent);
+    harness.check("overlay: draw-mode undo keydown maps ctrl/cmd+z and ctrl+shift+z / ctrl+y",
+      sandbox !== undefined && handled[0] === true && handled[1] === true && handled[2] === true && handled[3] === true &&
+      handled[4] === false && handled[5] === false && off === false &&
+      undoCalls === 2 && redoCalls === 2 &&
+      undoEvent.prevented === true && metaUndoEvent.prevented === true && shiftZEvent.prevented === true && yEvent.prevented === true &&
+      plainEvent.prevented === false && altEvent.prevented === false && offEvent.prevented === false,
+      JSON.stringify({ handled, off, undoCalls, redoCalls, prevented: [undoEvent.prevented, metaUndoEvent.prevented, shiftZEvent.prevented, yEvent.prevented, plainEvent.prevented, altEvent.prevented, offEvent.prevented] }));
+  }
+  {
+    const guardAt = overlay.indexOf("if (tag === \"INPUT\" || tag === \"TEXTAREA\" || from?.isContentEditable === true) return;");
+    const keydownAt = guardAt === -1 ? -1 : overlay.lastIndexOf("\"keydown\"", guardAt);
+    const listenerSpan = keydownAt === -1 ? "" : overlay.slice(keydownAt, keydownAt + 3000);
+    const adjustAt = listenerSpan.indexOf("adjustPanel !== null && (event.ctrlKey || event.metaKey)");
+    const drawUndoAt = listenerSpan.indexOf("drawUndoKeydown(event)");
+    const deleteAt = listenerSpan.indexOf("event.key === \"Delete\"");
+    harness.check("overlay: the draw undo wiring sits after the adjust undo branch and before the delete branch",
+      listenerSpan !== "" && adjustAt !== -1 && drawUndoAt > adjustAt && deleteAt > drawUndoAt,
+      JSON.stringify({ adjustAt, drawUndoAt, deleteAt }));
+  }
+
+  harness.section("client: overlay pin ancestor trail");
+  {
+    const trailSource = extractFunction(overlay, "ancestorTrail");
+    const run = trailSource === undefined ? undefined : evaluateExpression(`(document, host) => {
+${trailSource}
+return ancestorTrail;
+}`, "ancestorTrail");
+    const fakeBody = { localName: "body", parentElement: null };
+    const fakeDocument = { body: fakeBody };
+    const fakeHost = { localName: "dsh-redline-host", parentElement: fakeBody };
+    const trail = run === undefined ? undefined : run(fakeDocument, fakeHost);
+    const ancestorA = { localName: "div", parentElement: fakeBody };
+    const ancestorB = { localName: "span", parentElement: ancestorA };
+    const leaf = { localName: "p", parentElement: ancestorB };
+    const ordered = trail === undefined ? undefined : trail(leaf);
+    const chain13 = [];
+    let cursor = fakeBody;
+    for (let i = 13; i >= 1; i -= 1) { const node = { localName: `n${i}`, parentElement: cursor }; chain13.unshift(node); cursor = node; }
+    const capped = trail === undefined ? undefined : trail(chain13[0]);
+    const insideHostChild = { localName: "aside", parentElement: fakeHost };
+    const insideHostParent = { localName: "section", parentElement: insideHostChild };
+    const hostTrail = trail === undefined ? undefined : trail(insideHostParent);
+    harness.check("overlay: ancestorTrail walks deepest-first to the body, caps at 12 and skips the overlay host",
+      trail !== undefined && ordered !== undefined && ordered.length === 3 &&
+      ordered[0] === ancestorB && ordered[1] === ancestorA && ordered[2] === fakeBody &&
+      capped !== undefined && capped.length === 12 && capped[0] === chain13[1] && capped[11] === chain13[12] &&
+      !capped.includes(fakeBody) && hostTrail !== undefined && hostTrail.length === 1 &&
+      hostTrail[0] === insideHostChild && !hostTrail.includes(fakeHost) && !hostTrail.includes(fakeBody),
+      JSON.stringify({ ordered: ordered?.length, capped: capped?.length, cappedLast: capped?.[11]?.localName, hostTrail: hostTrail?.length, ready: trail !== undefined }));
+  }
+  {
+    const reanchorSource = extractFunction(overlay, "reanchorPin");
+    const run = reanchorSource === undefined ? undefined : evaluateExpression(`(cssPath, savePins, renderPins, postSnapshot) => {
+${reanchorSource}
+return reanchorPin;
+}`, "reanchorPin");
+    const element = { getBoundingClientRect: () => ({ left: 10, top: 20, width: 100, height: 50 }) };
+    const pin = { selector: "body > p:nth-of-type(2)", stale: true, offsets: { ox: 1, oy: 2 }, rect: { x: 0, y: 0, w: 0, h: 0 } };
+    const order = [];
+    let cssPathArg = null;
+    const reanchor = run === undefined ? undefined : run((arg) => { cssPathArg = arg; return "body > section:nth-of-type(1)"; }, () => { order.push("savePins"); }, () => { order.push("renderPins"); }, () => { order.push("postSnapshot"); });
+    reanchor?.(pin, element);
+    harness.check("overlay: reanchorPin applies the drag-drop mutation set without a snapshot",
+      reanchor !== undefined && cssPathArg === element && pin.selector === "body > section:nth-of-type(1)" &&
+      pin.stale === false && pin.offsets.ox === 50 && pin.offsets.oy === 25 &&
+      pin.rect.x === 10 && pin.rect.y === 20 && pin.rect.w === 100 && pin.rect.h === 50 &&
+      JSON.stringify(order) === JSON.stringify(["savePins", "renderPins"]),
+      JSON.stringify({ selector: pin.selector, stale: pin.stale, offsets: pin.offsets, rect: pin.rect, order }));
+  }
+  {
+    const sources = ["quickLabel", "reactComponentName", "ancestorTrail", "renderPinPanel"].map((name) => extractFunction(overlay, name));
+    const ready = sources.every((source) => source !== undefined);
+    const fakeBody = { localName: "body", parentElement: null };
+    const ancestorA = { localName: "div", parentElement: fakeBody };
+    const ancestorB = { localName: "section", parentElement: ancestorA };
+    const leaf = { localName: "p", id: "lead", parentElement: ancestorB };
+    const fakeHost = { localName: "dsh-redline-host", parentElement: fakeBody };
+    const fakeWindow = { innerWidth: 1000, innerHeight: 800 };
+    const el = (tag, attrs = {}, ...children) => {
+      const node = { tag, props: attrs, children: [], style: {} };
+      for (const kid of children) { if (kid !== null && kid !== undefined) node.children.push(kid); }
+      node.append = (...kids) => { for (const kid of kids) { if (kid !== null && kid !== undefined) node.children.push(kid); } return node; };
+      node.addEventListener = () => {};
+      return node;
+    };
+    const baseStubs = [el, (key) => key, { arrowUp: "icon-arrow", code: "icon-code" }, () => {}, () => null, () => 1];
+    const run = ready ? evaluateExpression(`(el, t, ICONS, mountShadow, anchorPoint, countSelectorMatches, locate, pinDimensions, renderTemplateRow, a11yAuditSection, a11yFixHandler, focusState, rootDiv, applyPanelPosition, wirePanelDrag, window, document, host, pin) => {
+${sources.join("\n")}
+let pinPanelNode = null;
+let openPinId = pin.id;
+const pins = [pin];
+renderPinPanel(pin);
+return pinPanelNode;
+}`, "renderPinPanel") : undefined;
+    const render = (locateStub, pin) => run === undefined ? undefined : run(...baseStubs, locateStub, () => "10×10", () => null, () => null, { current: null }, { current: null }, el("div", {}), () => {}, () => {}, fakeWindow, { body: fakeBody }, fakeHost, pin);
+    const positivePin = { id: "p1", comment: "", changes: [], textChange: null, selector: "p#lead", tag: "p", stale: false, component: "", rect: { x: 5, y: 6 }, status: "queued" };
+    const negativePin = { id: "p1", comment: "", changes: [], textChange: null, selector: "p.gone", tag: "p", stale: true, component: "", rect: { x: 5, y: 6 }, status: "queued" };
+    const positivePanel = render(() => leaf, positivePin);
+    const positiveBody = positivePanel?.children.find((child) => child?.props?.class === "pin-bubble-body");
+    const trailNode = positiveBody?.children[0];
+    const chips = trailNode?.children ?? [];
+    const negativePanel = render(() => null, negativePin);
+    const negativeBody = negativePanel?.children.find((child) => child?.props?.class === "pin-bubble-body");
+    harness.check("overlay: the pin popover renders the ancestor trail only when the target resolves",
+      positivePanel !== undefined && positiveBody !== undefined &&
+      trailNode?.props?.class === "lr-trail" && trailNode.props.title === "ancestorTrail" && trailNode.props["aria-label"] === "ancestorTrail" &&
+      chips.length === 3 && chips.every((chip) => chip.props.type === "button") &&
+      JSON.stringify(chips.map((chip) => chip.children[0])) === JSON.stringify(["section", "div", "body"]) &&
+      negativePanel !== undefined && negativeBody !== undefined && negativeBody.children[0].props.class === "pin-bubble-meta" &&
+      !negativeBody.children.some((child) => child?.props?.class === "lr-trail"),
+      JSON.stringify({ trail: trailNode?.props?.class, chips: chips.map((chip) => chip.children[0]), negativeFirst: negativeBody?.children[0]?.props?.class, ready }));
+  }
+  {
+    const panelSource = extractFunction(overlay, "renderPinPanel");
+    harness.check("overlay: the trail chips re-anchor through reanchorPin and the row carries the ancestorTrail label",
+      panelSource !== undefined &&
+      panelSource.includes("onclick: () => { reanchorPin(pin, ancestor); renderPinPanel(pin); }") &&
+      panelSource.includes("title: t(\"ancestorTrail\"), \"aria-label\": t(\"ancestorTrail\")") &&
+      panelSource.includes("quickLabel(ancestor)"),
+      panelSource === undefined ? "renderPinPanel missing" : "trail wiring drifted");
+  }
+  {
+    const panelSource = extractFunction(overlay, "renderPinPanel");
+    harness.check("overlay: the ancestor trail is skipped for canvas drawing pseudo-targets",
+      panelSource !== undefined && panelSource.includes("pin.selector === \"canvas:drawing\""),
+      panelSource === undefined ? "renderPinPanel missing" : "canvas:drawing guard missing");
+  }
+
+  harness.section("client: overlay layout grid");
+  {
+    const geometrySource = extractFunction(overlay, "gridGeometry");
+    const boundsSource = extractObjectLiteral(overlay, "const GRID_BOUNDS = {");
+    const stepperSource = extractFunction(overlay, "openGridStepper");
+    harness.check("overlay: the grid settings dismiss resolves shadow-retargeted events through composedPath",
+      stepperSource !== undefined && stepperSource.includes("composedPath?.()") &&
+      !stepperSource.includes("contains(event.target)"),
+      stepperSource === undefined ? "openGridStepper missing" : "dismiss still keys on event.target");
+    harness.check("overlay: the grid settings panel exposes columns, gutter, margin and fill/outline",
+      stepperSource !== undefined && boundsSource !== undefined &&
+      stepperSource.includes("row(\"gridColumns\", \"columns\")") && stepperSource.includes("row(\"gridGutter\", \"gutter\")") &&
+      stepperSource.includes("row(\"gridMargin\", \"margin\")") && stepperSource.includes("styleButton(\"fill\", \"gridFill\")") &&
+      stepperSource.includes("styleButton(\"outline\", \"gridOutline\")") &&
+      JSON.stringify(boundsSource ? evaluateObjectLiteral(boundsSource, "GRID_BOUNDS") : null) === JSON.stringify({ columns: [1, 24, 1], gutter: [0, 64, 4], margin: [0, 160, 8] }),
+      stepperSource === undefined ? "openGridStepper missing" : "settings rows or bounds drifted");
+    const geometry = geometrySource === undefined ? undefined : evaluateExpression(geometrySource, "gridGeometry");
+    harness.check("overlay: gridGeometry computes the column math exactly from gutter and margin",
+      geometry !== undefined &&
+      geometry(12, 1440, 24, 32).margin === 32 && geometry(12, 1440, 24, 32).gutter === 24 && geometry(12, 1440, 24, 32).columns === 12 &&
+      geometry(12, 1440, 24, 32).columnWidth === (1440 - 64 - 11 * 24) / 12 &&
+      geometry(1, 1440, 24, 32).columnWidth === 1376 && geometry(24, 1440, 24, 32).columnWidth === (1440 - 64 - 23 * 24) / 24 &&
+      geometry(1, 1440, 0, 0).columnWidth === 1440,
+      JSON.stringify({ c12: geometry?.(12, 1440, 24, 32).columnWidth, c1: geometry?.(1, 1440, 24, 32).columnWidth, c24: geometry?.(24, 1440, 24, 32).columnWidth, full: geometry?.(1, 1440, 0, 0).columnWidth }));
+  }
+  {
+    const languageSource = extractFunction(overlay, "applyOverlayLanguage");
+    const updateSource = extractFunction(overlay, "updateToolbar");
+    const gridBtnAt = overlay.indexOf("const gridBtn = el(\"button\", { class: \"tool\", title: t(\"layoutGrid\")");
+    const viewportAt = overlay.indexOf("const viewportBtn = el(\"button\"");
+    const eyeAt = overlay.indexOf("const eyeBtn = el(\"button\"");
+    harness.check("overlay: the layout grid button sits between viewport and eye and tracks gridOn",
+      gridBtnAt > viewportAt && eyeAt > gridBtnAt && overlay.includes("viewportBtn, gridBtn, eyeBtn") &&
+      updateSource !== undefined && updateSource.includes("gridBtn.classList.toggle(\"tool-active\", gridOn)") &&
+      languageSource !== undefined && languageSource.includes("gridBtn.title = t(\"layoutGrid\")"),
+      JSON.stringify({ gridBtnAt, viewportAt, eyeAt, ordered: gridBtnAt > viewportAt && eyeAt > gridBtnAt, activeToggled: updateSource?.includes("gridOn"), retitled: languageSource?.includes("layoutGrid") }));
+  }
+  {
+    const renderSource = extractFunction(overlay, "renderGrid");
+    const geometrySource = extractFunction(overlay, "gridGeometry");
+    const ready = renderSource !== undefined && geometrySource !== undefined;
+    const appended = [];
+    const fixedLayer = { append: (node) => appended.push(node) };
+    const el = (tag, attrs = {}, ...children) => {
+      const node = { tag, props: attrs, children: [], style: {} };
+      for (const kid of children) { if (kid !== null && kid !== undefined) node.children.push(kid); }
+      node.append = (...kids) => { for (const kid of kids) { if (kid !== null && kid !== undefined) node.children.push(kid); } return node; };
+      return node;
+    };
+    const run = ready ? evaluateExpression(`(el, fixedLayer, window) => {
+${geometrySource}
+${renderSource}
+let gridOn = true;
+let gridLayer = null;
+let gridColumns = 4;
+let gridGutter = 24;
+let gridMargin = 32;
+let gridOutline = false;
+return renderGrid;
+}`, "renderGrid") : undefined;
+    const render = run === undefined ? undefined : run(el, fixedLayer, { innerWidth: 1000 });
+    render?.();
+    const layer = appended[0];
+    const bands = layer?.children ?? [];
+    const columnWidth = (1000 - 64 - 3 * 24) / 4;
+    harness.check("overlay: renderGrid builds the exact column bands with computed geometry",
+      render !== undefined && appended.length === 1 && layer.props.class === "lr-grid" && bands.length === 4 &&
+      bands[0].style.left === "32px" && bands[0].style.width === `${columnWidth}px` &&
+      bands[1].style.left === `${32 + columnWidth + 24}px` && bands[3].style.left === `${32 + 3 * (columnWidth + 24)}px` &&
+      bands.every((band) => band.props.class === "lr-grid-band") &&
+      /\.lr-grid \{[^}]*pointer-events: none/.test(overlay),
+      JSON.stringify({ bands: bands.length, first: bands[0]?.style, secondLeft: bands[1]?.style.left, lastLeft: bands[3]?.style.left }));
+  }
+  {
+    const adjustSource = extractFunction(overlay, "gridAdjust");
+    const boundsSource = extractArrowConst(overlay, "GRID_BOUNDS");
+    const run = adjustSource === undefined || boundsSource === undefined ? undefined : evaluateExpression(`(renderGrid) => {
+let gridColumns = 12;
+let gridGutter = 24;
+let gridMargin = 32;
+let gridStepper = null;
+const GRID_BOUNDS = { columns: [1, 24, 1], gutter: [0, 64, 4], margin: [0, 160, 8] };
+${adjustSource}
+return { adjust: gridAdjust, state: () => ({ gridColumns, gridGutter, gridMargin }), set: (key, value) => { if (key === "columns") gridColumns = value; else if (key === "gutter") gridGutter = value; else gridMargin = value; } };
+}`, "gridAdjust");
+    let renders = 0;
+    const sandbox = run === undefined ? undefined : run(() => { renders += 1; });
+    sandbox?.set("columns", 1);
+    sandbox?.adjust("columns", -1);
+    const colMin = sandbox?.state().gridColumns;
+    sandbox?.adjust("columns", 1);
+    const colUp = sandbox?.state().gridColumns;
+    sandbox?.set("columns", 24);
+    sandbox?.adjust("columns", 1);
+    const colMax = sandbox?.state().gridColumns;
+    sandbox?.adjust("gutter", -100);
+    const gutterMin = sandbox?.state().gridGutter;
+    sandbox?.adjust("gutter", 3);
+    const gutterStep = sandbox?.state().gridGutter;
+    sandbox?.adjust("margin", 100);
+    const marginMax = sandbox?.state().gridMargin;
+    sandbox?.adjust("margin", 2);
+    const marginStep = sandbox?.state().gridMargin;
+    harness.check("overlay: gridAdjust clamps columns, gutter and margin through GRID_BOUNDS",
+      sandbox !== undefined && colMin === 1 && colUp === 2 && colMax === 24 && gutterMin === 0 &&
+      gutterStep === 12 && marginMax === 160 && marginStep === 160 && renders === 4,
+      JSON.stringify({ colMin, colUp, colMax, gutterMin, gutterStep, marginMax, marginStep, renders }));
+  }
+  {
+    const setGridSource = extractFunction(overlay, "setGrid");
+    const run = setGridSource === undefined ? undefined : evaluateExpression(`(updateToolbar, renderGrid, closeGridStepper, window) => {
+let gridOn = false;
+let gridLayer = null;
+let gridStepper = null;
+let gridResize = null;
+${setGridSource}
+return { setGrid, state: () => ({ gridOn, gridLayer, gridResize }), setLayer: (value) => { gridLayer = value; } };
+}`, "setGrid");
+    const added = [];
+    const removed = [];
+    const fakeWindow = { addEventListener: (type, handler) => added.push({ type, handler }), removeEventListener: (type, handler) => removed.push({ type, handler }) };
+    let renders = 0;
+    let stepperCloses = 0;
+    const layerStub = { removed: 0, remove() { this.removed += 1; } };
+    const sandbox = run === undefined ? undefined : run(() => {}, () => { renders += 1; }, () => { stepperCloses += 1; }, fakeWindow);
+    sandbox?.setGrid(true);
+    sandbox?.setGrid(true);
+    const afterEnable = { on: sandbox?.state().gridOn, added: added.length, type: added[0]?.type, renders };
+    sandbox?.setLayer(layerStub);
+    sandbox?.setGrid(false);
+    const afterDisable = { on: sandbox?.state().gridOn, removed: removed.length, layerRemoved: layerStub.removed, stepperCloses, sameHandler: removed[0]?.handler === added[0]?.handler, resizeCleared: sandbox?.state().gridResize === null, layerCleared: sandbox?.state().gridLayer === null };
+    sandbox?.setGrid(true);
+    harness.check("overlay: setGrid wires the resize listener on enable and removes layer, stepper and listener on disable",
+      sandbox !== undefined && afterEnable.on === true && afterEnable.added === 1 && afterEnable.type === "resize" && afterEnable.renders === 1 &&
+      afterDisable.on === false && afterDisable.removed === 1 && afterDisable.layerRemoved === 1 && afterDisable.stepperCloses === 1 &&
+      afterDisable.sameHandler === true && afterDisable.resizeCleared === true && afterDisable.layerCleared === true &&
+      added.length === 2,
+      JSON.stringify({ afterEnable, afterDisable, reAdded: added.length, ready: sandbox !== undefined }));
+  }
+
+  harness.section("client: overlay alt distance meter");
+  {
+    const gapsSource = extractFunction(overlay, "meterGaps");
+    const gaps = gapsSource === undefined ? undefined : evaluateExpression(gapsSource, "meterGaps");
+    const sideA = { left: 0, right: 100, top: 0, bottom: 50 };
+    const sideB = { left: 150, right: 250, top: 0, bottom: 50 };
+    const stackedB = { left: 0, right: 100, top: 80, bottom: 130 };
+    const diagonalB = { left: 150, right: 250, top: 100, bottom: 150 };
+    const overlappingB = { left: 50, right: 150, top: 25, bottom: 75 };
+    harness.check("overlay: meterGaps measures the facing gaps exactly",
+      gaps !== undefined &&
+      gaps(sideA, sideB).horizontal === 50 && gaps(sideA, sideB).vertical === null &&
+      gaps(sideB, sideA).horizontal === 50 && gaps(sideB, sideA).vertical === null &&
+      gaps(sideA, stackedB).horizontal === null && gaps(sideA, stackedB).vertical === 30 &&
+      gaps(sideA, diagonalB).horizontal === 50 && gaps(sideA, diagonalB).vertical === 50 &&
+      gaps(sideA, overlappingB).horizontal === null && gaps(sideA, overlappingB).vertical === null,
+      JSON.stringify({ side: gaps?.(sideA, sideB), stacked: gaps?.(sideA, stackedB), diagonal: gaps?.(sideA, diagonalB), overlapping: gaps?.(sideA, overlappingB) }));
+  }
+  {
+    const refSource = extractFunction(overlay, "meterReference");
+    const run = refSource === undefined ? undefined : evaluateExpression(`(adjustPanel, adjustTarget, openPinId, pins, locate) => {
+${refSource}
+return meterReference;
+}`, "meterReference");
+    const adjustEl = { tag: "adjust" };
+    const pinEl = { tag: "pin" };
+    const pin = { id: "p1", selector: "#pin-el" };
+    const withBoth = run === undefined ? undefined : run({ open: true }, adjustEl, "p1", [pin], () => pinEl);
+    const pinOnly = run === undefined ? undefined : run(null, null, "p1", [pin], () => pinEl);
+    const adjustWithoutTarget = run === undefined ? undefined : run({ open: true }, null, "p1", [pin], () => pinEl);
+    const nothing = run === undefined ? undefined : run(null, null, null, [], () => pinEl);
+    const stalePin = run === undefined ? undefined : run(null, null, "pX", [pin], () => pinEl);
+    harness.check("overlay: meterReference prefers the adjust target and falls back to the open pin",
+      run !== undefined && withBoth?.() === adjustEl && pinOnly?.() === pinEl && adjustWithoutTarget?.() === pinEl &&
+      nothing?.() === null && stalePin?.() === null,
+      JSON.stringify({ both: withBoth?.()?.tag, pinOnly: pinOnly?.()?.tag, adjustWithoutTarget: adjustWithoutTarget?.()?.tag, nothing: nothing?.() ?? "null", stale: stalePin?.() ?? "null" }));
+  }
+  {
+    const renderSource = extractFunction(overlay, "renderMeter");
+    const clearSource = extractFunction(overlay, "clearMeter");
+    const gapsSource = extractFunction(overlay, "meterGaps");
+    const ready = renderSource !== undefined && clearSource !== undefined && gapsSource !== undefined;
+    const appended = [];
+    const pending = [];
+    const cancelled = [];
+    const fixedLayer = { append: (node) => appended.push(node) };
+    const el = (tag, attrs = {}, ...children) => {
+      const node = { tag, props: attrs, children: [], style: {} };
+      for (const kid of children) { if (kid !== null && kid !== undefined) node.children.push(kid); }
+      node.append = (...kids) => { for (const kid of kids) { if (kid !== null && kid !== undefined) node.children.push(kid); } return node; };
+      node.remove = () => { node.removed = (node.removed ?? 0) + 1; };
+      return node;
+    };
+    const run = ready ? evaluateExpression(`(el, fixedLayer, requestAnimationFrame, cancelAnimationFrame) => {
+${gapsSource}
+let meterAlt = true;
+let meterRef = null;
+let meterLayer = null;
+let meterRaf = 0;
+${clearSource}
+${renderSource}
+return { render: renderMeter, clear: clearMeter, setRef: (value) => { meterRef = value; }, layer: () => meterLayer, raf: () => meterRaf };
+}`, "renderMeter") : undefined;
+    const sandbox = run === undefined ? undefined : run(el, fixedLayer, (fn) => { pending.push(fn); return 42; }, (handle) => cancelled.push(handle));
+    const refEl = { getBoundingClientRect: () => ({ left: 0, top: 0, right: 100, bottom: 50, width: 100, height: 50 }) };
+    const targetEl = { getBoundingClientRect: () => ({ left: 150, top: 0, right: 250, bottom: 50, width: 100, height: 50 }) };
+    sandbox?.setRef(refEl);
+    sandbox?.render(targetEl);
+    sandbox?.render(targetEl);
+    const scheduled = pending.length;
+    pending[0]?.();
+    const layer = appended[0];
+    const parts = layer?.children ?? [];
+    sandbox?.clear();
+    const afterClear = { removed: layer?.removed, layer: sandbox?.layer(), raf: sandbox?.raf() };
+    sandbox?.render(targetEl);
+    sandbox?.clear();
+    harness.check("overlay: renderMeter draws the facing gap lines, labels and boxes and clearMeter tears it all down",
+      sandbox !== undefined && scheduled === 1 && sandbox.raf() === 0 && appended.length === 1 &&
+      layer?.props?.class === "lr-meter" && parts.length === 4 &&
+      parts[0].props.class === "lr-meter-line" && parts[0].props.style === "left:100px;top:25px;width:50px;height:0" &&
+      parts[1].props.class === "lr-meter-label" && parts[1].children[0] === "50px" && parts[1].props.style === "left:125px;top:25px" &&
+      parts[2].props.class === "lr-meter-box" && parts[2].props.style === "left:0px;top:0px;width:100px;height:50px" &&
+      parts[3].props.class === "lr-meter-box" && parts[3].props.style === "left:150px;top:0px;width:100px;height:50px" &&
+      afterClear.removed === 1 && afterClear.layer === null && afterClear.raf === 0 &&
+      cancelled.length === 1 && cancelled[0] === 42 && appended.length === 1,
+      JSON.stringify({ scheduled, parts: parts.map((part) => part.props.class), label: parts[1]?.children[0], styles: parts.map((part) => part.props.style), afterClear, cancelled, appended: appended.length }));
+  }
+  {
+    const keydownSource = extractFunction(overlay, "meterAltKeydown");
+    const keyupSource = extractFunction(overlay, "meterAltKeyup");
+    const run = keydownSource === undefined || keyupSource === undefined ? undefined : evaluateExpression(`(meterReference, clearMeter, setHint, t) => {
+let meterAlt = false;
+let meterRef = null;
+${keydownSource}
+${keyupSource}
+return { keydown: meterAltKeydown, keyup: meterAltKeyup, state: () => ({ meterAlt, meterRef }) };
+}`, "meterAltKeydown");
+    const mk = (props) => ({ prevented: false, preventDefault() { this.prevented = true; }, ...props });
+    let referenceCalls = 0;
+    let clearCalls = 0;
+    let hints = [];
+    const adjustEl = { tag: "adjust" };
+    const sandbox = run === undefined ? undefined : run(() => { referenceCalls += 1; return adjustEl; }, () => { clearCalls += 1; }, (text) => { hints.push(text); }, (key) => key);
+    const altDown1 = mk({ key: "Alt" });
+    const down1 = sandbox?.keydown(altDown1);
+    const afterFirst = sandbox?.state();
+    const altDown2 = mk({ key: "Alt" });
+    const down2 = sandbox?.keydown(altDown2);
+    const afterSecond = sandbox?.state();
+    const plainDown = mk({ key: "z" });
+    const downPlain = sandbox?.keydown(plainDown);
+    const altUp = mk({ key: "Alt" });
+    const up = sandbox?.keyup(altUp);
+    const afterUp = sandbox?.state();
+    const hintsBefore = hints.length;
+    const nullSandbox = run === undefined ? undefined : run(() => null, () => { clearCalls += 1; }, (text) => { hints.push(text); }, (key) => key);
+    const nullDown = mk({ key: "Alt" });
+    nullSandbox?.keydown(nullDown);
+    const hintsAfterNull = hints.length;
+    harness.check("overlay: alt keydown arms the meter once and keyup disarms it",
+      sandbox !== undefined && down1 === true && altDown1.prevented === true && afterFirst.meterAlt === true &&
+      afterFirst.meterRef === adjustEl && referenceCalls === 1 &&
+      down2 === true && afterSecond.meterAlt === true && referenceCalls === 1 &&
+      downPlain === false && plainDown.prevented === false &&
+      up === true && altUp.prevented === true && afterUp.meterAlt === false && clearCalls === 1 &&
+      nullSandbox !== undefined && nullDown.prevented === true && hintsBefore === 0 && hintsAfterNull === 1 &&
+      hints[0] === "distanceMeter" && nullSandbox.state().meterAlt === true && nullSandbox.state().meterRef === null &&
+      overlay.includes("if (meterAltKeydown(event)) return;") &&
+      overlay.indexOf("if (meterAltKeydown(event)) return;") < overlay.indexOf("if (tag === \"INPUT\"") &&
+      /document\.addEventListener\(\s*"keyup"/.test(overlay) && overlay.includes("meterAltKeyup(event);"),
+      JSON.stringify({ down1, down2, downPlain, up, referenceCalls, clearCalls, hints, prevented: [altDown1.prevented, altDown2.prevented, plainDown.prevented, altUp.prevented] }));
+  }
+  {
+    const mousemoveAt = overlay.indexOf("\"mousemove\"");
+    const span = mousemoveAt === -1 ? "" : overlay.slice(mousemoveAt, mousemoveAt + 900);
+    const inHostAt = span.indexOf("const inHost = event.composedPath()");
+    const meterAt = span.indexOf("if (meterAlt && meterRef !== null && !inHost)");
+    const modeAt = span.indexOf("(mode === null && !groupMode) || draft !== null");
+    harness.check("overlay: the meter mousemove branch runs before the mode gate and skips host-shadow events",
+      span !== "" && inHostAt !== -1 && meterAt > inHostAt && modeAt > meterAt &&
+      span.includes("renderMeter(event.target instanceof Element ? event.target : null)"),
+      JSON.stringify({ inHostAt, meterAt, modeAt }));
+  }
+
+  harness.section("client: overlay ui polish");
+  {
+    const panelSource = extractFunction(overlay, "renderPinPanel");
+    harness.check("overlay: the ancestor trail chips carry the styled chip class",
+      panelSource !== undefined && panelSource.includes("{ type: \"button\", class: \"lr-trail-chip\"") &&
+      overlay.includes(".lr-trail-chip { all: unset"),
+      panelSource === undefined ? "renderPinPanel missing" : "chips render unstyled");
+    harness.check("overlay: the states row leads the inspector body",
+      overlay.includes("body.prepend(inspectorRow(t(\"inspectorStates\")"),
+      "states row must be prepended, not appended");
+    harness.check("overlay: the toolbar stacks above dragged panels",
+      overlay.includes(".popover { z-index: 2147483601; }") && overlay.includes(".toolbar-wrap { z-index: 2147483602; }"),
+      "toolbar must out-stack panels");
+    harness.check("overlay: pin markers pass clicks through while drawing",
+      overlay.includes("rootDiv.classList.toggle(\"lr-drawing\", drawMode)") &&
+      overlay.includes(".root.lr-drawing .pin { pointer-events: none; }"),
+      "draw mode must silence marker clicks");
+    harness.check("overlay: toolbar labels never wrap",
+      overlay.includes(".tool-label { font-weight: 500; color: inherit; white-space: nowrap; }"),
+      "pending count wraps to two lines without nowrap");
+  }
+
+  harness.section("client: overlay inspector force states");
+  {
+    const classesSource = extractArrowConst(overlay, "FORCE_STATE_CLASSES");
+    const splitSource = extractFunction(overlay, "forceSubjectSplit");
+    const spansSource = extractFunction(overlay, "notPseudoSpans");
+    const buildSource = extractFunction(overlay, "buildForceRules");
+    const ready = classesSource !== undefined && splitSource !== undefined && spansSource !== undefined && buildSource !== undefined;
+    const buildRun = ready ? evaluateExpression(`(document, target, pseudo) => {
+${classesSource}
+${spansSource}
+${splitSource}
+${buildSource}
+return buildForceRules(target, pseudo);
+}`, "buildForceRules") : undefined;
+    const matchingTarget = { matches: (selector) => selector === ".btn" };
+    const itemTarget = { matches: (selector) => selector === ".item" };
+    const plainSheet = (selectorText, cssText) => ({ cssRules: [{ selectorText, style: { cssText } }] });
+    const docWith = (sheets) => ({ styleSheets: sheets });
+    const basic = buildRun === undefined ? undefined : buildRun(docWith([plainSheet(".btn:hover", "color:red")]), matchingTarget, "hover");
+    const multi = buildRun === undefined ? undefined : buildRun(docWith([plainSheet(".btn:hover:hover", "color:red")]), matchingTarget, "hover");
+    harness.check("overlay: buildForceRules rewrites the subject compound exactly",
+      buildRun !== undefined && JSON.stringify(basic) === JSON.stringify([".btn.lr-fh{color:red}"]) &&
+      JSON.stringify(multi) === JSON.stringify([".btn.lr-fh.lr-fh{color:red}"]),
+      JSON.stringify({ basic, multi }));
+    const nonSubject = buildRun === undefined ? undefined : buildRun(docWith([plainSheet(".menu:hover .item", "color:red")]), itemTarget, "hover");
+    harness.check("overlay: buildForceRules skips rules whose pseudo sits in a non-subject compound",
+      buildRun !== undefined && JSON.stringify(nonSubject) === JSON.stringify([]),
+      JSON.stringify({ nonSubject }));
+    const comma = buildRun === undefined ? undefined : buildRun(docWith([plainSheet(".btn:hover, .card:hover .inner, .x:not(:hover)", "color:red")]), matchingTarget, "hover");
+    harness.check("overlay: buildForceRules emits only the matching comma part and skips :not-wrapped pseudos",
+      buildRun !== undefined && JSON.stringify(comma) === JSON.stringify([".btn.lr-fh{color:red}"]),
+      JSON.stringify({ comma }));
+    const mediaRule = { conditionText: "screen", cssRules: [{ selectorText: ".btn:hover", style: { cssText: "color:red" } }] };
+    const throwingSheet = { get cssRules() { throw new Error("cross-origin"); } };
+    let recursion = null;
+    try { recursion = buildRun === undefined ? undefined : buildRun(docWith([throwingSheet, { cssRules: [mediaRule] }, plainSheet(".btn:hover", "outline:solid red")]), matchingTarget, "hover"); } catch (error) { recursion = `threw: ${error}`; }
+    harness.check("overlay: buildForceRules recurses into grouping rules and skips throwing sheets",
+      Array.isArray(recursion) && JSON.stringify(recursion) === JSON.stringify([".btn.lr-fh{color:red}", ".btn.lr-fh{outline:solid red}"]),
+      JSON.stringify({ recursion }));
+  }
+  {
+    const classesSource = extractArrowConst(overlay, "FORCE_STATE_CLASSES");
+    const splitSource = extractFunction(overlay, "forceSubjectSplit");
+    const spansSource = extractFunction(overlay, "notPseudoSpans");
+    const buildSource = extractFunction(overlay, "buildForceRules");
+    const applySource = extractFunction(overlay, "applyForceStates");
+    const clearSource = extractFunction(overlay, "clearForceStates");
+    const ready = [classesSource, splitSource, spansSource, buildSource, applySource, clearSource].every((source) => source !== undefined);
+    const created = [];
+    const fakeDocument = {
+      styleSheets: [{ cssRules: [{ selectorText: ".btn:hover", style: { cssText: "color:red" } }, { selectorText: ".btn:focus", style: { cssText: "outline:2px solid red" } }] }],
+      head: { append: (node) => created.push(node) },
+      createElement: (tag) => ({ tag, textContent: "", id: null, removed: 0, remove() { this.removed += 1; } }),
+      getElementById: (id) => created.find((node) => node.id === id) ?? null,
+      documentElement: { append() {} }
+    };
+    const target = {
+      matches: (selector) => selector === ".btn",
+      classList: { toggles: [], removed: [], toggle(name, on) { this.toggles.push([name, on]); }, remove(name) { this.removed.push(name); } }
+    };
+    const run = ready ? evaluateExpression(`(document, target) => {
+${classesSource}
+${spansSource}
+${splitSource}
+${buildSource}
+${clearSource}
+${applySource}
+let forceTarget = null;
+let forceStates = new Set();
+forceTarget = target;
+return { apply: applyForceStates, clear: clearForceStates, force: (pseudo) => forceStates.add(pseudo), states: () => [...forceStates], target: () => forceTarget };
+}`, "applyForceStates") : undefined;
+    const sandbox = run === undefined ? undefined : run(fakeDocument, target);
+    sandbox?.force("hover");
+    sandbox?.force("focus");
+    sandbox?.apply();
+    const tag = created[0];
+    sandbox?.apply();
+    harness.check("overlay: applyForceStates markers the target and writes one style tag for all forced states",
+      sandbox !== undefined &&
+      JSON.stringify(target.classList.toggles.slice(0, 3)) === JSON.stringify([["lr-fh", true], ["lr-ff", true], ["lr-fa", false]]) &&
+      tag !== undefined && tag.id === "lr-force-states" && created.length === 1 &&
+      tag.textContent === ".btn.lr-fh{color:red}.btn.lr-ff{outline:2px solid red}",
+      JSON.stringify({ toggles: target.classList.toggles, tags: created.length, text: tag?.textContent }));
+    sandbox?.clear();
+    const cleared = { removed: target.classList.removed, tagRemoved: tag?.removed, target: sandbox?.target(), states: sandbox?.states() };
+    sandbox?.apply();
+    harness.check("overlay: clearForceStates removes the markers, the style tag and resets the state",
+      sandbox !== undefined && JSON.stringify(cleared.removed) === JSON.stringify(["lr-fh", "lr-ff", "lr-fa"]) &&
+      cleared.tagRemoved === 1 && cleared.target === null && JSON.stringify(cleared.states) === JSON.stringify([]) &&
+      created.length === 1,
+      JSON.stringify({ cleared, tags: created.length }));
+  }
+  {
+    const closeSource = extractFunction(overlay, "closeAdjustPanel");
+    const openSource = extractFunction(overlay, "openAdjustPanel");
+    harness.check("overlay: the force-state lifecycle hooks the adjust panel close and confirm paths",
+      closeSource !== undefined && closeSource.includes("clearForceStates();") &&
+      closeSource.indexOf("clearForceStates();") < closeSource.indexOf("restoreAll") &&
+      openSource !== undefined && openSource.includes("closeAdjustPanel(false)") &&
+      openSource.includes("t(\"inspectorStates\")") &&
+      ["\"hover\"", "\"focus\"", "\"active\""].every((literal) => openSource.includes(literal)) &&
+      openSource.includes("forceTarget = adjustTarget") && openSource.includes("forceStates = new Set()"),
+      JSON.stringify({ clearFirst: closeSource !== undefined && closeSource.indexOf("clearForceStates();") < closeSource.indexOf("restoreAll"), confirm: openSource?.includes("closeAdjustPanel(false)"), chips: openSource?.includes("inspectorStates") }));
   }
 
   harness.section("client: overlay theme derivation");
@@ -4065,19 +4778,19 @@ export async function runClientSuite(harness, { pluginDir }) {
       harness.check("overlay: the bubble-close branch precedes the audit and draft branches", bubbleIdx !== -1 && draftIdx !== -1 && bubbleIdx < auditIdx && auditIdx < draftIdx, JSON.stringify({ bubbleIdx, auditIdx, draftIdx }));
     }
     {
-      const dispatch = exitSource === "" || escapeSource === "" ? undefined : evaluateExpression(`(focusState, focusSpotlightNode, focusHintNode, focusRepositionTimer, clearTimeout, drawMode, groupMode, adjustPanel, openPinId, pinPanelNode, auditPanelNode, draft, mode, a11yFixHandler, toggleDraw, setGroupMode, closeAdjustPanel, closeAuditPanel, discardDraft, setMode) => {
+      const dispatch = exitSource === "" || escapeSource === "" ? undefined : evaluateExpression(`(focusState, focusSpotlightNode, focusHintNode, focusRepositionTimer, clearTimeout, drawMode, groupMode, adjustPanel, openPinId, pinPanelNode, auditPanelNode, draft, mode, a11yFixHandler, toggleDraw, setGroupMode, closeAdjustPanel, closeAuditPanel, discardDraft, setMode, gridStepper, closeGridStepper, resetMeter) => {
 ${exitSource}
 ${escapeSource}
 return { handleEscape, state: () => ({ focusState, openPinId, pinPanelNode, a11yFixHandler }) };
 }`, "handleEscape");
       const noops = [() => {}, () => {}, () => {}, () => {}, () => {}, () => {}];
-      const runFocus = dispatch === undefined ? undefined : dispatch({ current: { selector: "#x" } }, null, null, null, () => {}, false, false, null, null, null, null, null, null, { current: null }, ...noops);
+      const runFocus = dispatch === undefined ? undefined : dispatch({ current: { selector: "#x" } }, null, null, null, () => {}, false, false, null, null, null, null, null, null, { current: null }, ...noops, null, () => {}, () => {});
       const consumed = runFocus === undefined ? undefined : runFocus.handleEscape({ key: "Escape" });
       harness.check("overlay: Escape under focus mode exits focus and is consumed",
         consumed === true && runFocus !== undefined && runFocus.state().focusState.current === null,
         JSON.stringify({ consumed, focus: runFocus?.state().focusState.current }));
       const bubbleNode = fakeNode();
-      const runBubble = dispatch === undefined ? undefined : dispatch({ current: null }, null, null, null, () => {}, false, false, null, "pin-1", bubbleNode, null, null, null, { current: { ensurePin: () => {} } }, ...noops);
+      const runBubble = dispatch === undefined ? undefined : dispatch({ current: null }, null, null, null, () => {}, false, false, null, "pin-1", bubbleNode, null, null, null, { current: { ensurePin: () => {} } }, ...noops, null, () => {}, () => {});
       const consumedBubble = runBubble === undefined ? undefined : runBubble.handleEscape({ key: "Escape" });
       harness.check("overlay: Escape with the bubble open closes it and is consumed",
         consumedBubble === true && runBubble !== undefined && runBubble.state().openPinId === null && bubbleNode.removed === true && runBubble.state().a11yFixHandler.current === null,
@@ -4295,6 +5008,11 @@ return { focusState, timer: focusRepositionTimer };
         }
       }
       harness.check("overlay: the five comment templates exist in all three languages", templateMissing.length === 0, templateMissing.slice(0, 6).join(", "));
+      const templateRowSource = extractFunction(overlay, "renderTemplateRow");
+      harness.check("overlay: the template popup dismiss resolves shadow-retargeted events through composedPath",
+        templateRowSource !== undefined && templateRowSource.includes("composedPath?.()") &&
+        !templateRowSource.includes("contains(event.target)"),
+        templateRowSource === undefined ? "renderTemplateRow missing" : "dismiss still keys on event.target");
       const insertSource = extractFunction(overlay, "insertAtCaret") ?? "";
       harness.check("overlay: insertAtCaret is liftable and returns the one caret shape",
         insertSource !== "" && !insertSource.includes("document") && !insertSource.includes("window") &&

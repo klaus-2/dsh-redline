@@ -47,18 +47,23 @@ Para cada pin, um bloco em um único snapshot:
 - Exportação de patch CSS: os ajustes confirmados viram uma regra `selector { prop: value; }` copiável no overlay e um bloco `Requested CSS:` no contexto do agente
 - Botão de copiar seletor no popover do pin: coloca o seletor CSS do pin na área de transferência verbatim
 - Reancoragem de pins obsoletos: quando o elemento alvo sai do DOM, o pin é marcado e o popover avisa; arrastar o marcador religa o pin
+- Trilha de ancestrais no popover do pin: o popover lista os ancestrais do alvo até `<body>` como chips clicáveis — clicar em um reancora o pin (marcador e painel) naquele contêiner
 - O popover do pin mostra as dimensões em tempo real do alvo (L×A px), recaindo para o snapshot fixado quando o elemento não existe mais
 - O balão do pin avisa quando um seletor corresponde a mais de um elemento, com a contagem.
 - Duplique um pin para reaproveitar o comentário e os ajustes em outro elemento.
 - O modo de foco escurece a página e mantém o elemento selecionado interativo; Esc sai.
 - Temas do overlay: escuro (padrão), claro e uma variante de alto contraste, escolhidos nas configurações do plugin e persistidos
 - Desfazer/refazer no inspetor: Ctrl+Z / Ctrl+Shift+Z (ou os botões do painel) retrocedem e avançam os ajustes e o texto não confirmados enquanto o painel está aberto
+- Apagador e desfazer por teclado no canvas: a barra de desenho ganha uma ferramenta de apagar que remove o desenho sob o cursor (clique ou arraste por vários), e Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y desfazem e refazem os desenhos enquanto o canvas está aberto (quando o foco não está em um campo de texto)
 - Clicar em um pin no card do chat rola a página até o elemento e o destaca por alguns instantes
 - Cole uma imagem no composer do comentário: ela é reduzida (máx. 1600px, JPEG), mostrada como um chip removível e entregue junto do pin para o agente ler
 - Screenshots antes/depois por pin ajustado: o recorte "depois" é capturado ao vivo e, então, a página é restaurada para capturar o recorte "antes" do mesmo enquadramento
 - Comentários em grupo: o modo de grupo da toolbar reúne N elementos e publica um comentário copiado para cada pin do grupo (escopo da página — grupos não atravessam páginas)
 - Modelos de comentário inserem uma frase reutilizável no compositor com um clique.
 - Predefinições de preview responsivo: restringe a página a 375/768/1280 px ou volta à largura total; pins criados sob uma predefinição registram a largura (nota: unidades `100vw` e navbars `position: fixed` não respeitam a restrição)
+- Grade de layout na toolbar: um botão alterna faixas de colunas não interativas sobre a página (margens de 32 px, calhas de 24 px); um segundo clique abre o seletor de colunas (1–24), clique fora ou Esc fecha o seletor com a grade ligada, e o resize reflui as faixas
+- Medidor de distância com Alt: segure Alt com o painel de ajuste ou um pin aberto e a página mostra guias tracejadas com a distância em px da referência até o elemento sob o cursor, contornando ambos; soltar Alt limpa tudo
+- Estados no inspetor (apenas preview): chips :hover / :focus / :active no painel de ajuste forçam esses estados no alvo da página por emulação — uma classe marcadora e uma folha de estilo com regras reescritas, nunca um focus() real — para prever estilos de hover, focus e active antes de confirmar; apenas regras cujo último composto do seletor carrega o pseudo são reescritas (regras ancestrais como `.menu:hover .item` e :focus-within são ignoradas) e a classe marcadora pode aumentar levemente a especificidade
 - Auditoria de acessibilidade no balão do pin e em toda a página, agrupada por tipo de verificação.
 - Correções rápidas aumentam o contraste do texto e adicionam texto alternativo, com pré-visualização antes de confirmar.
 - Um toast dispensável na página confirma copiar e resolver/excluir; o card do chat mostra um aviso inline para exportar o relatório e para ações em lote.
@@ -94,6 +99,7 @@ dsh plugin --profile web add ./dsh-redline
 | `H` | Mostra ou oculta os pins — marcadores, popovers e o composer de comentários somem, a toolbar fica |
 | `Esc` | Cancela o modo atual, o popover ou o preview |
 | `Enter` | Salva a anotação do popover |
+| `Ctrl/Cmd+Enter` | Salva o comentário no popover de um pin aberto |
 
 Qualquer uma das três teclas de modo pode ser trocada nas configurações do plugin, e um atalho pode ter
 modificadores: `Ctrl+Shift+A` também é um atalho. Os modificadores precisam bater exatamente —

@@ -84,14 +84,14 @@
       "templateExplainWhy": "Explain why this is a problem",
       "panelDrag": "Drag to move · double-click to reset",
       "attachesTo": "attaches to the session chat",
-      "savedHint": "Saved — use Send on the card above the composer to dispatch",
+      "savedHint": "Saved. Use Send on the card above the composer to dispatch",
       "saveFailed": "Failed to save: ",
       "editComment": "Edit the comment…",
       "saveEdit": "Save edit",
       "resolved": "Resolve",
       "reopen": "Reopen",
       "del": "Delete",
-      "pinStale": "Target not found — pin is stale. Drag the marker to re-anchor.",
+      "pinStale": "Target not found. The pin is stale. Drag the marker to re-anchor.",
       "ambiguousSelectorWarning": "This selector matches {n} elements on the page.",
       "ambiguousSelectorDetail": "Selector: {selector}",
       "focusMode": "Focus",
@@ -102,6 +102,7 @@
       "duplicateHint": "Click an element to duplicate this pin. Press Esc to cancel.",
       "duplicateDone": "Pin duplicated.",
       "pinDimensions": "Dimensions",
+      "ancestorTrail": "Click an ancestor to re-anchor",
       "copyCss": "Copy CSS",
       "cssCopied": "CSS copied to clipboard",
       "cssCopyFailed": "Could not copy CSS",
@@ -135,13 +136,21 @@
       "groupCreated": "Group created",
       "viewportLabel": "Preview width",
       "viewportReset": "Full width",
+      "layoutGrid": "Toggle layout grid",
+      "gridColumns": "Columns",
+      "gridGutter": "Gutter",
+      "gridMargin": "Margin",
+      "gridFill": "Fill",
+      "gridOutline": "Outline",
+      "distanceMeter": "Hold Alt with a panel open to measure distances",
+      "inspectorStates": "States",
       "eyeTitle": "Show/hide pins",
       "statusTitle": "Live Review active",
       "pendingTitle": "Annotations waiting for your next prompt in the chat",
       "pendingCount": "{n} pending",
       "restoredPins": "Redline: {n} pin(s) restored",
       "a11yAuditPage": "Page accessibility audit",
-      "a11yAuditScanned": "Scanned {scanned} elements — {findings} findings",
+      "a11yAuditScanned": "Scanned {scanned} elements, {findings} findings",
       "a11yAuditNoIssues": "No accessibility issues found in the scanned elements.",
       "a11yAuditGroupContrast": "Contrast",
       "a11yAuditGroupName": "Accessible name",
@@ -151,8 +160,9 @@
       "a11yAuditIssuesCount": "{n} issues",
     "drawTool": "Draw",
     "drawTitle": "Free canvas",
-    "drawHint": "Canvas mode — draw over the page · Esc exits",
+    "drawHint": "Draw over the page. Esc exits.",
     "drawBrush": "Brush",
+    "drawErase": "Erase",
     "drawText": "Text",
     "drawRect": "Rectangle",
     "drawCircle": "Ellipse",
@@ -160,8 +170,8 @@
     "drawClear": "Clear drawings",
     "drawExit": "Exit canvas",
     "drawBlack": "Black",
-    "drawRed": "Red — corrections",
-    "drawBlue": "Blue — highlights",
+    "drawRed": "Red, for corrections",
+    "drawBlue": "Blue, for highlights",
     "drawGreen": "Green",
     "drawWhite": "White",
     "drawShapes": "Shapes",
@@ -177,7 +187,7 @@
     "drawThin": "Thin",
     "drawMedium": "Medium",
     "drawThick": "Thick",
-    "drawSentHint": "Added to chat — it will follow your next message",
+    "drawSentHint": "Added to chat. It follows your next message.",
     "drawShotFail": "Could not capture the screen",
       "viewPending": "View pending annotations",
       "sendNow": "Send the annotations to the agent now",
@@ -195,7 +205,7 @@
       "linkOn": "Unlink values",
       "linkOff": "Link values",
       "rawHint": "raw value (CSS syntax)",
-      "adjustSaved": "Adjustments saved — they attach to your next prompt",
+      "adjustSaved": "Adjustments saved. They attach to your next prompt.",
       "deliveredToast": "Annotations delivered to the agent with your message",
       "secText": "Text",
       "secFill": "Fill",
@@ -297,14 +307,14 @@
       "templateExplainWhy": "Explicar por que isto é um problema",
       "panelDrag": "Arraste para mover · duplo clique para voltar ao padrão",
       "attachesTo": "anexa ao chat da sessão",
-      "savedHint": "Guardada — use Enviar no card acima do composer para despachar",
+      "savedHint": "Guardada. Use Enviar no card acima do composer para despachar",
       "saveFailed": "Falha ao guardar: ",
       "editComment": "Editar o comentário…",
       "saveEdit": "Salvar edição",
       "resolved": "✓ Resolvido",
       "reopen": "Reabrir",
       "del": "Excluir",
-      "pinStale": "Alvo não encontrado — pin obsoleto. Arraste o marcador para reancorar.",
+      "pinStale": "Alvo não encontrado. O pin está obsoleto. Arraste o marcador para reancorar.",
       "ambiguousSelectorWarning": "Este seletor corresponde a {n} elementos na página.",
       "ambiguousSelectorDetail": "Seletor: {selector}",
       "focusMode": "Foco",
@@ -315,6 +325,7 @@
       "duplicateHint": "Clique em um elemento para duplicar este pin. Pressione Esc para cancelar.",
       "duplicateDone": "Pin duplicado.",
       "pinDimensions": "Dimensões",
+      "ancestorTrail": "Clique em um ancestral para reancorar",
       "copyCss": "Copiar CSS",
       "cssCopied": "CSS copiado para a área de transferência",
       "cssCopyFailed": "Não foi possível copiar o CSS",
@@ -348,13 +359,21 @@
       "groupCreated": "Grupo criado",
       "viewportLabel": "Largura do preview",
       "viewportReset": "Largura total",
+      "layoutGrid": "Alternar grade de layout",
+      "gridColumns": "Colunas",
+      "gridGutter": "Medianiz",
+      "gridMargin": "Margem",
+      "gridFill": "Preenchimento",
+      "gridOutline": "Contorno",
+      "distanceMeter": "Segure Alt com um painel aberto para medir distâncias",
+      "inspectorStates": "Estados",
       "eyeTitle": "Mostrar/ocultar pins",
       "statusTitle": "Live Review ativo",
       "pendingTitle": "Anotações aguardando seu próximo prompt no chat",
       "pendingCount": "{n} pendente(s)",
       "restoredPins": "Redline: {n} pin(s) restaurado(s)",
       "a11yAuditPage": "Auditoria de acessibilidade da página",
-      "a11yAuditScanned": "Analisados {scanned} elementos — {findings} problemas",
+      "a11yAuditScanned": "Analisados {scanned} elementos, {findings} problemas",
       "a11yAuditNoIssues": "Nenhum problema de acessibilidade encontrado nos elementos analisados.",
       "a11yAuditGroupContrast": "Contraste",
       "a11yAuditGroupName": "Nome acessível",
@@ -364,8 +383,9 @@
       "a11yAuditIssuesCount": "{n} problemas",
     "drawTool": "Desenhar",
     "drawTitle": "Canvas livre",
-    "drawHint": "Modo canvas — desenhe sobre a página · Esc sai",
+    "drawHint": "Desenhe sobre a página. Esc sai.",
     "drawBrush": "Pincel",
+    "drawErase": "Apagar",
     "drawText": "Texto",
     "drawRect": "Retângulo",
     "drawCircle": "Elipse",
@@ -373,8 +393,8 @@
     "drawClear": "Limpar desenhos",
     "drawExit": "Sair do canvas",
     "drawBlack": "Preto",
-    "drawRed": "Vermelho — correções",
-    "drawBlue": "Azul — destaques",
+    "drawRed": "Vermelho, para correções",
+    "drawBlue": "Azul, para destaques",
     "drawGreen": "Verde",
     "drawWhite": "Branco",
     "drawShapes": "Formas",
@@ -390,7 +410,7 @@
     "drawThin": "Fina",
     "drawMedium": "Média",
     "drawThick": "Grossa",
-    "drawSentHint": "Adicionado ao chat — segue com a sua próxima mensagem",
+    "drawSentHint": "Adicionado ao chat. Segue com a sua próxima mensagem.",
     "drawShotFail": "Não foi possível capturar a tela",
       "viewPending": "Ver as anotações pendentes",
       "sendNow": "Enviar as anotações ao agente agora",
@@ -408,7 +428,7 @@
       "linkOn": "Desvincular valores",
       "linkOff": "Vincular valores",
       "rawHint": "valor bruto (sintaxe CSS)",
-      "adjustSaved": "Ajustes guardados — anexam ao seu próximo prompt",
+      "adjustSaved": "Ajustes guardados. Anexam ao seu próximo prompt.",
       "deliveredToast": "Anotações entregues ao agente com sua mensagem",
       "secText": "Texto",
       "secFill": "Preenchimento",
@@ -510,14 +530,14 @@
       "templateExplainWhy": "说明为什么这是个问题",
       "panelDrag": "拖动移动 · 双击恢复默认位置",
       "attachesTo": "附加到会话聊天",
-      "savedHint": "已保存 — 使用 composer 上方卡片的发送按钮派发",
+      "savedHint": "已保存。使用 composer 上方卡片的发送按钮派发",
       "saveFailed": "保存失败：",
       "editComment": "编辑评论…",
       "saveEdit": "保存编辑",
       "resolved": "标记已解决",
       "reopen": "重新打开",
       "del": "删除",
-      "pinStale": "未找到目标 — 图钉已失效。拖动标记以重新锚定。",
+      "pinStale": "未找到目标。图钉已失效。拖动标记以重新锚定。",
       "ambiguousSelectorWarning": "此选择器匹配页面上的 {n} 个元素。",
       "ambiguousSelectorDetail": "选择器：{selector}",
       "focusMode": "聚焦",
@@ -528,6 +548,7 @@
       "duplicateHint": "点击某个元素以复制此 pin。按 Esc 取消。",
       "duplicateDone": "Pin 已复制。",
       "pinDimensions": "尺寸",
+      "ancestorTrail": "点击祖先元素重新锚定",
       "copyCss": "复制 CSS",
       "cssCopied": "CSS 已复制到剪贴板",
       "cssCopyFailed": "无法复制 CSS",
@@ -561,13 +582,21 @@
       "groupCreated": "组已创建",
       "viewportLabel": "预览宽度",
       "viewportReset": "全宽",
+      "layoutGrid": "切换布局网格",
+      "gridColumns": "列数",
+      "gridGutter": "栏间距",
+      "gridMargin": "边距",
+      "gridFill": "填充",
+      "gridOutline": "轮廓",
+      "distanceMeter": "按住 Alt 并打开面板以测量距离",
+      "inspectorStates": "状态",
       "eyeTitle": "显示/隐藏图钉",
       "statusTitle": "Live Review 运行中",
       "pendingTitle": "标注将随你的下一条消息发送",
       "pendingCount": "{n} 条待发送",
       "restoredPins": "Redline: 已恢复 {n} 个图钉",
       "a11yAuditPage": "页面无障碍审计",
-      "a11yAuditScanned": "已扫描 {scanned} 个元素 — {findings} 个问题",
+      "a11yAuditScanned": "已扫描 {scanned} 个元素，{findings} 个问题",
       "a11yAuditNoIssues": "在已扫描的元素中未发现无障碍问题。",
       "a11yAuditGroupContrast": "对比度",
       "a11yAuditGroupName": "可访问名称",
@@ -577,8 +606,9 @@
       "a11yAuditIssuesCount": "{n} 个问题",
     "drawTool": "绘制",
     "drawTitle": "自由画布",
-    "drawHint": "画布模式 — 在页面上绘制 · Esc 退出",
+    "drawHint": "在页面上绘制。Esc 退出。",
     "drawBrush": "画笔",
+    "drawErase": "擦除",
     "drawText": "文本",
     "drawRect": "矩形",
     "drawCircle": "椭圆",
@@ -586,8 +616,8 @@
     "drawClear": "清空绘图",
     "drawExit": "退出画布",
     "drawBlack": "黑色",
-    "drawRed": "红色 — 修改",
-    "drawBlue": "蓝色 — 强调",
+    "drawRed": "红色，修改",
+    "drawBlue": "蓝色，强调",
     "drawGreen": "绿色",
     "drawWhite": "白色",
     "drawShapes": "形状",
@@ -603,7 +633,7 @@
     "drawThin": "细",
     "drawMedium": "中",
     "drawThick": "粗",
-    "drawSentHint": "已添加到聊天 — 将随你的下一条消息发送",
+    "drawSentHint": "已添加到聊天。将随你的下一条消息发送。",
     "drawShotFail": "无法截取屏幕",
       "viewPending": "查看待发送标注",
       "sendNow": "立即把标注发送给智能体",
@@ -621,7 +651,7 @@
       "linkOn": "取消关联",
       "linkOff": "关联数值",
       "rawHint": "原始值（CSS 语法）",
-      "adjustSaved": "调整已保存 — 将附加到你的下一个提示",
+      "adjustSaved": "调整已保存。将附加到你的下一个提示。",
       "deliveredToast": "标注已随消息发送给智能体",
       "secText": "文本",
       "secFill": "填充",
@@ -776,6 +806,18 @@
   let screenshotOnSend = SETTINGS.screenshot === false ? false : true;
   let html2canvasReady = null;
   let hidden = false;
+  let gridOn = false;
+  let gridLayer = null;
+  let gridStepper = null;
+  let gridColumns = 12;
+  let gridGutter = 24;
+  let gridMargin = 32;
+  let gridOutline = false;
+  let gridResize = null;
+  let meterAlt = false;
+  let meterRef = null;
+  let meterLayer = null;
+  let meterRaf = 0;
   let lastAgentActivity = 0;
 
   function loadPins() {
@@ -838,6 +880,17 @@
       node = node.parentElement;
     }
     return parts.length === 0 ? "body" : `body ${parts.join(" > ")}`;
+  }
+
+  function ancestorTrail(element) {
+    const trail = [];
+    let node = element.parentElement;
+    while (node !== null && node !== host && node !== document.documentElement && trail.length < 12) {
+      trail.push(node);
+      if (node === document.body) break;
+      node = node.parentElement;
+    }
+    return trail;
   }
 
   function locate(selector) {
@@ -1073,7 +1126,9 @@
 .lr-draw-canvas { position: fixed; inset: 0; pointer-events: none; touch-action: none; z-index: 2147483590; }
 .lr-draw-canvas[data-on] { pointer-events: auto; cursor: crosshair; }
 .lr-draw-canvas[data-tool="none"] { cursor: default; }
-.popover, .toolbar-wrap { z-index: 2147483601; }
+.popover { z-index: 2147483601; }
+.toolbar-wrap { z-index: 2147483602; }
+.root.lr-drawing .pin { pointer-events: none; }
 .lr-drawbar { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); display: none; flex-direction: row; align-items: center; gap: 2px; background: var(--n-100); border: 1px solid var(--line); border-radius: 12px; padding: 4px 6px; box-shadow: var(--shadow); z-index: 2147483601; max-width: calc(100vw - 16px); overflow-x: auto; }
 .lr-drawbar[data-on] { display: flex; }
 .lr-dicon { display: inline-flex; width: 14px; height: 14px; }
@@ -1106,6 +1161,7 @@
 
   const ICONS_CANVAS = {
     brush: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>',
+    eraser: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>',
     text: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>',
     rect: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>',
     circle: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>',
@@ -1116,7 +1172,8 @@
     redo: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0-5.5 5.5v0a5.5 5.5 0 0 0 5.5 5.5H13"/></svg>',
     trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>',
     plus: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>',
-    chev: '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>'
+    chev: '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+    grid: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>'
   };
 
   let drawMode = false;
@@ -1198,6 +1255,22 @@
     saveDrawings();
     redrawDrawings();
     updateDrawBarState();
+  }
+
+  function drawUndoKeydown(event) {
+    if (!drawMode || !(event.ctrlKey || event.metaKey) || event.altKey) return false;
+    const key = event.key.toLowerCase();
+    if (key === "z" && !event.shiftKey) {
+      event.preventDefault();
+      undoDraw();
+      return true;
+    }
+    if ((key === "z" && event.shiftKey) || key === "y") {
+      event.preventDefault();
+      redoDraw();
+      return true;
+    }
+    return false;
   }
 
   function itemBBox(item) {
@@ -1309,6 +1382,18 @@
       if (drawHit(drawItems[i], x, y)) return drawItems[i];
     }
     return null;
+  }
+
+  function eraseDrawItemAt(x, y) {
+    if (drawTyping !== null) return false;
+    const hit = hitTestDraw(x, y);
+    if (hit === null) return false;
+    snapshotDraw();
+    drawItems.splice(drawItems.indexOf(hit), 1);
+    saveDrawings();
+    redrawDrawings();
+    updateDrawBarState();
+    return true;
   }
 
   function renderDrawItem(ctx, item, previewTo) {
@@ -1437,6 +1522,7 @@
     if (!drawMode && drawTyping !== null) commitDrawTyping();
     drawCanvas.toggleAttribute("data-on", drawMode);
     drawBar.toggleAttribute("data-on", drawMode);
+    rootDiv.classList.toggle("lr-drawing", drawMode);
     if (drawBtn !== null) drawBtn.classList.toggle("tool-active", drawMode);
     if (drawMode) {
       resizeDrawCanvas();
@@ -1576,22 +1662,23 @@
     addTool("brush", "drawBrush", ICONS_CANVAS.brush);
     const shapeBtn = addTool("shapes", "drawShapes", ICONS_CANVAS.rect, (btn) => openShapesMenu(btn));
     drawShapeIcon = shapeBtn.querySelector(".lr-dicon");
-    shapeBtn.append(el("span", { class: "lr-dchev" }, ICONS_CANVAS.chev));
+    shapeBtn.append(el("span", { class: "lr-dchev", html: ICONS_CANVAS.chev }));
+    addTool("eraser", "drawErase", ICONS_CANVAS.eraser);
     addTool("text", "drawText", ICONS_CANVAS.text);
     const colorBtn = addTool("color", "drawColor", "", (btn) => openColorMenu(btn));
     drawColorDot = el("span", { class: "lr-dcolor" });
     drawColorDot.style.background = drawColor;
     colorBtn.prepend(drawColorDot);
-    colorBtn.append(el("span", { class: "lr-dchev" }, ICONS_CANVAS.chev));
+    colorBtn.append(el("span", { class: "lr-dchev", html: ICONS_CANVAS.chev }));
     const widthBtn = addTool("width", "drawWidth", "", (btn) => openWidthMenu(btn));
     drawWidthDemo = el("span", { class: "lr-dwdemo" });
     drawWidthDemo.style.borderBottomWidth = `${drawWidth}px`;
     widthBtn.prepend(drawWidthDemo);
-    widthBtn.append(el("span", { class: "lr-dchev" }, ICONS_CANVAS.chev));
+    widthBtn.append(el("span", { class: "lr-dchev", html: ICONS_CANVAS.chev }));
     drawUndoBtn = addTool("undo", "drawUndo", ICONS_CANVAS.undo, () => undoDraw());
     drawRedoBtn = addTool("redo", "drawRedo", ICONS_CANVAS.redo, () => redoDraw());
     drawTrashBtn = addTool("trash", "drawClear", ICONS_CANVAS.trash, () => clearDraw());
-    drawSendBtn = el("button", { class: "lr-dsend", type: "button", title: t("drawSend") }, ICONS_CANVAS.plus);
+    drawSendBtn = el("button", { class: "lr-dsend", type: "button", title: t("drawSend"), html: ICONS_CANVAS.plus });
     drawSendBtn.addEventListener("click", () => sendDrawingToChat());
     drawBar.append(drawSendBtn);
     const exit = el("button", { class: "lr-dtool", type: "button", title: t("drawExit") }, "✕");
@@ -1679,6 +1766,11 @@
       redrawDrawings();
       return;
     }
+    if (drawTool === "eraser") {
+      drawCanvas.setPointerCapture?.(e.pointerId);
+      eraseDrawItemAt(x, y);
+      return;
+    }
     if (drawTool === "text") {
       e.preventDefault();
       if (drawTyping !== null) commitDrawTyping();
@@ -1733,6 +1825,10 @@
       drawDrag.x = e.clientX;
       drawDrag.y = e.clientY;
       redrawDrawings();
+      return;
+    }
+    if (drawTool === "eraser" && e.buttons === 1) {
+      eraseDrawItemAt(e.clientX, e.clientY);
       return;
     }
     if (drawLive === null) {
@@ -1892,6 +1988,12 @@
     viewportBtn.querySelector(".lr-viewport-label").textContent = label;
     viewportBtn.classList.toggle("tool-active", !vpIsDefault());
   }
+  const gridBtn = el("button", { class: "tool", title: t("layoutGrid"), "aria-label": t("layoutGrid"), html: ICONS_CANVAS.grid });
+  gridBtn.addEventListener("click", () => {
+    if (gridStepper !== null) setGrid(false);
+    else if (gridOn) openGridStepper();
+    else setGrid(true);
+  });
   const eyeBtn = el("button", { class: "tool", title: "Mostrar/ocultar pins", html: ICONS.eye });
   const auditBtn = el("button", { class: "tool", title: t("a11yAuditPage"), "aria-label": t("a11yAuditPage"), html: ICONS.accessibility });
   auditBtn.addEventListener("click", () => {
@@ -1900,7 +2002,7 @@
   });
     drawBtn = el("button", { class: "tool", title: t("drawTitle") + " (" + formatHotkey(hotkeyDraw) + ")", html: ICONS_CANVAS.brush }, el("span", { class: "tool-label" }, t("drawTool")), el("kbd", {}, formatHotkey(hotkeyDraw)));
     drawBtn.addEventListener("click", () => toggleDraw());
-    toolbar.append(statusDot, divider, commentBtn, pendingSpan, adjustBtn, drawBtn, groupBtn, viewportBtn, eyeBtn, auditBtn);
+    toolbar.append(statusDot, divider, commentBtn, pendingSpan, adjustBtn, drawBtn, groupBtn, viewportBtn, gridBtn, eyeBtn, auditBtn);
   wrap.append(hint, toolbar);
   rootDiv.append(wrap);
 
@@ -1928,6 +2030,8 @@
     groupBtn.querySelector(".tool-label").textContent = t("groupBtn");
     viewportBtn.title = t("viewportLabel");
     viewportBtn.setAttribute("aria-label", t("viewportLabel"));
+    gridBtn.title = t("layoutGrid");
+    gridBtn.setAttribute("aria-label", t("layoutGrid"));
     auditBtn.title = t("a11yAuditPage");
     auditBtn.setAttribute("aria-label", t("a11yAuditPage"));
     if (auditPanelNode !== null) {
@@ -2008,10 +2112,195 @@
     commentBtn.classList.toggle("tool-active", mode === "picking");
     adjustBtn.classList.toggle("tool-active", mode === "adjust");
     groupBtn.classList.toggle("tool-active", groupMode);
+    gridBtn.classList.toggle("tool-active", gridOn);
     pendingSpan.textContent = pending > 0 ? t("pendingCount").replace("{n}", pending) : "";
     pendingSpan.style.display = pending > 0 ? "" : "none";
     eyeBtn.innerHTML = hidden ? ICONS.eyeOff : ICONS.eye;
     absLayer.style.display = hidden ? "none" : "";
+  }
+
+  const GRID_BOUNDS = { columns: [1, 24, 1], gutter: [0, 64, 4], margin: [0, 160, 8] };
+
+  function gridGeometry(columns, innerWidth, gutter, margin) {
+    const columnWidth = Math.max(0, (innerWidth - margin * 2 - (columns - 1) * gutter) / columns);
+    return { margin, gutter, columnWidth, columns };
+  }
+
+  function renderGrid() {
+    if (!gridOn) return;
+    gridLayer?.remove();
+    const geometry = gridGeometry(gridColumns, window.innerWidth, gridGutter, gridMargin);
+    const bands = [];
+    for (let index = 0; index < geometry.columns; index += 1) {
+      const band = el("div", { class: "lr-grid-band" });
+      band.style.left = `${geometry.margin + index * (geometry.columnWidth + geometry.gutter)}px`;
+      band.style.width = `${geometry.columnWidth}px`;
+      bands.push(band);
+    }
+    gridLayer = el("div", { class: gridOutline ? "lr-grid lr-outline" : "lr-grid" }, ...bands);
+    fixedLayer.append(gridLayer);
+  }
+
+  function gridAdjust(key, delta) {
+    const bounds = GRID_BOUNDS[key];
+    const current = key === "columns" ? gridColumns : key === "gutter" ? gridGutter : gridMargin;
+    const next = Math.max(bounds[0], Math.min(bounds[1], current + delta * bounds[2]));
+    if (next === current) return;
+    if (key === "columns") gridColumns = next;
+    else if (key === "gutter") gridGutter = next;
+    else gridMargin = next;
+    renderGrid();
+    const value = gridStepper?.querySelector(`[data-grid-value="${key}"]`);
+    if (value !== undefined && value !== null) value.textContent = `${next}`;
+  }
+
+  function closeGridStepper() {
+    if (gridStepper === null) return;
+    try { gridStepper.__lrCleanup?.(); } catch {}
+    gridStepper.remove();
+    gridStepper = null;
+  }
+
+  function openGridStepper() {
+    closeGridStepper();
+    const row = (label, key) => el("div", { class: "lr-grid-row" }, el("span", { class: "lr-grid-row-label" }, t(label)), el("span", { class: "lr-grid-stepper" }, el("button", { class: "lr-grid-step-btn", type: "button", onclick: () => gridAdjust(key, -1) }, "−"), el("span", { class: "lr-grid-step-value", "data-grid-value": key }, `${key === "columns" ? gridColumns : key === "gutter" ? gridGutter : gridMargin}`), el("button", { class: "lr-grid-step-btn", type: "button", onclick: () => gridAdjust(key, 1) }, "+")));
+    const styleButton = (key, label) => el("button", { class: "lr-grid-style-btn", type: "button", "data-grid-style": key, "data-on": gridOutline === (key === "outline") ? "" : null, onclick: () => { gridOutline = key === "outline"; renderGrid(); gridStepper?.querySelectorAll(".lr-grid-style-btn").forEach((b) => b.toggleAttribute("data-on", b.dataset.gridStyle === key)); } }, t(label));
+    gridStepper = el("div", { class: "lr-grid-step" },
+      row("gridColumns", "columns"),
+      row("gridGutter", "gutter"),
+      row("gridMargin", "margin"),
+      el("div", { class: "lr-grid-row" }, el("span", { class: "lr-grid-row-label" }, " "), el("span", { class: "lr-grid-style" }, styleButton("fill", "gridFill"), styleButton("outline", "gridOutline"))));
+    fixedLayer.append(gridStepper);
+    const place = () => {
+      if (gridStepper === null || !gridStepper.isConnected) return;
+      const r = gridBtn.getBoundingClientRect();
+      gridStepper.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - 224))}px`;
+      gridStepper.style.top = `${Math.max(8, r.top - gridStepper.offsetHeight - 6)}px`;
+    };
+    place();
+    requestAnimationFrame(place);
+    const dismiss = (event) => {
+      if (gridStepper === null) return;
+      const path = event.composedPath?.() ?? [];
+      if (path.includes(gridStepper) || path.includes(gridBtn)) return;
+      closeGridStepper();
+    };
+    document.addEventListener("pointerdown", dismiss, true);
+    gridStepper.__lrCleanup = () => {
+      document.removeEventListener("pointerdown", dismiss, true);
+    };
+  }
+
+  function setGrid(on) {
+    if (on === gridOn) return;
+    gridOn = on;
+    updateToolbar();
+    if (on) {
+      renderGrid();
+      gridResize = () => renderGrid();
+      window.addEventListener("resize", gridResize);
+    } else {
+      gridLayer?.remove();
+      gridLayer = null;
+      closeGridStepper();
+      if (gridResize !== null) {
+        window.removeEventListener("resize", gridResize);
+        gridResize = null;
+      }
+    }
+  }
+
+  function meterReference() {
+    if (adjustPanel !== null && adjustTarget !== null) return adjustTarget;
+    if (openPinId !== null) {
+      const pin = pins.find((candidate) => candidate.id === openPinId);
+      if (pin !== undefined) return locate(pin.selector);
+    }
+    return null;
+  }
+
+  function meterGaps(aRect, bRect) {
+    let horizontal = null;
+    if (bRect.left >= aRect.right) horizontal = bRect.left - aRect.right;
+    else if (aRect.left >= bRect.right) horizontal = aRect.left - bRect.right;
+    let vertical = null;
+    if (bRect.top >= aRect.bottom) vertical = bRect.top - aRect.bottom;
+    else if (aRect.top >= bRect.bottom) vertical = aRect.top - bRect.bottom;
+    return { horizontal, vertical };
+  }
+
+  function clearMeter() {
+    if (meterRaf !== 0) {
+      cancelAnimationFrame(meterRaf);
+      meterRaf = 0;
+    }
+    meterLayer?.remove();
+    meterLayer = null;
+  }
+
+  function renderMeter(target) {
+    if (!meterAlt || meterRef === null || target === null || target === meterRef) {
+      clearMeter();
+      return;
+    }
+    if (meterRaf !== 0) return;
+    meterRaf = requestAnimationFrame(() => {
+      meterRaf = 0;
+      if (!meterAlt || meterRef === null || target === null || target === meterRef) {
+        clearMeter();
+        return;
+      }
+      const refRect = meterRef.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const gaps = meterGaps(refRect, targetRect);
+      meterLayer?.remove();
+      const parts = [];
+      if (gaps.horizontal !== null) {
+        const bRightOfA = targetRect.left >= refRect.right;
+        const x1 = bRightOfA ? refRect.right : targetRect.right;
+        const x2 = bRightOfA ? targetRect.left : refRect.left;
+        const y = (Math.max(refRect.top, targetRect.top) + Math.min(refRect.bottom, targetRect.bottom)) / 2;
+        parts.push(el("div", { class: "lr-meter-line", style: `left:${Math.min(x1, x2)}px;top:${y}px;width:${Math.abs(x2 - x1)}px;height:0` }));
+        parts.push(el("span", { class: "lr-meter-label", style: `left:${(x1 + x2) / 2}px;top:${y}px` }, `${Math.round(gaps.horizontal)}px`));
+      }
+      if (gaps.vertical !== null) {
+        const bBelowA = targetRect.top >= refRect.bottom;
+        const y1 = bBelowA ? refRect.bottom : targetRect.bottom;
+        const y2 = bBelowA ? targetRect.top : refRect.top;
+        const x = (Math.max(refRect.left, targetRect.left) + Math.min(refRect.right, targetRect.right)) / 2;
+        parts.push(el("div", { class: "lr-meter-line lr-meter-line-v", style: `left:${x}px;top:${Math.min(y1, y2)}px;width:0;height:${Math.abs(y2 - y1)}px` }));
+        parts.push(el("span", { class: "lr-meter-label", style: `left:${x}px;top:${(y1 + y2) / 2}px` }, `${Math.round(gaps.vertical)}px`));
+      }
+      parts.push(el("div", { class: "lr-meter-box", style: `left:${refRect.left}px;top:${refRect.top}px;width:${refRect.width}px;height:${refRect.height}px` }));
+      parts.push(el("div", { class: "lr-meter-box", style: `left:${targetRect.left}px;top:${targetRect.top}px;width:${targetRect.width}px;height:${targetRect.height}px` }));
+      meterLayer = el("div", { class: "lr-meter" }, ...parts);
+      fixedLayer.append(meterLayer);
+    });
+  }
+
+  function resetMeter() {
+    meterAlt = false;
+    meterRef = null;
+    clearMeter();
+  }
+
+  function meterAltKeydown(event) {
+    if (event.key !== "Alt") return false;
+    event.preventDefault();
+    if (!meterAlt) {
+      meterAlt = true;
+      meterRef = meterReference();
+      if (meterRef === null) setHint(t("distanceMeter"));
+    }
+    return true;
+  }
+
+  function meterAltKeyup(event) {
+    if (event.key !== "Alt") return false;
+    event.preventDefault();
+    meterAlt = false;
+    clearMeter();
+    return true;
   }
 
   function setHidden(next) {
@@ -2123,8 +2412,12 @@
   document.addEventListener(
     "mousemove",
     (event) => {
+      const inHost = event.composedPath().some((n) => n === host || (n instanceof Node && host.contains(n)));
+      if (meterAlt && meterRef !== null && !inHost) {
+        renderMeter(event.target instanceof Element ? event.target : null);
+      }
       if ((mode === null && !groupMode) || draft !== null) return;
-      if (event.composedPath().some((n) => n === host || (n instanceof Node && host.contains(n)))) return;
+      if (inHost) return;
       const target = event.target instanceof Element ? event.target : null;
       if (!target || target === hovered) return;
       showHighlight(target);
@@ -2159,6 +2452,11 @@
   );
 
   function handleEscape(event) {
+    if (gridStepper !== null) {
+      closeGridStepper();
+      return true;
+    }
+    resetMeter();
     if (focusState.current !== null) {
       exitFocusMode();
       return true;
@@ -2192,6 +2490,7 @@
     (event) => {
       const from = event.composedPath?.()[0] ?? event.target;
       const tag = from?.tagName;
+      if (meterAltKeydown(event)) return;
       if (tag === "INPUT" || tag === "TEXTAREA" || from?.isContentEditable === true) return;
       if (adjustPanel !== null && (event.ctrlKey || event.metaKey) && !event.altKey) {
         const undoKey = event.key.toLowerCase();
@@ -2204,6 +2503,7 @@
           return;
         }
       }
+      if (drawUndoKeydown(event)) return;
       if (drawMode && drawTyping === null && drawSel !== null && (event.key === "Delete" || event.key === "Backspace")) {
         event.preventDefault();
         snapshotDraw();
@@ -2236,6 +2536,14 @@
         event.preventDefault();
         openGroupComposer();
       }
+    },
+    true
+  );
+
+  document.addEventListener(
+    "keyup",
+    (event) => {
+      meterAltKeyup(event);
     },
     true
   );
@@ -2441,6 +2749,16 @@
       node.addEventListener("pointerup", end);
       node.addEventListener("pointercancel", end);
     });
+  }
+
+  function reanchorPin(pin, element) {
+    pin.selector = cssPath(element);
+    pin.stale = false;
+    const rect = element.getBoundingClientRect();
+    pin.offsets = { ox: rect.width / 2, oy: rect.height / 2 };
+    pin.rect = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
+    savePins();
+    renderPins();
   }
 
   function insidePage(point) {
@@ -2671,7 +2989,8 @@
       drawMenu.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - 200))}px`;
       drawMenu.style.top = `${Math.max(8, r.top - drawMenu.offsetHeight - 6)}px`;
       const dismiss = (event) => {
-        if (drawMenu !== null && !drawMenu.contains(event.target) && event.target !== btn) {
+        const path = event.composedPath?.() ?? [];
+        if (drawMenu !== null && !path.includes(drawMenu) && !path.includes(btn)) {
           closeDrawMenu();
           document.removeEventListener("pointerdown", dismiss, true);
         }
@@ -3568,15 +3887,8 @@
     const textarea = el("textarea", { placeholder: t("editComment") });
     textarea.value = pin.comment;
     const submit = el("button", { class: "send", title: t("saveEdit") }, ICONS.arrowUp);
-    submit.addEventListener("click", () => {
-      pin.comment = textarea.value.trim() || pin.comment;
-      pin.status = "queued";
-      savePins();
-      postSnapshot();
-      openPinId = null;
-      renderPinPanel(pin);
-      renderPins();
-    });
+    submit.addEventListener("click", () => savePinComment(pin, textarea));
+    textarea.addEventListener("keydown", (event) => pinCommentKeydown(pin, textarea, event));
     const auditTarget = locate(pin.selector);
     a11yFixHandler.current = auditTarget === null || pin.tag === "canvas" ? null : {
       ensurePin: () => {
@@ -3584,6 +3896,8 @@
         return pin;
       }
     };
+    const trailAncestors = auditTarget === null || pin.selector === "canvas:drawing" ? [] : ancestorTrail(auditTarget);
+    const trail = trailAncestors.length === 0 ? null : el("div", { class: "lr-trail", title: t("ancestorTrail"), "aria-label": t("ancestorTrail") }, ...trailAncestors.map((ancestor) => el("button", { type: "button", class: "lr-trail-chip", onclick: () => { reanchorPin(pin, ancestor); renderPinPanel(pin); } }, quickLabel(ancestor))));
     const focusBtn = el("button", {
       onclick: () => {
         toggleFocusMode(pin);
@@ -3592,7 +3906,7 @@
     }, focusState.current !== null ? t("focusModeExit") : t("focusMode"));
     panel.append(
       el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, `${pins.filter((p) => p.status !== "resolvido").indexOf(pin) + 1} · ${quickLabel(locate(pin.selector) ?? pin.tag)}`), el("button", { class: "lr-close", title: t("panelClose"), type: "button", onclick: () => closePinPanel() }, "✕")),
-      el("div", { class: "pin-bubble-body" }, el("div", { class: "pin-bubble-meta" }, `${pin.selector.slice(0, 90)}${pin.component ? ` · ${pin.component}` : ""}`), el("div", { class: "pin-bubble-meta" }, `${t("pinDimensions")}: ${pinDimensions(pin)} px`), pin.stale === true ? el("div", { class: "pin-bubble-stale" }, t("pinStale")) : null, ambiguousCount > 1 ? el("div", { class: "pin-bubble-warning" }, `${t("ambiguousSelectorWarning").replace("{n}", ambiguousCount)} ${t("ambiguousSelectorDetail").replace("{selector}", pin.selector)}`) : null, changesText !== "" ? el("div", { class: "pin-bubble-changes" }, changesText) : null, textChangeText !== "" ? el("div", { class: "pin-bubble-changes" }, textChangeText) : null),
+      el("div", { class: "pin-bubble-body" }, trail, el("div", { class: "pin-bubble-meta" }, `${pin.selector.slice(0, 90)}${pin.component ? ` · ${pin.component}` : ""}`), el("div", { class: "pin-bubble-meta" }, `${t("pinDimensions")}: ${pinDimensions(pin)} px`), pin.stale === true ? el("div", { class: "pin-bubble-stale" }, t("pinStale")) : null, ambiguousCount > 1 ? el("div", { class: "pin-bubble-warning" }, `${t("ambiguousSelectorWarning").replace("{n}", ambiguousCount)} ${t("ambiguousSelectorDetail").replace("{selector}", pin.selector)}`) : null, changesText !== "" ? el("div", { class: "pin-bubble-changes" }, changesText) : null, textChangeText !== "" ? el("div", { class: "pin-bubble-changes" }, textChangeText) : null),
       auditTarget === null || pin.tag === "canvas" ? null : a11yAuditSection(auditTarget),
       el("div", { class: "prompt-input" }, renderTemplateRow(textarea), textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }), submit)),
       el(
@@ -3647,6 +3961,23 @@
     panel.style.top = `${top}px`;
     applyPanelPosition(panel, "pin");
     wirePanelDrag(panel, "pin", placePinDefault);
+  }
+
+  function savePinComment(pin, textarea) {
+    pin.comment = textarea.value.trim() || pin.comment;
+    pin.status = "queued";
+    savePins();
+    postSnapshot();
+    openPinId = null;
+    renderPinPanel(pin);
+    renderPins();
+  }
+
+  function pinCommentKeydown(pin, textarea, event) {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      savePinComment(pin, textarea);
+    }
   }
 
 
@@ -4010,6 +4341,131 @@
     if (entry.kind === "text") adjustUndoStack.push({ kind: "text", prop: null, value: adjustText });
     else adjustUndoStack.push({ kind: "prop", prop: entry.prop, value: adjustValues.get(entry.prop) ?? "" });
     applyAdjustEntry(entry);
+  }
+
+  const FORCE_STATE_CLASSES = { hover: "lr-fh", focus: "lr-ff", active: "lr-fa" };
+  let forceTarget = null;
+  let forceStates = new Set();
+
+  function forceSubjectSplit(part) {
+    let depth = 0;
+    let boundary = -1;
+    for (let i = 0; i < part.length; i += 1) {
+      const char = part[i];
+      if (char === "[" || char === "(") depth += 1;
+      else if (char === "]" || char === ")") depth -= 1;
+      else if (depth === 0 && (char === " " || char === ">" || char === "+" || char === "~")) boundary = i;
+    }
+    if (boundary === -1) return ["", part];
+    return [part.slice(0, boundary + 1), part.slice(boundary + 1).trim()];
+  }
+
+  function notPseudoSpans(part) {
+    const spans = [];
+    let i = part.indexOf(":not(");
+    while (i !== -1) {
+      let depth = 0;
+      for (let j = i + 5; j < part.length; j += 1) {
+        if (part[j] === "(") depth += 1;
+        else if (part[j] === ")") {
+          if (depth === 0) { spans.push([i + 5, j]); break; }
+          depth -= 1;
+        }
+      }
+      i = part.indexOf(":not(", i + 1);
+    }
+    return spans;
+  }
+
+  function buildForceRules(target, pseudo) {
+    const token = `:${pseudo}`;
+    const marker = `.${FORCE_STATE_CLASSES[pseudo]}`;
+    const rules = [];
+    const walk = (ruleList) => {
+      for (const rule of ruleList) {
+        if (rule.selectorText === undefined && rule.cssRules !== undefined && rule.cssRules !== null) {
+          walk(rule.cssRules);
+          continue;
+        }
+        if (typeof rule.selectorText !== "string" || rule.style === null || rule.style === undefined) continue;
+        for (const rawPart of rule.selectorText.split(",")) {
+          const part = rawPart.trim();
+          if (part === "") continue;
+          const spans = notPseudoSpans(part);
+          const occurrences = [];
+          let at = part.indexOf(token);
+          while (at !== -1) {
+            const next = part[at + token.length];
+            if (!(next !== undefined && /[a-zA-Z-]/.test(next))) occurrences.push(at);
+            at = part.indexOf(token, at + 1);
+          }
+          if (occurrences.length === 0) continue;
+          if (occurrences.some((at) => spans.some(([start, end]) => at >= start && at < end))) continue;
+          const [prefix, subject] = forceSubjectSplit(part);
+          if (!occurrences.some((at) => at >= prefix.length)) continue;
+          const subjectWithout = subject.split(token).join("");
+          let matched = false;
+          try { matched = target.matches(subjectWithout); } catch {}
+          if (matched) rules.push(`${prefix}${subject.split(token).join(marker)}{${rule.style.cssText}}`);
+        }
+      }
+    };
+    for (const sheet of document.styleSheets) {
+      try {
+        walk(sheet.cssRules);
+      } catch {}
+    }
+    return rules;
+  }
+
+  function applyForceStates() {
+    if (forceTarget === null) return;
+    let css = "";
+    for (const pseudo of Object.keys(FORCE_STATE_CLASSES)) {
+      const on = forceStates.has(pseudo);
+      forceTarget.classList.toggle(FORCE_STATE_CLASSES[pseudo], on);
+      if (on) {
+        for (const rule of buildForceRules(forceTarget, pseudo)) css += rule;
+      }
+    }
+    if (forceStates.size === 0) {
+      clearForceStates();
+      return;
+    }
+    let tag = document.getElementById("lr-force-states");
+    if (css === "") {
+      tag?.remove();
+      return;
+    }
+    if (tag === null) {
+      tag = document.createElement("style");
+      tag.id = "lr-force-states";
+      (document.head ?? document.documentElement).append(tag);
+    }
+    tag.textContent = css;
+  }
+
+  function clearForceStates() {
+    if (forceTarget !== null) {
+      for (const marker of Object.values(FORCE_STATE_CLASSES)) forceTarget.classList.remove(marker);
+    }
+    document.getElementById("lr-force-states")?.remove();
+    forceTarget = null;
+    forceStates = new Set();
+  }
+
+  function refreshForceChips() {
+    if (adjustPanel === null) return;
+    for (const chip of adjustPanel.querySelectorAll("[data-lr-pseudo]")) {
+      chip.toggleAttribute("data-on", forceStates.has(chip.dataset.lrPseudo));
+    }
+  }
+
+  function toggleForceState(pseudo) {
+    if (forceStates.has(pseudo)) forceStates.delete(pseudo);
+    else forceStates.add(pseudo);
+    applyForceStates();
+    refreshForceChips();
   }
 
 
@@ -4524,6 +4980,7 @@
   let adjustTargetSelector = "";
 
   function closeAdjustPanel(restore) {
+    clearForceStates();
     if (adjustPanel !== null && restore && adjustPatch !== null) restoreAll(adjustPatch);
     adjustPanel?.remove();
     adjustPanel = null;
@@ -4542,6 +4999,8 @@
   function openAdjustPanel(target) {
     closePanels();
     adjustTarget = target ?? document.body;
+    forceTarget = adjustTarget;
+    forceStates = new Set();
     adjustTargetSelector = cssPath(adjustTarget);
 
 
@@ -4680,6 +5139,13 @@
       const transformRowEl = inspectorRow(t("prop.transform"), transformWrap, { wide: true, staticLabel: true, changed: () => adjustChanged("transform"), onReset: () => { adjustReset("transform"); transformWrap.__render(); }, rerender: adjustRerender });
       sec.append(shadowRowEl, transformRowEl);
     }));
+
+    body.prepend(inspectorRow(t("inspectorStates"), el("span", { class: "lr-row-ctl" }, ...["hover", "focus", "active"].map((pseudo) => {
+      const chip = el("button", { type: "button", class: "lr-tgl", "data-lr-pseudo": pseudo }, `:${pseudo}`);
+      chip.toggleAttribute("data-on", forceStates.has(pseudo));
+      chip.addEventListener("click", () => toggleForceState(pseudo));
+      return chip;
+    }))));
 
     panel.append(body);
 
@@ -4844,6 +5310,7 @@
   }
 
   function closePanels() {
+    resetMeter();
     pinPanelNode?.remove();
     pinPanelNode = null;
     a11yFixHandler.current = null;

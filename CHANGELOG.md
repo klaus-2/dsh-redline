@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The layout grid follows the design-tool convention.** Column bands render at 10% opacity with hairline column edges (Figma's default), and the settings popover gains gutter (medianiz), margin and fill/outline controls. Outline mode strips the fill and keeps only the column hairlines.
+
+- **Interface copy reads cleaner.** The overlay's toasts, hints and tooltips no longer use em dashes; the drawing hint is now "Draw over the page. Esc exits." and the stale-pin warning says "Target not found. The pin is stale. Drag the marker to re-anchor." in all three languages.
+
+### Added
+
+- **Ctrl/Cmd+Enter saves the comment of an open pin.** The pin popover's comment box confirms with Ctrl+Enter (Cmd+Enter on macOS), running the same save routine as the popover's submit button — the comment is stored, the pin re-enters the queue and the pending snapshot is reposted. Plain Enter keeps inserting a newline, and the comment composer still sends on plain Enter.
+- **An eraser tool and keyboard undo for the drawing canvas.** The draw bar gains an eraser between shapes and text: clicking or dragging with it deletes the topmost drawing under the cursor, one undo snapshot per removed item and nothing recorded when the cursor hits empty space. While the canvas is open and focus is not in an input, Ctrl+Z undoes the last drawing mutation and Ctrl+Shift+Z or Ctrl+Y redoes it; the inspector panel keeps its own undo when both are open.
+- **An ancestor trail in the pin popover re-anchors pins with one click.** When the pin's target resolves, the popover lists its ancestors up to and including `<body>` (deepest first, capped at 12 entries) as clickable chips. Clicking a chip re-anchors the pin to that container with the same mutation set as dragging the marker — new selector, cleared stale flag, snapshot rect and offsets at the container's center — then persists and re-renders the panel without posting a snapshot, matching marker drags. Unresolved targets and `canvas:drawing` pseudo-targets show no trail.
+- **A toggleable layout grid with a column stepper.** A toolbar button between the viewport and the eye toggles full-height column bands over the page (32 px margins, 24 px gutters, session-only). Clicking the active button again opens a small stepper with − / value / + clamped to 1–24 columns; the grid re-flows immediately, outside pointerdown and Esc close only the stepper, and resizing the window re-flows the bands while the grid is on. Toggling the button off removes the layer, the stepper and the resize listener.
+- **An Alt-key distance meter between elements.** Holding Alt with the adjust panel or an open pin as the reference draws dashed connectors with px labels for the horizontal and vertical gaps between the nearest facing edges of the reference and whatever is under the cursor, outlining both elements. The mousemove work is rAF-throttled and skips overlay-internal events; releasing Alt, Escape or closing a panel clears everything, and with nothing open a hint explains the feature once per activation.
+- **Forced pseudo-class states in the inspector.** A States section in the adjust panel adds :hover, :focus and :active toggle chips that preview those states on the page target through emulation: the target gets a marker class and one stylesheet is written with every matching rule whose last selector compound carries the pseudo, rewritten to the marker class. :focus is emulated (never a real focus()), ancestor-pseudo rules and :focus-within are skipped, the marker class may slightly raise specificity, and everything is preview-only — nothing is recorded into pin changes. Closing, confirming or switching targets strips the classes and removes the stylesheet.
+
 ## [1.5.0] - 2026-11-17
 
 ### Added
