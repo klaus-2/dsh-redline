@@ -1861,6 +1861,58 @@ return { keydown: meterAltKeydown, keyup: meterAltKeyup, state: () => ({ meterAl
       span.includes("renderMeter(event.target instanceof Element ? event.target : null)"),
       JSON.stringify({ inHostAt, meterAt, modeAt }));
   }
+  {
+    const scheduleSource = extractFunction(overlay, "scheduleHighlight");
+    const clearSource = extractFunction(overlay, "clearHighlight");
+    const pending = [];
+    const cancelled = [];
+    let rafHandle = 0;
+    const run = scheduleSource === undefined || clearSource === undefined ? undefined : evaluateExpression(`(requestAnimationFrame, cancelAnimationFrame) => {
+let highlightEl = null;
+let highlightLabel = null;
+let hovered = null;
+let hoverRaf = null;
+let hoverPendingTarget = null;
+let mode = "picking";
+let groupMode = false;
+let draft = null;
+let showCalls = [];
+function showHighlight(target) { showCalls.push(target); }
+${clearSource}
+${scheduleSource}
+return { schedule: scheduleHighlight, clear: clearHighlight, calls: () => showCalls, raf: () => hoverRaf, pendingTarget: () => hoverPendingTarget, setMode: (value) => { mode = value; } };
+}`, "scheduleHighlight");
+    const sandbox = run === undefined ? undefined : run((fn) => { pending.push(fn); return ++rafHandle; }, (handle) => cancelled.push(handle));
+    const first = { tag: "a" };
+    const second = { tag: "b" };
+    sandbox?.schedule(first);
+    sandbox?.schedule(second);
+    sandbox?.schedule(first);
+    const burstFrames = pending.length;
+    const burstCalls = sandbox?.calls().length;
+    pending[0]?.();
+    const afterFrame = { calls: sandbox?.calls().length, latest: sandbox?.calls()[0]?.tag, raf: sandbox?.raf() };
+    sandbox?.schedule(second);
+    sandbox?.clear();
+    const cleared = { cancelled: cancelled.length, handle: cancelled[0], pendingTarget: sandbox?.pendingTarget(), raf: sandbox?.raf() };
+    pending[1]?.();
+    const afterStaleFrame = sandbox?.calls().length;
+    sandbox?.setMode(null);
+    sandbox?.schedule(first);
+    pending[2]?.();
+    const gatedCalls = sandbox?.calls().length;
+    harness.check("overlay: the picker highlight is scheduled once per frame with the latest target and clear cancels the pending frame",
+      sandbox !== undefined && burstFrames === 1 && burstCalls === 0 &&
+      afterFrame.calls === 1 && afterFrame.latest === "a" && afterFrame.raf === null &&
+      cleared.cancelled === 1 && cleared.handle === 2 && cleared.pendingTarget === null && cleared.raf === null &&
+      afterStaleFrame === 1 && gatedCalls === 1,
+      JSON.stringify({ burstFrames, burstCalls, afterFrame, cleared, afterStaleFrame, gatedCalls }));
+    const mousemoveAt = overlay.indexOf("\"mousemove\"");
+    const pickerSpan = mousemoveAt === -1 ? "" : overlay.slice(mousemoveAt, mousemoveAt + 900);
+    harness.check("overlay: the picker mousemove branch schedules the highlight instead of painting it inline",
+      pickerSpan !== "" && pickerSpan.includes("scheduleHighlight(target)") && !pickerSpan.includes("showHighlight(target)"),
+      JSON.stringify({ hasScheduled: pickerSpan.includes("scheduleHighlight(target)"), hasInline: pickerSpan.includes("showHighlight(target)") }));
+  }
 
   harness.section("client: overlay ui polish");
   {
