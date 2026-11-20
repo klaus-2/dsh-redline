@@ -1091,11 +1091,13 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
     {
       const reposition = extractFunction(overlay, "repositionPins");
-      const scrollLine = overlay.split("\n").find((line) => line.includes('addEventListener("scroll"') && line.includes("repositionPins")) ?? "";
-      const resizeLine = overlay.split("\n").find((line) => line.includes('addEventListener("resize"') && line.includes("repositionPins")) ?? "";
+      const schedule = extractFunction(overlay, "scheduleReposition");
+      const scrollLine = overlay.split("\n").find((line) => line.includes('addEventListener("scroll"') && line.includes("scheduleReposition")) ?? "";
+      const resizeLine = overlay.split("\n").find((line) => line.includes('addEventListener("resize"') && line.includes("scheduleReposition")) ?? "";
       harness.check("overlay: the scroll and resize paths reposition without classifying stale",
         reposition !== undefined && !reposition.includes("auditPinAnchors") &&
-        scrollLine.includes("repositionPins") && resizeLine.includes("repositionPins"),
+        schedule !== undefined && schedule.includes("repositionPins()") &&
+        scrollLine.includes("scheduleReposition") && resizeLine.includes("scheduleReposition"),
         JSON.stringify({ scroll: scrollLine.trim(), resize: resizeLine.trim() }));
     }
     {
@@ -1913,6 +1915,192 @@ return { schedule: scheduleHighlight, clear: clearHighlight, calls: () => showCa
       pickerSpan !== "" && pickerSpan.includes("scheduleHighlight(target)") && !pickerSpan.includes("showHighlight(target)"),
       JSON.stringify({ hasScheduled: pickerSpan.includes("scheduleHighlight(target)"), hasInline: pickerSpan.includes("showHighlight(target)") }));
   }
+
+  harness.section("client: overlay viewport pins");
+  {
+    const scheduleSource = extractFunction(overlay, "scheduleReposition");
+    const pending = [];
+    const run = scheduleSource === undefined ? undefined : evaluateExpression(`(requestAnimationFrame) => {
+let repositionRaf = null;
+let calls = 0;
+function repositionPins() { calls += 1; }
+${scheduleSource}
+return { schedule: scheduleReposition, calls: () => calls, raf: () => repositionRaf };
+}`, "scheduleReposition");
+    const sandbox = run === undefined ? undefined : run((fn) => { pending.push(fn); return 1; });
+    sandbox?.schedule();
+    sandbox?.schedule();
+    sandbox?.schedule();
+    const frames = pending.length;
+    const callsBefore = sandbox?.calls();
+    pending[0]?.();
+    const after = { calls: sandbox?.calls(), raf: sandbox?.raf() };
+    harness.check("overlay: scroll repositions run at most once per frame",
+      sandbox !== undefined && frames === 1 && callsBefore === 0 && after.calls === 1 && after.raf === null,
+      JSON.stringify({ frames, callsBefore, after }));
+  }
+  {
+    const repositionSource = extractFunction(overlay, "repositionPins");
+    const pinIsFarSource = extractFunction(overlay, "pinIsFar");
+    const ready = repositionSource !== undefined && pinIsFarSource !== undefined;
+    const makeNode = () => {
+      const classes = new Set();
+      return { style: {}, classes, classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) } };
+    };
+    const run = ready ? evaluateExpression(`(requestAnimationFrame) => {
+const pinNodes = new Map();
+const pins = [];
+const pinIoNear = new Map();
+const pinIoRects = new Map();
+const pinLastPoints = new Map();
+let anchorCalls = 0;
+function anchorPoint(pin) { anchorCalls += 1; return { x: 12, y: 34 }; }
+function repositionDraft() {}
+function repositionFocus() {}
+function updateEdgeMarkers() {}
+${pinIsFarSource}
+${repositionSource}
+return { run: repositionPins, nodes: pinNodes, pins, near: pinIoNear, rects: pinIoRects, last: pinLastPoints, anchorCalls: () => anchorCalls };
+}`, "repositionPins") : undefined;
+    const sandbox = run === undefined ? undefined : run((fn) => {});
+    const nearNode = makeNode();
+    sandbox?.nodes.set("a", { node: nearNode });
+    sandbox?.pins.push({ id: "a" });
+    sandbox?.run();
+    const nearState = { calls: sandbox?.anchorCalls(), transform: nearNode.style.transform, last: sandbox?.last.get("a") };
+    const farNode = makeNode();
+    sandbox?.nodes.set("b", { node: farNode });
+    sandbox?.pins.push({ id: "b", stale: true });
+    farNode.classList.add("lr-pin-stale");
+    sandbox?.near.set("b", false);
+    sandbox?.rects.set("b", { width: 60, height: 30 });
+    sandbox?.run();
+    const farState = { calls: sandbox?.anchorCalls(), transform: farNode.style.transform, staleKept: farNode.classes.has("lr-pin-stale") };
+    sandbox?.near.set("b", true);
+    sandbox?.run();
+    const caughtUp = { calls: sandbox?.anchorCalls(), transform: farNode.style.transform, staleCleared: !farNode.classes.has("lr-pin-stale") };
+    harness.check("overlay: reposition skips far pins and catches up when the observer reports them near",
+      sandbox !== undefined && nearState.calls === 1 && nearState.transform === "translate(12px, 34px)" && nearState.last?.x === 12 &&
+      farState.calls === 2 && farState.transform === undefined && farState.staleKept === true &&
+      caughtUp.calls === 4 && caughtUp.transform === "translate(12px, 34px)" && caughtUp.staleCleared === true,
+      JSON.stringify({ nearState, farState, caughtUp }));
+  }
+  {
+    const syncSource = extractFunction(overlay, "syncPinObserver");
+    class FakeIO {
+      constructor(callback, options) { this.callback = callback; this.options = options; this.observed = []; }
+      observe(element) { this.observed.push(element); }
+      unobserve(element) { this.observed = this.observed.filter((item) => item !== element); }
+    }
+    const elA = { tag: "a" };
+    let io = null;
+    const run = syncSource === undefined ? undefined : evaluateExpression(`(IntersectionObserver, locate) => {
+const pins = [];
+const pinIoIds = new Map();
+const pinIoNear = new Map();
+const pinIoRects = new Map();
+let repositionRaf = null;
+let pinObserver = null;
+let scheduled = 0;
+function scheduleReposition() { scheduled += 1; }
+${syncSource}
+return { sync: syncPinObserver, pins, ids: pinIoIds, near: pinIoNear, rects: pinIoRects, scheduled: () => scheduled, observer: () => pinObserver };
+}`, "syncPinObserver");
+    const sandbox = run === undefined ? undefined : run(class extends FakeIO { constructor(...args) { super(...args); io = this; } }, (selector) => (selector === "#a" ? elA : null));
+    sandbox?.pins.push({ id: "p1", selector: "#a" });
+    sandbox?.sync();
+    const wired = { options: io?.options, observed: io?.observed.length, id: sandbox?.ids.get(elA) };
+    io?.callback([{ target: elA, boundingClientRect: { left: 4, top: 6, width: 20, height: 10 }, isIntersecting: true }]);
+    const reported = { near: sandbox?.near.get("p1"), rect: sandbox?.rects.get("p1"), scheduled: sandbox?.scheduled() };
+    if (sandbox !== undefined) sandbox.pins.length = 0;
+    sandbox?.sync();
+    harness.check("overlay: the pin observer watches pinned elements, reports proximity and releases removed pins",
+      sandbox !== undefined && wired.options?.rootMargin === "480px" && wired.observed === 1 && wired.id === "p1" &&
+      reported.near === true && reported.rect?.left === 4 && reported.scheduled === 1 &&
+      io?.observed.length === 0 && sandbox.ids.size === 0 && sandbox.near.size === 0 && sandbox.rects.size === 0,
+      JSON.stringify({ wired, reported, remaining: io?.observed.length }));
+  }
+  {
+    const edgeSource = extractFunction(overlay, "updateEdgeMarkers");
+    const makeNode = () => {
+      const node = { tag: "button", props: {}, children: [], style: {}, listeners: {} };
+      node.append = (...kids) => { for (const kid of kids) node.children.push(kid); return node; };
+      node.remove = () => { node.removed = (node.removed ?? 0) + 1; };
+      node.addEventListener = (type, fn) => { node.listeners[type] = fn; };
+      return node;
+    };
+    const el = (tag, attrs = {}, ...children) => {
+      const node = makeNode();
+      node.tag = tag;
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === "class") node.props.class = v;
+        else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+        else node.props[k] = v;
+      }
+      for (const child of children) node.children.push(child);
+      return node;
+    };
+    const fixedLayer = { appended: [], append: (node) => fixedLayer.appended.push(node) };
+    const win = { innerWidth: 1200, innerHeight: 800 };
+    const elA = { scrollIntoView: (payload) => { elA.scrollPayload = payload; } };
+    const run = edgeSource === undefined ? undefined : evaluateExpression(`(window, fixedLayer, el, locate) => {
+const pins = [];
+let hidden = false;
+const pinIoNear = new Map();
+const pinIoRects = new Map();
+const pinLastPoints = new Map();
+const edgeChips = [];
+const pulseTimers = new Map();
+let repositionRaf = null;
+let pulsed = null;
+let repositionScheduled = 0;
+function pulsePin(id) { pulsed = id; }
+function scheduleReposition() { repositionScheduled += 1; }
+function pinIsFar() { return false; }
+const ICONS_CANVAS = { chev: "CHEV" };
+${edgeSource}
+return { update: updateEdgeMarkers, pins, setHidden: (v) => { hidden = v; }, layer: fixedLayer, chips: edgeChips, pulsed: () => pulsed, scheduled: () => repositionScheduled };
+}`, "updateEdgeMarkers");
+    const sandbox = run === undefined ? undefined : run(win, fixedLayer, el, (selector) => (selector === "#a" ? elA : null));
+    sandbox?.pins.push(
+      { id: "p1", selector: "#a", tag: "div", status: "queued", comment: "first", rect: { x: -40, y: 305 } },
+      { id: "p2", selector: "#gone", tag: "div", status: "queued", comment: "second", rect: { x: -42, y: 318 } },
+      { id: "p3", selector: "#c", tag: "div", status: "queued", comment: "right", rect: { x: 1250, y: 100 } },
+      { id: "p4", selector: "#d", tag: "div", status: "resolvido", comment: "resolved", rect: { x: -40, y: 700 } },
+      { id: "p5", selector: "#e", tag: "div", status: "queued", comment: "visible", rect: { x: 100, y: 100 } }
+    );
+    sandbox?.update();
+    const firstPass = fixedLayer.appended.length;
+    const chips = fixedLayer.appended.slice(0, 2);
+    const leftChip = chips[0];
+    const rightChip = chips[1];
+    const leftCount = leftChip?.children[1]?.children[0];
+    const rightCount = rightChip?.children[1]?.children[0];
+    leftChip?.listeners.click?.();
+    const clicked = { block: elA.scrollPayload?.block, pulsed: sandbox?.pulsed(), scheduled: sandbox?.scheduled() };
+    sandbox?.setHidden(true);
+    sandbox?.update();
+    const afterHidden = { chips: sandbox?.chips.length, removed: leftChip?.removed };
+    sandbox?.setHidden(false);
+    sandbox?.update();
+    const restored = { chips: sandbox?.chips.length };
+    harness.check("overlay: off-viewport pins get clustered edge chips with direction, count, scroll and pulse",
+      sandbox !== undefined && firstPass === 2 &&
+      leftChip?.props["data-side"] === "left" && leftChip?.style.left === "3px" && leftChip?.style.top === "294px" &&
+      leftCount === "2" && rightChip?.props["data-side"] === "right" && rightChip?.style.right === "3px" &&
+      rightChip?.style.top === "89px" && rightCount === "3" && leftChip?.children[0]?.props.html === "CHEV" &&
+      chips[0] !== undefined && chips[0].children[0].children.length === 0 &&
+      clicked.block === "center" && clicked.pulsed === "p1" && clicked.scheduled === 1 &&
+      afterHidden.chips === 0 && afterHidden.removed === 1 && restored.chips === 2,
+      JSON.stringify({ chips: chips.map((chip) => ({ side: chip.props["data-side"], style: chip.style, count: chip.children[1]?.children[0] })), clicked, afterHidden, restored }));
+  }
+  harness.check("overlay: scroll and resize schedule reposition and renderPins syncs the observer and chips",
+    overlay.includes("window.addEventListener(\"scroll\", scheduleReposition") &&
+    overlay.includes("window.addEventListener(\"resize\", scheduleReposition)") &&
+    overlay.includes("if (!hidden) syncPinObserver();") &&
+    overlay.includes("updateEdgeMarkers();") &&
+    overlay.includes("rootMargin: \"480px\""),
+    "wiring drift");
 
   harness.section("client: overlay ui polish");
   {

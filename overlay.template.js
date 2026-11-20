@@ -2637,6 +2637,14 @@
   }
 
   const pinNodes = new Map();
+  const pinIoIds = new Map();
+  const pinIoNear = new Map();
+  const pinIoRects = new Map();
+  const pinLastPoints = new Map();
+  const edgeChips = [];
+  const pulseTimers = new Map();
+  let repositionRaf = null;
+  let pinObserver = null;
 
   function renderPins() {
     mountShadow();
@@ -2670,18 +2678,36 @@
       if (!alive.has(id)) {
         entry.node.remove();
         pinNodes.delete(id);
+        pinIoNear.delete(id);
+        pinIoRects.delete(id);
+        pinLastPoints.delete(id);
       }
     }
+    if (!hidden) syncPinObserver();
     updateToolbar();
+    updateEdgeMarkers();
   }
 
+  function scheduleReposition() {
+    if (repositionRaf !== null) return;
+    repositionRaf = requestAnimationFrame(() => {
+      repositionRaf = null;
+      repositionPins();
+    });
+  }
+  function pinIsFar(id) {
+    const rect = pinIoRects.get(id);
+    return pinIoNear.get(id) === false && rect !== undefined && (rect.width > 0 || rect.height > 0);
+  }
   function repositionPins() {
     for (const [id, entry] of pinNodes) {
       const pin = pins.find((p) => p.id === id);
       if (!pin) continue;
+      if (pinIsFar(id)) continue;
       const point = anchorPoint(pin);
       if (point) {
         entry.node.style.transform = `translate(${point.x}px, ${point.y}px)`;
+        pinLastPoints.set(id, point);
         if (pin.stale === true) {
           pin.stale = false;
           entry.node.classList.remove("lr-pin-stale");
@@ -2690,6 +2716,109 @@
     }
     repositionDraft();
     repositionFocus();
+    updateEdgeMarkers();
+  }
+  function syncPinObserver() {
+    if (typeof IntersectionObserver !== "function") return;
+    if (pinObserver === null) {
+      pinObserver = new IntersectionObserver((entries) => {
+        let entered = false;
+        for (const entry of entries) {
+          const id = pinIoIds.get(entry.target);
+          if (id === undefined) continue;
+          pinIoRects.set(id, entry.boundingClientRect);
+          pinIoNear.set(id, entry.isIntersecting);
+          if (entry.isIntersecting) entered = true;
+        }
+        if (entered) scheduleReposition();
+      }, { rootMargin: "480px" });
+    }
+    const wanted = new Map();
+    for (const pin of pins) {
+      if (pin.status === "resolvido" || pin.tag === "canvas") continue;
+      const element = locate(pin.selector);
+      if (element !== null) wanted.set(element, pin.id);
+    }
+    for (const [element, id] of [...pinIoIds]) {
+      if (wanted.has(element)) continue;
+      pinObserver.unobserve(element);
+      pinIoIds.delete(element);
+      pinIoNear.delete(id);
+      pinIoRects.delete(id);
+    }
+    for (const [element, id] of wanted) {
+      if (pinIoIds.has(element)) continue;
+      pinIoIds.set(element, id);
+      pinObserver.observe(element);
+    }
+  }
+  function updateEdgeMarkers() {
+    for (const node of edgeChips) node.remove();
+    edgeChips.length = 0;
+    if (hidden) return;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const lanes = new Map();
+    for (const pin of pins) {
+      if (pin.status === "resolvido") continue;
+      const ioRect = pinIoRects.get(pin.id);
+      let point = pinIsFar(pin.id) && ioRect ? { x: ioRect.left + ioRect.width / 2, y: ioRect.top + ioRect.height / 2 } : pinLastPoints.get(pin.id) ?? null;
+      if (point === null && pin.rect) point = { x: pin.rect.x, y: pin.rect.y };
+      if (point === null) continue;
+      if (point.x >= 0 && point.x <= vw && point.y >= 0 && point.y <= vh) continue;
+      const overLeft = -point.x;
+      const overRight = point.x - vw;
+      const overTop = -point.y;
+      const overBottom = point.y - vh;
+      const overX = Math.max(overLeft, overRight);
+      const overY = Math.max(overTop, overBottom);
+      const side = overX >= overY ? (overLeft >= overRight ? "left" : "right") : (overTop >= overBottom ? "top" : "bottom");
+      const along = side === "left" || side === "right" ? Math.min(Math.max(24, point.y), vh - 24) : Math.min(Math.max(24, point.x), vw - 24);
+      const laneKey = `${side}:${Math.round(along / 32)}`;
+      const lane = lanes.get(laneKey);
+      if (lane) lane.pins.push(pin);
+      else lanes.set(laneKey, { side, along, pins: [pin] });
+    }
+    for (const lane of lanes.values()) {
+      const count = lane.pins.length;
+      const number = pins.filter((p) => p.status !== "resolvido").indexOf(lane.pins[0]) + 1;
+      const chip = el("button", { class: "lr-edge-pin", "data-side": lane.side, type: "button", title: lane.pins[0].comment });
+      chip.append(el("span", { class: "lr-edge-arrow", html: ICONS_CANVAS.chev }), el("span", { class: "lr-edge-count" }, count > 1 ? String(count) : String(number || "•")));
+      chip.addEventListener("click", () => {
+        const pin = lane.pins[0];
+        const element = pin.tag === "canvas" ? null : locate(pin.selector);
+        if (element !== null) element.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+        else if (pin.rect) window.scrollTo({ top: Math.max(0, pin.rect.y - window.innerHeight / 2), behavior: "smooth" });
+        scheduleReposition();
+        pulsePin(pin.id);
+      });
+      if (lane.side === "left" || lane.side === "right") {
+        if (lane.side === "left") chip.style.left = "3px";
+        else chip.style.right = "3px";
+        chip.style.top = `${lane.along - 11}px`;
+      } else if (lane.side === "top") {
+        chip.style.top = "3px";
+        chip.style.left = `${lane.along}px`;
+        chip.style.transform = "translateX(-50%)";
+      } else {
+        chip.style.bottom = "3px";
+        chip.style.left = `${lane.along}px`;
+        chip.style.transform = "translateX(-50%)";
+      }
+      fixedLayer.append(chip);
+      edgeChips.push(chip);
+    }
+  }
+  function pulsePin(id) {
+    const entry = pinNodes.get(id);
+    if (!entry) return;
+    entry.node.classList.add("lr-pin-pulse");
+    const timer = pulseTimers.get(id);
+    if (timer !== undefined) clearTimeout(timer);
+    pulseTimers.set(id, setTimeout(() => {
+      pulseTimers.delete(id);
+      entry.node.classList.remove("lr-pin-pulse");
+    }, 1400));
   }
   function repositionDraft() {
     if (draft === null || draftNode === null || composerNode === null) return;
@@ -2718,13 +2847,13 @@
       }
     }
   }
-  window.addEventListener("scroll", repositionPins, { passive: true });
-  window.addEventListener("resize", repositionPins);
+  window.addEventListener("scroll", scheduleReposition, { passive: true });
+  window.addEventListener("resize", scheduleReposition);
   let mutationTimer = null;
   new MutationObserver(() => {
     clearTimeout(mutationTimer);
     mutationTimer = setTimeout(() => {
-      repositionPins();
+      scheduleReposition();
       auditPinAnchors();
     }, 400);
   }).observe(document.body ?? document.documentElement, { childList: true, subtree: true, attributes: true });
