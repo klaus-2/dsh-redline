@@ -102,6 +102,8 @@
   "drawDockDesc": "Where the drawing toolbar docks",
   "drawDockLeft": "Left (vertical)",
   "drawDockTop": "Top (horizontal)",
+  "drawDockRight": "Right (vertical)",
+  "drawDockBottom": "Bottom (above the main dock)",
   "inspectorFilterPlaceholder": "Filter properties",
   "inspectorFilterNoResults": "No properties match this filter",
   "inspectorFilterClear": "Clear the filter",

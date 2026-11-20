@@ -313,10 +313,12 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.eq("the audit limit is clamped at the floor", tinyAudit.settings.auditLimit, 50);
       const backAudit = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ auditLimit: 400 }) })).json();
       harness.eq("the audit limit returns to the default", backAudit.settings.auditLimit, 400);
-      const badDock = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ drawDock: "right" }) })).json();
+      const badDock = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ drawDock: "center" }) })).json();
       harness.eq("an invalid draw dock is ignored", badDock.settings.drawDock, "left");
       const topDock = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ drawDock: "top" }) })).json();
       harness.eq("a valid draw dock is applied", topDock.settings.drawDock, "top");
+      const rightDock = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ drawDock: "right" }) })).json();
+      harness.eq("the right draw dock is applied", rightDock.settings.drawDock, "right");
       const backDock = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ drawDock: "left" }) })).json();
       harness.eq("the draw dock returns to the default", backDock.settings.drawDock, "left");
     }

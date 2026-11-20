@@ -102,6 +102,8 @@
   "drawDockDesc": "绘图工具栏停靠的位置",
   "drawDockLeft": "左侧（垂直）",
   "drawDockTop": "顶部（水平）",
+  "drawDockRight": "右侧（垂直）",
+  "drawDockBottom": "底部（主栏上方）",
   "inspectorFilterPlaceholder": "筛选属性",
   "inspectorFilterNoResults": "没有匹配的属性",
   "inspectorFilterClear": "清除筛选",

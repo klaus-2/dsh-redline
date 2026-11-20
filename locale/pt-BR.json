@@ -102,6 +102,8 @@
   "drawDockDesc": "Onde a barra de desenho fica ancorada",
   "drawDockLeft": "Esquerda (vertical)",
   "drawDockTop": "Topo (horizontal)",
+  "drawDockRight": "Direita (vertical)",
+  "drawDockBottom": "Embaixo (acima da barra principal)",
   "inspectorFilterPlaceholder": "Filtrar propriedades",
   "inspectorFilterNoResults": "Nenhuma propriedade corresponde ao filtro",
   "inspectorFilterClear": "Limpar o filtro",
