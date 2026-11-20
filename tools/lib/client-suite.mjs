@@ -2281,6 +2281,45 @@ return { run: (theTarget, thePin) => captureBeforeAfter(theTarget, thePin), canc
       JSON.stringify({ cancelledFlow, normalFlow }));
   }
 
+  harness.section("client: overlay capture reuse");
+  {
+    const raceSource = extractFunction(overlay, "raceCapture");
+    const cropSource = extractFunction(overlay, "captureCropFor");
+    const run = cropSource === undefined ? undefined : evaluateExpression(`(setTimeout, clearTimeout) => {
+let captureTimeout = 0;
+let captureCancelled = false;
+let captureAbort = null;
+let CROP_PAD = 72;
+const CAPTURE_SIMPLIFIED_TAGS = new Set(["IMG", "VIDEO", "IFRAME", "OBJECT", "EMBED"]);
+const calls = [];
+const scroll = { x: 0, y: 0 };
+function cropCanvas(canvas, rect) { return \`crop-\${rect.x}\`; }
+const window = { html2canvas: () => { calls.push("render"); return Promise.resolve({ width: 100 }); }, innerWidth: 1200, innerHeight: 800, get scrollX() { return scroll.x; }, get scrollY() { return scroll.y; } };
+const document = { body: {} };
+async function ensureHtml2Canvas() { return true; }
+function showCaptureToast() {}
+function hideCaptureToast() {}
+function toast() {}
+function reportDiag() {}
+function t(key) { return key; }
+function groupCanvasKey() { return \`\${window.scrollX}|\${window.scrollY}|\${window.innerWidth}|\${window.innerHeight}\`; }
+${raceSource}
+${cropSource}
+return { capture: captureCropFor, calls: () => calls, scroll, armed: () => captureAbort !== null };
+}`, "captureCropFor");
+    const sandbox = run === undefined ? undefined : run(setTimeout, clearTimeout);
+    const guarded = (promise, label) => Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(label), 6000))]);
+    const reuse = { canvas: null, key: null, at: 0 };
+    const first = await guarded(sandbox?.capture({ x: 0, y: 0, w: 10, h: 10 }, 72, false, reuse), "first-stuck");
+    const second = await guarded(sandbox?.capture({ x: 5, y: 5, w: 10, h: 10 }, 72, false, reuse), "second-stuck");
+    if (sandbox !== undefined) sandbox.scroll.y = 300;
+    const scrolled = await guarded(sandbox?.capture({ x: 0, y: 0, w: 10, h: 10 }, 72, false, reuse), "scrolled-stuck");
+    harness.check("overlay: group captures reuse the rendered canvas until the page or viewport changes",
+      sandbox !== undefined && first === "crop-0" && second === "crop-5" && scrolled === "crop-0" &&
+      sandbox?.calls().length === 2,
+      JSON.stringify({ first, second, scrolled, renders: sandbox?.calls().length }));
+  }
+
   harness.section("client: overlay ui polish");
   {
     const panelSource = extractFunction(overlay, "renderPinPanel");
@@ -2911,7 +2950,7 @@ return { apply: applyForceStates, clear: clearForceStates, force: (pseudo) => fo
         JSON.stringify(created.map((pin) => ({ shot: pin.shot, rect: pin.rect }))));
     }
     {
-      const pick = pickSource === undefined ? undefined : evaluateExpression(`(Element, modeBox, target, groupPicks, captureCropFor, screenshotOnSend, cssPath, groupPickMarker) => {\nconst readGroupMode = () => modeBox.value;\n${pickSource.replace(/groupMode/g, "readGroupMode()")}\nreturn groupPick(target);\n}`, "groupPick");
+      const pick = pickSource === undefined ? undefined : evaluateExpression(`(Element, modeBox, target, groupPicks, captureCropFor, screenshotOnSend, cssPath, groupPickMarker) => {\nlet CROP_PAD = 72;\nconst groupCaptureCache = null;\nconst readGroupMode = () => modeBox.value;\n${pickSource.replace(/groupMode/g, "readGroupMode()")}\nreturn groupPick(target);\n}`, "groupPick");
       if (pick !== undefined) {
         const ElementClass = class Element {};
         const makeElement = (tagName) => {

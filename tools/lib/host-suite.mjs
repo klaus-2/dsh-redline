@@ -11,6 +11,7 @@ import { evaluateExpression, extractFunction, flush, freePort, storageShim, with
 
 const enc = (value) => Buffer.from(value, "utf8").toString("base64url");
 const SHOT = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwcJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==";
+const SHOT_ALT = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwcJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2w==";
 
 const PROTECTED_ROUTES = [
   { path: "/.lr/status", method: "GET" },
@@ -621,6 +622,14 @@ export async function runHostSuite(harness, { pluginDir }) {
         contractPost.ok === true && contractPin !== undefined && contractPin.afterShot === undefined && typeof contractPin.afterShotPath === "string" && contractPin.afterShotPath.startsWith(attachmentDir + path.sep) && typeof contractPin.screenshotPath === "string",
         JSON.stringify({ post: contractPost, afterShotPath: contractPin?.afterShotPath }));
 
+      await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: json(), body: JSON.stringify({ kind: "view", sessionId: "session-dedupe" }) });
+      const dedupePost = await (await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "proj-2", tag: "h1", selector: "body h1", comment: "dedupe", shot: SHOT }], screenshot: SHOT }) })).json();
+      const dedupeSnapshot = pendingBySession.get("session-dedupe")?.snapshot;
+      const dedupePin = dedupeSnapshot?.pins?.find((pin) => pin.id === "proj-2");
+      harness.check("host: identical shot data URLs reuse the same attachment file",
+        dedupePost.ok === true && dedupePin !== undefined && typeof dedupePin.screenshotPath === "string" && dedupePin.screenshotPath === contractPin.screenshotPath,
+        JSON.stringify({ dedupe: dedupePin?.screenshotPath, first: contractPin?.screenshotPath }));
+
       const projection = await (await fetch(`${base}/.lr/pending?sessionId=session-contract`, { headers: auth })).json();
       harness.check("host: GET /.lr/pending pins projection omits screenshot and grouping fields, with status added deliberately (D12: the dock shows what happened to each pin)",
         projection.count === 1 && projection.pins.length === 1 &&
@@ -1053,7 +1062,7 @@ export async function runHostSuite(harness, { pluginDir }) {
 
       const shotDir = path.join(home, ".dsh", "attachments", "live-review");
       const shotCountBefore = existsSync(shotDir) ? readdirSync(shotDir).length : 0;
-      const viewportAnnotations = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "v1", tag: "h1", selector: "body h1", text: "Alvo", comment: "com viewport", changes: [] }], screenshot: SHOT }) });
+      const viewportAnnotations = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "v1", tag: "h1", selector: "body h1", text: "Alvo", comment: "com viewport", changes: [] }], screenshot: SHOT_ALT }) });
       const shotFiles = existsSync(shotDir) ? readdirSync(shotDir) : [];
       const shotName = shotFiles.length > shotCountBefore ? shotFiles[shotFiles.length - 1] : "";
       harness.check("the viewport screenshot is stored for delivery", viewportAnnotations.ok === true && shotName !== "", JSON.stringify({ ok: viewportAnnotations.ok, files: shotFiles.length }));
