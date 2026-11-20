@@ -277,14 +277,14 @@ export async function runHostSuite(harness, { pluginDir }) {
     {
       const response = await fetch(`${base}/.lr/settings`, { headers: auth });
       const body = await response.json();
-      harness.check("the defaults come back", body.ok === true && body.settings.lang === "auto" && body.settings.keys.comment === "c" && body.settings.keys.adjust === "v" && body.settings.keys.draw === "d" && body.settings.screenshot === true && body.settings.cropPad === 72 && body.settings.captureQuality === "padrao" && body.settings.captureTimeout === 12 && body.settings.auditLimit === 400, JSON.stringify(body.settings));
+      harness.check("the defaults come back", body.ok === true && body.settings.lang === "auto" && body.settings.keys.comment === "c" && body.settings.keys.adjust === "v" && body.settings.keys.draw === "d" && body.settings.screenshot === true && body.settings.cropPad === 72 && body.settings.captureQuality === "padrao" && body.settings.captureTimeout === 12 && body.settings.auditLimit === 400 && body.settings.drawDock === "left", JSON.stringify(body.settings));
       harness.check("the settings expose the version and the repo", body.version === pluginVersion && body.current === pluginVersion && body.repo === "https://github.com/klaus-2/dsh-redline");
       harness.check("host: the defaults carry the dark theme", body.settings.theme === "dark", JSON.stringify(body.settings));
     }
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "pt", keys: { comment: "x", adjust: "z" }, screenshot: false, cropPad: 96 }) });
       const body = await response.json();
-      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 96, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, theme: "dark", templates: [] });
+      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 96, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [] });
     }
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "klingon", keys: { comment: "xx", adjust: "!" }, screenshot: "yes", cropPad: 5 }) });
@@ -313,6 +313,12 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.eq("the audit limit is clamped at the floor", tinyAudit.settings.auditLimit, 50);
       const backAudit = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ auditLimit: 400 }) })).json();
       harness.eq("the audit limit returns to the default", backAudit.settings.auditLimit, 400);
+      const badDock = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ drawDock: "right" }) })).json();
+      harness.eq("an invalid draw dock is ignored", badDock.settings.drawDock, "left");
+      const topDock = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ drawDock: "top" }) })).json();
+      harness.eq("a valid draw dock is applied", topDock.settings.drawDock, "top");
+      const backDock = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ drawDock: "left" }) })).json();
+      harness.eq("the draw dock returns to the default", backDock.settings.drawDock, "left");
     }
     {
       const restarted = await import(`${moduleUrl}?restart=2`);
@@ -320,7 +326,7 @@ export async function runHostSuite(harness, { pluginDir }) {
       const port2 = server2.port ?? server2.address().port;
       const response = await fetch(`http://127.0.0.1:${port2}/.lr/settings`, { headers: { [secretHeader]: secret } });
       const body = await response.json();
-      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, theme: "dark", templates: [] });
+      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [] });
       server2.close();
     }
 

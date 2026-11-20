@@ -1173,7 +1173,8 @@
 .popover { z-index: 2147483601; }
 .toolbar-wrap { z-index: 2147483602; }
 .root.lr-drawing .pin { pointer-events: none; }
-.lr-drawbar { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); display: none; flex-direction: row; align-items: center; gap: 2px; background: var(--n-100); border: 1px solid var(--line); border-radius: 12px; padding: 4px 6px; box-shadow: var(--shadow); z-index: 2147483601; max-width: calc(100vw - 16px); overflow-x: auto; }
+.lr-drawbar { position: fixed; left: 12px; top: 50%; transform: translateY(-50%); display: none; flex-direction: column; gap: 4px; background: var(--n-100); border: 1px solid var(--line); border-radius: 12px; padding: 6px; box-shadow: var(--shadow); z-index: 2147483601; }
+.lr-drawbar[data-dock="top"] { left: 50%; top: 12px; transform: translateX(-50%); flex-direction: row; align-items: center; gap: 2px; padding: 4px 6px; max-width: calc(100vw - 16px); overflow-x: auto; }
 .lr-drawbar[data-on] { display: flex; }
 .lr-dicon { display: inline-flex; width: 14px; height: 14px; }
 .lr-dicon svg { display: block; }
@@ -1234,6 +1235,7 @@
   let drawCanvas = null;
   let drawCtx = null;
   let drawBar = null;
+  let drawDock = "left";
   let drawBtn = null;
   let drawLive = null;
   let drawMenu = null;
@@ -1674,6 +1676,7 @@
 
   function buildDrawBar() {
     drawBar = el("div", { class: "lr-drawbar" });
+    drawBar.setAttribute("data-dock", drawDock);
     drawBar.toggleAttribute("data-on", drawMode);
     const addTool = (id, labelKey, icon, onPick) => {
       const btn = el("button", { class: "lr-dtool", type: "button", title: t(labelKey) });
@@ -2140,6 +2143,8 @@
     if (typeof next.captureQuality === "string") captureQuality = ["leve", "padrao", "alta"].includes(next.captureQuality) ? next.captureQuality : "padrao";
     if (Number.isFinite(Number(next.captureTimeout))) captureTimeout = Math.max(0, Math.min(60, Math.round(Number(next.captureTimeout))));
     if (Number.isFinite(Number(next.auditLimit))) auditLimit = Math.max(50, Math.min(2000, Math.round(Number(next.auditLimit))));
+    if (typeof next.drawDock === "string") drawDock = ["left", "top"].includes(next.drawDock) ? next.drawDock : "left";
+    drawBar?.setAttribute("data-dock", drawDock);
     if (next.keys === null || typeof next.keys !== "object") return;
     let changed = false;
     const comment = parseHotkey(next.keys.comment);

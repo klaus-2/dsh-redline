@@ -2365,6 +2365,13 @@ return { run: runPageAudit, probes: () => probes };
     client.includes("lr-preview-dropped-row") && client.includes("removePreviewPin") &&
     client.includes("chars: Number.isFinite(Number(data.chars))"),
     "card budget wiring drift");
+  harness.check("overlay: the drawing dock defaults to the left column and follows the setting",
+    overlay.includes("let drawDock = \"left\";") &&
+    overlay.includes(".lr-drawbar[data-dock=\"top\"]") &&
+    overlay.includes("drawBar.setAttribute(\"data-dock\", drawDock)") &&
+    overlay.includes("if (typeof next.drawDock === \"string\") drawDock = [\"left\", \"top\"].includes(next.drawDock) ? next.drawDock : \"left\";") &&
+    overlay.includes("drawBar?.setAttribute(\"data-dock\", drawDock);"),
+    "draw dock wiring drift");
 
   harness.section("client: overlay ui polish");
   {
