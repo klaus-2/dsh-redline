@@ -283,7 +283,7 @@ export async function runHostSuite(harness, { pluginDir }) {
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "pt", keys: { comment: "x", adjust: "z" }, screenshot: false, cropPad: 96 }) });
       const body = await response.json();
-      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 96, theme: "dark", templates: [] });
+      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 96, captureQuality: "padrao", theme: "dark", templates: [] });
     }
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "klingon", keys: { comment: "xx", adjust: "!" }, screenshot: "yes", cropPad: 5 }) });
@@ -294,6 +294,12 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.eq("the crop padding is clamped", body.settings.cropPad, 16);
       const high = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ cropPad: 9999 }) })).json();
       harness.eq("the crop padding is clamped at the top", high.settings.cropPad, 200);
+      const badQuality = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ captureQuality: "ultra" }) })).json();
+      harness.eq("an invalid capture quality is ignored", badQuality.settings.captureQuality, "padrao");
+      const altaQuality = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ captureQuality: "alta" }) })).json();
+      harness.eq("a valid capture quality is applied", altaQuality.settings.captureQuality, "alta");
+      const resetQuality = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ captureQuality: "padrao" }) })).json();
+      harness.eq("the capture quality resets to the default", resetQuality.settings.captureQuality, "padrao");
     }
     {
       const restarted = await import(`${moduleUrl}?restart=2`);
@@ -301,7 +307,7 @@ export async function runHostSuite(harness, { pluginDir }) {
       const port2 = server2.port ?? server2.address().port;
       const response = await fetch(`http://127.0.0.1:${port2}/.lr/settings`, { headers: { [secretHeader]: secret } });
       const body = await response.json();
-      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200, theme: "dark", templates: [] });
+      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200, captureQuality: "padrao", theme: "dark", templates: [] });
       server2.close();
     }
 
@@ -1406,8 +1412,8 @@ export async function runHostSuite(harness, { pluginDir }) {
         const unknownPreview = await (await fetch(`${base}/.lr/preview?sessionId=session-preview-unknown`, { headers: auth })).json();
         const absentPreview = await (await fetch(`${base}/.lr/preview`, { headers: auth })).json();
         harness.check("the preview route answers the empty shape for an unknown or absent session",
-          JSON.stringify(unknownPreview) === JSON.stringify({ ok: true, context: "", sections: [], pins: [] }) &&
-          JSON.stringify(absentPreview) === JSON.stringify({ ok: true, context: "", sections: [], pins: [] }),
+          JSON.stringify(unknownPreview) === JSON.stringify({ ok: true, context: "", sections: [], bytes: 0, captureQuality: "padrao", pins: [] }) &&
+          JSON.stringify(absentPreview) === JSON.stringify({ ok: true, context: "", sections: [], bytes: 0, captureQuality: "padrao", pins: [] }),
           JSON.stringify({ unknown: unknownPreview, absent: absentPreview }));
       }
 

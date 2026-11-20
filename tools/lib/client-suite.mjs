@@ -2149,6 +2149,35 @@ function mkEntry(wasOpen, texts) {
     overlay.includes(".lr-filter { all: unset"),
     "filter wiring drift");
 
+  harness.section("client: overlay capture quality");
+  {
+    const presetSource = extractFunction(overlay, "capturePreset");
+    const run = presetSource === undefined ? undefined : evaluateExpression(`() => {
+let captureQuality = "bogus";
+${presetSource}
+return { value: () => capturePreset(captureQuality), set: (v) => { captureQuality = v; } };
+}`, "capturePreset");
+    const sandbox = run === undefined ? undefined : run();
+    const bogus = sandbox?.value();
+    sandbox?.set("leve");
+    const leve = sandbox?.value();
+    sandbox?.set("alta");
+    const alta = sandbox?.value();
+    harness.check("overlay: the capture preset picks the quality pair and falls back to the standard",
+      sandbox !== undefined && bogus?.maxEdge === 900 && bogus?.quality === 0.8 &&
+      leve?.maxEdge === 640 && leve?.quality === 0.7 &&
+      alta?.maxEdge === 1400 && alta?.quality === 0.92,
+      JSON.stringify({ bogus, leve, alta }));
+    harness.check("overlay: the capture quality arrives from settings and sizes the crop",
+      overlay.includes("if (typeof next.captureQuality === \"string\") captureQuality =") &&
+      overlay.includes("const preset = capturePreset(captureQuality);") &&
+      overlay.includes("preset.maxEdge / Math.max(sw, sh)") &&
+      overlay.includes("toDataURL(\"image/jpeg\", preset.quality)") &&
+      overlay.includes("let captureQuality = \"padrao\";") &&
+      !overlay.includes("CROP_MAX_EDGE"),
+      "capture quality wiring drift");
+  }
+
   harness.section("client: overlay ui polish");
   {
     const panelSource = extractFunction(overlay, "renderPinPanel");

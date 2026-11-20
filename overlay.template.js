@@ -2108,6 +2108,7 @@
     }
     rootDiv.className = themeRootClass(next.theme);
     if (Array.isArray(next.templates)) customTemplates = normalizeTemplates(next.templates);
+    if (typeof next.captureQuality === "string") captureQuality = ["leve", "padrao", "alta"].includes(next.captureQuality) ? next.captureQuality : "padrao";
     if (next.keys === null || typeof next.keys !== "object") return;
     let changed = false;
     const comment = parseHotkey(next.keys.comment);
@@ -3360,7 +3361,12 @@
 
 
   let CROP_PAD = 72;
-  const CROP_MAX_EDGE = 900;
+  let captureQuality = "padrao";
+  function capturePreset(quality) {
+    if (quality === "leve") return { maxEdge: 640, quality: 0.7 };
+    if (quality === "alta") return { maxEdge: 1400, quality: 0.92 };
+    return { maxEdge: 900, quality: 0.8 };
+  }
 
   async function captureCropFor(rect, cropPad = CROP_PAD, withDrawings = false) {
     const ok = await ensureHtml2Canvas();
@@ -3396,6 +3402,7 @@
 
   function cropCanvas(canvas, rect, pad = CROP_PAD) {
     try {
+      const preset = capturePreset(captureQuality);
       const scale = canvas.width / Math.max(1, window.innerWidth);
       let sx = (rect.x - pad) * scale;
       let sy = (rect.y - pad) * scale;
@@ -3405,7 +3412,7 @@
       sy = Math.max(0, Math.min(sy, canvas.height - 1));
       sw = Math.max(32, Math.min(sw, canvas.width - sx));
       sh = Math.max(32, Math.min(sh, canvas.height - sy));
-      const shrink = Math.min(1, CROP_MAX_EDGE / Math.max(sw, sh));
+      const shrink = Math.min(1, preset.maxEdge / Math.max(sw, sh));
       const out = document.createElement("canvas");
       out.width = Math.max(1, Math.round(sw * shrink));
       out.height = Math.max(1, Math.round(sh * shrink));
@@ -3413,7 +3420,7 @@
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, out.width, out.height);
       ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, out.width, out.height);
-      return out.toDataURL("image/jpeg", 0.8);
+      return out.toDataURL("image/jpeg", preset.quality);
     } catch (error) {
       reportDiag(`crop: ${String(error && error.message ? error.message : error).slice(0, 200)}`);
       return null;
