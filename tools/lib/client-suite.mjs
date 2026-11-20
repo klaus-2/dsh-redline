@@ -2320,6 +2320,47 @@ return { capture: captureCropFor, calls: () => calls, scroll, armed: () => captu
       JSON.stringify({ first, second, scrolled, renders: sandbox?.calls().length }));
   }
 
+  harness.section("client: overlay audit batching");
+  {
+    const auditSource = extractFunction(overlay, "runPageAudit");
+    const run = auditSource === undefined ? undefined : evaluateExpression(`(setTimeout, clearTimeout) => {
+const A11Y_AUDIT_FAMILY_SELECTORS = { interactive: "i", images: "img", semantic: "s" };
+const elements = [];
+for (let index = 0; index < 100; index += 1) elements.push({ __fail: index % 10 === 0, tag: "div" });
+const root = { querySelectorAll: (selector) => (selector === "i" ? elements : []) };
+const document = { body: root };
+let probes = 0;
+function collectAuditCandidates(families, budget) { return families.interactive(); }
+function pickAuditCandidates(list, cap) { return list.slice(0, cap); }
+function auditElement(element) { probes += 1; return [{ check: "contrast", status: element.__fail === true ? "fail" : "pass", value: "1" }]; }
+function cssPath() { return "path"; }
+function quickLabel() { return "label"; }
+${auditSource}
+return { run: runPageAudit, probes: () => probes };
+}`, "runPageAudit");
+    const sandbox = run === undefined ? undefined : run(setTimeout, clearTimeout);
+    const guarded = (promise, label) => Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(label), 6000))]);
+    const updates = [];
+    const result = await guarded(sandbox?.run({ limit: 400, onProgress: (update) => updates.push({ done: update.done, total: update.total, findings: update.findings.length }), shouldStop: null }), "audit-stuck");
+    const chunking = { updates: updates.map((update) => update.done), total: updates[0]?.total, findings: result?.findings.length, scanned: result?.scanned };
+    const stopUpdates = [];
+    const stopResult = await guarded(sandbox?.run({ limit: 400, onProgress: (update) => stopUpdates.push(update.done), shouldStop: () => stopUpdates.length >= 1 }), "stop-stuck");
+    harness.check("overlay: the page audit runs in chunks with progress and honors a stop",
+      sandbox !== undefined && JSON.stringify(chunking.updates) === "[40,80,100]" && chunking.total === 100 && chunking.findings === 10 && chunking.scanned === 100 && sandbox?.probes() === 140 &&
+      stopResult?.stopped === true && stopResult?.scanned === 40 && JSON.stringify(stopUpdates) === "[40]",
+      JSON.stringify({ chunking, stopUpdates, stopScanned: stopResult?.scanned, stopped: stopResult?.stopped }));
+    harness.check("overlay: the audit panel streams progress and the limit arrives from settings",
+      overlay.includes("async function runPageAudit(options)") &&
+      overlay.includes("shouldStop: () => auditRunToken !== token") &&
+      overlay.includes("auditRunToken += 1;") &&
+      overlay.includes("t(\"auditCancel\")") &&
+      overlay.includes("t(\"auditPartial\")") &&
+      overlay.includes("limit: auditLimit") &&
+      overlay.includes("if (Number.isFinite(Number(next.auditLimit))) auditLimit = Math.max(50, Math.min(2000, Math.round(Number(next.auditLimit))));") &&
+      overlay.includes(".lr-audit-progress-track"),
+      "audit batching wiring drift");
+  }
+
   harness.section("client: overlay ui polish");
   {
     const panelSource = extractFunction(overlay, "renderPinPanel");
