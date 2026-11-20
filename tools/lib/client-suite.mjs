@@ -1120,7 +1120,7 @@ export async function runClientSuite(harness, { pluginDir }) {
   harness.section("client: overlay before/after captures");
   {
     const captureSource = extractFunction(overlay, "captureBeforeAfter");
-    const runCapture = captureSource === undefined ? undefined : evaluateExpression(`(screenshotOnSend, captureCropFor, restoreAll, applyCommitted, adjustPatch, target, pin) => {\n${captureSource}\nreturn captureBeforeAfter(target, pin);\n}`, "captureBeforeAfter");
+    const runCapture = captureSource === undefined ? undefined : evaluateExpression(`(screenshotOnSend, captureCropFor, restoreAll, applyCommitted, adjustPatch, target, pin) => {\nlet captureCancelled = false;\n${captureSource}\nreturn captureBeforeAfter(target, pin);\n}`, "captureBeforeAfter");
     const captureTarget = { getBoundingClientRect: () => ({ left: 10, top: 20, width: 100, height: 50 }) };
     harness.check("the overlay keeps its capture chain", runCapture !== undefined);
     const makeStubs = () => {
@@ -2176,6 +2176,109 @@ return { value: () => capturePreset(captureQuality), set: (v) => { captureQualit
       overlay.includes("let captureQuality = \"padrao\";") &&
       !overlay.includes("CROP_MAX_EDGE"),
       "capture quality wiring drift");
+  }
+
+  harness.section("client: overlay capture timeout");
+  {
+    const raceSource = extractFunction(overlay, "raceCapture");
+    const clearedTimers = [];
+    const run = raceSource === undefined ? undefined : evaluateExpression(`(setTimeout, clearTimeout) => {
+let captureAbort = null;
+${raceSource}
+return { race: raceCapture, abort: () => captureAbort?.(), armed: () => captureAbort !== null };
+}`, "raceCapture");
+    const sandbox = run === undefined ? undefined : run(setTimeout, (handle) => clearedTimers.push(handle));
+    let cancelled = null;
+    const first = sandbox?.race(new Promise(() => {}), 30000);
+    const armed = sandbox?.armed();
+    first?.then((value) => { cancelled = value; });
+    sandbox?.abort();
+    const afterAbort = sandbox?.armed();
+    let doneValue = null;
+    sandbox?.race(Promise.resolve("fast"), 30000).then((value) => { doneValue = value; });
+    await waitFor(() => doneValue !== null);
+    let timedOut = null;
+    sandbox?.race(new Promise(() => {}), 30).then((value) => { timedOut = value; });
+    await waitFor(() => timedOut !== null);
+    harness.check("overlay: the capture race resolves done, timeout and cancelled exactly once",
+      sandbox !== undefined && armed === true && cancelled?.status === "cancelled" && afterAbort === false &&
+      doneValue?.status === "done" && doneValue?.canvas === "fast" && clearedTimers.length >= 2 && timedOut?.status === "timeout",
+      JSON.stringify({ armed, cancelled, afterAbort, doneValue, clearedTimers: clearedTimers.length, timedOut }));
+  }
+  {
+    const raceSource = extractFunction(overlay, "raceCapture");
+    const cropSource = extractFunction(overlay, "captureCropFor");
+    const run = cropSource === undefined ? undefined : evaluateExpression(`(setTimeout, clearTimeout) => {
+let captureTimeout = 0.05;
+let captureCancelled = false;
+let captureAbort = null;
+let CROP_PAD = 72;
+const CAPTURE_SIMPLIFIED_TAGS = new Set(["IMG", "VIDEO", "IFRAME", "OBJECT", "EMBED"]);
+const toasts = [];
+const calls = [];
+function t(key) { return key; }
+function toast(text) { toasts.push(text); }
+function reportDiag() {}
+function showCaptureToast() {}
+function hideCaptureToast() {}
+function cropCanvas() { return "CROPPED"; }
+const window = { html2canvas: (body, options) => { calls.push(options); return calls.length === 1 || calls.length === 4 ? new Promise(() => {}) : Promise.resolve({ width: 100 }); }, innerWidth: 1200, innerHeight: 800, scrollX: 0, scrollY: 0 };
+const document = { body: {} };
+async function ensureHtml2Canvas() { return true; }
+${raceSource}
+${cropSource}
+return { capture: captureCropFor, calls: () => calls, toasts: () => toasts, cancelled: () => captureCancelled, abort: () => captureAbort?.(), armed: () => captureAbort !== null };
+}`, "captureCropFor");
+    const sandbox = run === undefined ? undefined : run(setTimeout, clearTimeout);
+    const guarded = (promise, label) => Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(label), 6000))]);
+    const retriedPromise = sandbox?.capture({ x: 0, y: 0, w: 10, h: 10 });
+    await waitFor(() => (sandbox?.calls().length ?? 0) >= 2, 4000, 20);
+    const retried = await guarded(retriedPromise, "retried-stuck");
+    const firstIgnore = sandbox?.calls()[0]?.ignoreElements;
+    const secondIgnore = sandbox?.calls()[1]?.ignoreElements;
+    const classified = { firstPlain: firstIgnore?.({ id: "", tagName: "DIV" }), simplifiedImg: secondIgnore?.({ id: "", tagName: "IMG" }), simplifiedHost: secondIgnore?.({ id: "dsh-redline-host", tagName: "DIV" }), simplifiedPlain: secondIgnore?.({ id: "", tagName: "DIV" }) };
+    const normal = await guarded(sandbox?.capture({ x: 0, y: 0, w: 10, h: 10 }), "normal-stuck");
+    const cancelledPromise = sandbox?.capture({ x: 0, y: 0, w: 10, h: 10 });
+    await waitFor(() => sandbox?.armed() === true, 4000, 20);
+    sandbox?.abort();
+    const cancelled = await guarded(cancelledPromise, "cancelled-stuck");
+    const cancelledState = { value: cancelled, cancelled: sandbox?.cancelled(), calls: sandbox?.calls().length };
+    harness.check("overlay: a timed out capture retries simplified and a cancelled capture returns null",
+      sandbox !== undefined && retried === "CROPPED" && sandbox?.toasts()[0] === "captureTimeoutFallback" &&
+      classified.firstPlain === false && classified.simplifiedImg === true && classified.simplifiedHost === true && classified.simplifiedPlain === false &&
+      normal === "CROPPED" && cancelledState.value === null && cancelledState.cancelled === true && cancelledState.calls === 4,
+      JSON.stringify({ retried, toasts: sandbox?.toasts(), classified, normal, cancelledState }));
+  }
+  {
+    const beforeSource = extractFunction(overlay, "captureBeforeAfter");
+    const run = beforeSource === undefined ? undefined : evaluateExpression(`(screenshotOnSend, captureCropFor, restoreAll, applyCommitted, adjustPatch, target, pin) => {
+let captureCancelled = false;
+${beforeSource}
+return { run: (theTarget, thePin) => captureBeforeAfter(theTarget, thePin), cancel: () => { captureCancelled = true; } };
+}`, "captureBeforeAfter");
+    const target = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 50, height: 50 }) };
+    const captures = [];
+    const restored = [];
+    const applied = [];
+    const capture = async () => { captures.push("c"); return null; };
+    const restore = () => restored.push("restore");
+    const apply = () => applied.push("apply");
+    const patch = { originalText: null };
+    const pin = { changes: [{ prop: "color", after: "red" }] };
+    const cancelledBox = run === undefined ? undefined : run(true, capture, restore, apply, patch, target, pin);
+    cancelledBox?.cancel();
+    await cancelledBox?.run(target, pin);
+    const cancelledFlow = { captures: captures.length, restored: restored.length, applied: applied.length };
+    const normalBox = run === undefined ? undefined : run(true, async () => { captures.push("c"); return "shot"; }, restore, apply, patch, target, pin);
+    const baseCaptures = captures.length;
+    const baseRestored = restored.length;
+    const baseApplied = applied.length;
+    await normalBox?.run(target, pin);
+    const normalFlow = { captures: captures.length - baseCaptures, restored: restored.length - baseRestored, applied: applied.length - baseApplied };
+    harness.check("overlay: a cancelled before-capture still commits the changes and skips the second shot",
+      cancelledBox !== undefined && cancelledFlow.captures === 1 && cancelledFlow.restored === 1 && cancelledFlow.applied === 1 &&
+      normalFlow.captures === 2 && normalFlow.restored === 1 && normalFlow.applied === 1,
+      JSON.stringify({ cancelledFlow, normalFlow }));
   }
 
   harness.section("client: overlay ui polish");

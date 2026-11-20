@@ -147,6 +147,11 @@
       "inspectorFilterPlaceholder": "Filter properties",
       "inspectorFilterNoResults": "No properties match this filter",
       "inspectorFilterClear": "Clear the filter",
+      "captureRunning": "Capturing the page…",
+      "captureSimplified": "Capturing without images…",
+      "captureCancel": "Cancel",
+      "captureTimeoutFallback": "The capture took too long; trying without images",
+      "captureTimeoutFailed": "The capture did not finish in time",
       "eyeTitle": "Show/hide pins",
       "statusTitle": "Live Review active",
       "pendingTitle": "Annotations waiting for your next prompt in the chat",
@@ -373,6 +378,11 @@
       "inspectorFilterPlaceholder": "Filtrar propriedades",
       "inspectorFilterNoResults": "Nenhuma propriedade corresponde ao filtro",
       "inspectorFilterClear": "Limpar o filtro",
+      "captureRunning": "Capturando a página…",
+      "captureSimplified": "Capturando sem imagens…",
+      "captureCancel": "Cancelar",
+      "captureTimeoutFallback": "A captura demorou; tentando sem imagens",
+      "captureTimeoutFailed": "A captura não terminou a tempo",
       "eyeTitle": "Mostrar/ocultar pins",
       "statusTitle": "Live Review ativo",
       "pendingTitle": "Anotações aguardando seu próximo prompt no chat",
@@ -599,6 +609,11 @@
       "inspectorFilterPlaceholder": "筛选属性",
       "inspectorFilterNoResults": "没有匹配的属性",
       "inspectorFilterClear": "清除筛选",
+      "captureRunning": "正在截取页面…",
+      "captureSimplified": "正在截取（不含图片）…",
+      "captureCancel": "取消",
+      "captureTimeoutFallback": "截图超时，正在尝试不含图片",
+      "captureTimeoutFailed": "截图未按时完成",
       "eyeTitle": "显示/隐藏图钉",
       "statusTitle": "Live Review 运行中",
       "pendingTitle": "标注将随你的下一条消息发送",
@@ -1052,6 +1067,8 @@
     .lr-focus-hint .lr-close { pointer-events: auto; }
     .lr-toast-stack { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); pointer-events: none; display: grid; gap: 8px; z-index: 2147483602; }
     .lr-toast-stack .toast { position: static; left: auto; bottom: auto; transform: none; }
+    .lr-capture-toast { pointer-events: auto; display: flex; align-items: center; gap: 10px; }
+    .lr-capture-cancel { all: unset; cursor: pointer; padding: 2px 10px; border-radius: 999px; background: var(--n-950); color: var(--n-50); font-size: 11px; }
     .lr-template-row { display: flex; align-items: center; gap: 5px; min-width: 0; }
     .lr-template-label { display: none; }
     .lr-template-btn { all: unset; box-sizing: border-box; cursor: pointer; padding: 1px 8px; border-radius: 999px; background: var(--n-100); color: var(--n-600); font-size: 10px; white-space: nowrap; }
@@ -2526,6 +2543,12 @@
       const from = event.composedPath?.()[0] ?? event.target;
       const tag = from?.tagName;
       if (meterAltKeydown(event)) return;
+      if (event.key === "Escape" && captureAbort !== null) {
+        event.preventDefault();
+        event.stopPropagation();
+        captureAbort();
+        return;
+      }
       if (tag === "INPUT" || tag === "TEXTAREA" || from?.isContentEditable === true) return;
       if (adjustPanel !== null && (event.ctrlKey || event.metaKey) && !event.altKey) {
         const undoKey = event.key.toLowerCase();
@@ -3368,11 +3391,46 @@
     return { maxEdge: 900, quality: 0.8 };
   }
 
+  let captureTimeout = 12;
+  let captureCancelled = false;
+  let captureAbort = null;
+  const CAPTURE_SIMPLIFIED_TAGS = new Set(["IMG", "VIDEO", "IFRAME", "OBJECT", "EMBED"]);
+  function raceCapture(renderPromise, ms) {
+    return new Promise((resolve) => {
+      let settled = false;
+      let timer = null;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        captureAbort = null;
+        if (timer !== null) clearTimeout(timer);
+        resolve(value);
+      };
+      if (ms > 0) timer = setTimeout(() => finish({ status: "timeout" }), ms);
+      captureAbort = () => finish({ status: "cancelled" });
+      renderPromise.then((canvas) => finish({ status: "done", canvas })).catch((error) => finish({ status: "error", error }));
+    });
+  }
+  let captureToastNode = null;
+  function showCaptureToast(simplified) {
+    hideCaptureToast();
+    captureToastNode = el("div", { class: "toast lr-capture-toast" },
+      el("span", { class: "lr-capture-label" }, simplified ? t("captureSimplified") : t("captureRunning")),
+      el("button", { class: "lr-capture-cancel", type: "button", onclick: () => captureAbort?.() }, t("captureCancel")));
+    toastStack.append(captureToastNode);
+  }
+  function hideCaptureToast() {
+    captureToastNode?.remove();
+    captureToastNode = null;
+  }
   async function captureCropFor(rect, cropPad = CROP_PAD, withDrawings = false) {
     const ok = await ensureHtml2Canvas();
     if (!ok || typeof window.html2canvas !== "function") return null;
-    try {
-      const canvas = await window.html2canvas(document.body, {
+    captureCancelled = false;
+    let simplified = false;
+    for (;;) {
+      showCaptureToast(simplified);
+      const outcome = await raceCapture(window.html2canvas(document.body, {
         backgroundColor: "#ffffff",
         scale: Math.min(1, 1600 / window.innerWidth),
         width: window.innerWidth,
@@ -3382,21 +3440,39 @@
         scrollX: window.scrollX,
         scrollY: window.scrollY,
         useCORS: true,
-        ignoreElements: (element) => element.id === "dsh-redline-host"
-      });
-      if (withDrawings && drawCtx !== null && drawItems.length > 0) {
-        const dscale = canvas.width / Math.max(1, drawCanvas.width);
-        canvas.getContext("2d").drawImage(drawCanvas, 0, 0, drawCanvas.width * dscale, drawCanvas.height * dscale);
+        ignoreElements: simplified
+          ? (element) => element.id === "dsh-redline-host" || CAPTURE_SIMPLIFIED_TAGS.has(element.tagName)
+          : (element) => element.id === "dsh-redline-host"
+      }), captureTimeout > 0 ? captureTimeout * 1000 : 0);
+      hideCaptureToast();
+      if (outcome.status === "cancelled") {
+        captureCancelled = true;
+        return null;
       }
-      if (withDrawings && drawCtx !== null && drawItems.length > 0) {
-        const dscale = canvas.width / Math.max(1, drawCanvas.width);
-        canvas.getContext("2d").drawImage(drawCanvas, 0, 0, drawCanvas.width * dscale, drawCanvas.height * dscale);
+      if (outcome.status === "timeout") {
+        if (simplified) {
+          toast(t("captureTimeoutFailed"));
+          return null;
+        }
+        simplified = true;
+        toast(t("captureTimeoutFallback"));
+        continue;
       }
-      const data = cropCanvas(canvas, rect, cropPad);
-      return data;
-    } catch (error) {
-      reportDiag(`capture: exceção ${String(error && error.message ? error.message : error).slice(0, 200)}`);
-      return null;
+      if (outcome.status === "error") {
+        reportDiag(`capture: exceção ${String(outcome.error && outcome.error.message ? outcome.error.message : outcome.error).slice(0, 200)}`);
+        return null;
+      }
+      try {
+        const canvas = outcome.canvas;
+        if (withDrawings && drawCtx !== null && drawItems.length > 0) {
+          const dscale = canvas.width / Math.max(1, drawCanvas.width);
+          canvas.getContext("2d").drawImage(drawCanvas, 0, 0, drawCanvas.width * dscale, drawCanvas.height * dscale);
+        }
+        return cropCanvas(canvas, rect, cropPad);
+      } catch (error) {
+        reportDiag(`crop: ${String(error && error.message ? error.message : error).slice(0, 200)}`);
+        return null;
+      }
     }
   }
 
@@ -4406,8 +4482,10 @@
     const after = await captureCropFor(box);
     if (after !== null) pin.afterShot = after;
     restoreAll(patch);
-    const before = await captureCropFor(box);
-    if (before !== null) pin.shot = before;
+    if (!captureCancelled) {
+      const before = await captureCropFor(box);
+      if (before !== null) pin.shot = before;
+    }
     applyCommitted(patch, pin.changes, pin.textChange);
   }
 
