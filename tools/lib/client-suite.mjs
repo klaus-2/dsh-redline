@@ -2102,6 +2102,53 @@ return { update: updateEdgeMarkers, pins, setHidden: (v) => { hidden = v; }, lay
     overlay.includes("rootMargin: \"480px\""),
     "wiring drift");
 
+  harness.section("client: overlay inspector filter");
+  {
+    const normalizeSource = extractFunction(overlay, "normalizeInspectorText");
+    const applySource = extractFunction(overlay, "applyInspectorFilter");
+    const run = normalizeSource === undefined || applySource === undefined ? undefined : evaluateExpression(`() => {
+${normalizeSource}
+${applySource}
+return { apply: applyInspectorFilter, normalize: normalizeInspectorText, mkEntry };
+function mkEntry(wasOpen, texts) {
+  const section = { style: {}, attrs: new Set(), setAttribute(n) { this.attrs.add(n); }, removeAttribute(n) { this.attrs.delete(n); }, hasAttribute(n) { return this.attrs.has(n); } };
+  const head = { aria: null, setAttribute(n, v) { this.aria = v; } };
+  const body = { style: {} };
+  return { section, head, body, wasOpen, rows: texts.map((text) => ({ row: { style: {} }, text })) };
+}
+}`, "applyInspectorFilter");
+    const sandbox = run === undefined ? undefined : run();
+    const a = sandbox?.mkEntry(true, ["border radius", "width"]);
+    const b = sandbox?.mkEntry(false, ["background color", "opacity"]);
+    const states = sandbox?.mkEntry(false, ["hover focus active states"]);
+    const emptyNote = { style: {} };
+    sandbox?.apply("", [a, b, states], emptyNote);
+    const restored = { aOpen: a.section.hasAttribute("data-open"), bOpen: b.section.hasAttribute("data-open"), bBody: b.body.style.display, aRows: a.rows.map((row) => row.row.style.display) };
+    sandbox?.apply("Radius", [a, b, states], emptyNote);
+    const filtered = { aOpen: a.section.hasAttribute("data-open"), aVisible: a.section.style.display, widthHidden: a.rows[1].row.style.display === "none", bHidden: b.section.style.display === "none", statesHidden: states.section.style.display === "none", emptyNote: emptyNote.style.display };
+    sandbox?.apply("active", [a, b, states], emptyNote);
+    const statesOnly = { statesVisible: states.section.style.display === "", aHidden: a.section.style.display === "none", emptyNote: emptyNote.style.display };
+    sandbox?.apply("zzz", [a, b, states], emptyNote);
+    const none = { emptyNote: emptyNote.style.display, allHidden: [a.section.style.display, b.section.style.display, states.section.style.display].every((d) => d === "none") };
+    harness.check("overlay: the inspector filter matches rows, keeps groups open and restores them on clear",
+      sandbox !== undefined && restored.aOpen === true && restored.bOpen === false && restored.bBody === "none" && restored.aRows.every((d) => d === "") &&
+      filtered.aOpen === true && filtered.aVisible === "" && filtered.widthHidden === true && filtered.bHidden === true && filtered.statesHidden === true && filtered.emptyNote === "none" &&
+      statesOnly.statesVisible === true && statesOnly.aHidden === true && statesOnly.emptyNote === "none" &&
+      none.emptyNote === "" && none.allHidden === true &&
+      sandbox.normalize("Configuração") === "configuracao",
+      JSON.stringify({ restored, filtered, statesOnly, none, normalized: sandbox?.normalize("Configuração") }));
+  }
+  harness.check("overlay: the adjust panel wires the filter bar and ships its strings in every language",
+    overlay.includes("wireInspectorFilter(body);") &&
+    overlay.includes("t(\"inspectorFilterPlaceholder\")") &&
+    overlay.includes("t(\"inspectorFilterNoResults\")") &&
+    overlay.includes("t(\"inspectorFilterClear\")") &&
+    overlay.includes("row.setAttribute(\"data-filter\", opts.filter)") &&
+    overlay.includes("filter: props4.join(\" \")") &&
+    overlay.includes("filter: \"font-weight font-style text-decoration\"") &&
+    overlay.includes(".lr-filter { all: unset"),
+    "filter wiring drift");
+
   harness.section("client: overlay ui polish");
   {
     const panelSource = extractFunction(overlay, "renderPinPanel");

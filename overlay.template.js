@@ -144,6 +144,9 @@
       "gridOutline": "Outline",
       "distanceMeter": "Hold Alt with a panel open to measure distances",
       "inspectorStates": "States",
+      "inspectorFilterPlaceholder": "Filter properties",
+      "inspectorFilterNoResults": "No properties match this filter",
+      "inspectorFilterClear": "Clear the filter",
       "eyeTitle": "Show/hide pins",
       "statusTitle": "Live Review active",
       "pendingTitle": "Annotations waiting for your next prompt in the chat",
@@ -367,6 +370,9 @@
       "gridOutline": "Contorno",
       "distanceMeter": "Segure Alt com um painel aberto para medir distâncias",
       "inspectorStates": "Estados",
+      "inspectorFilterPlaceholder": "Filtrar propriedades",
+      "inspectorFilterNoResults": "Nenhuma propriedade corresponde ao filtro",
+      "inspectorFilterClear": "Limpar o filtro",
       "eyeTitle": "Mostrar/ocultar pins",
       "statusTitle": "Live Review ativo",
       "pendingTitle": "Anotações aguardando seu próximo prompt no chat",
@@ -590,6 +596,9 @@
       "gridOutline": "轮廓",
       "distanceMeter": "按住 Alt 并打开面板以测量距离",
       "inspectorStates": "状态",
+      "inspectorFilterPlaceholder": "筛选属性",
+      "inspectorFilterNoResults": "没有匹配的属性",
+      "inspectorFilterClear": "清除筛选",
       "eyeTitle": "显示/隐藏图钉",
       "statusTitle": "Live Review 运行中",
       "pendingTitle": "标注将随你的下一条消息发送",
@@ -1060,6 +1069,12 @@
     .lr-sec-chev { color: var(--n-500); font-size: 10px; transition: transform .15s; }
     .lr-sec[data-open] .lr-sec-chev { transform: rotate(180deg); }
     .lr-sec-body { display: flex; flex-direction: column; gap: 6px; padding: 2px 0 8px; }
+    .lr-filter-bar { display: flex; align-items: center; gap: 4px; padding: 6px 0; }
+    .lr-filter { all: unset; box-sizing: border-box; flex: 1; min-width: 0; height: 26px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--n-50); color: var(--n-900); font-size: 12px; }
+    .lr-filter:focus { border-color: var(--accent); }
+    .lr-filter-clear { all: unset; box-sizing: border-box; cursor: pointer; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 5px; color: var(--n-500); font-size: 11px; }
+    .lr-filter-clear:hover { background: var(--n-100); color: var(--n-900); }
+    .lr-filter-empty { padding: 8px 2px; font-size: 12px; color: var(--n-500); }
     .lr-row { display: flex; align-items: center; gap: 8px; min-height: 28px; min-width: 0; flex-wrap: wrap; }
     .lr-row-wide { flex-direction: column; align-items: stretch; gap: 4px; }
     .lr-row-label { flex: none; width: 88px; min-width: 0; max-width: 40%; font-size: 11px; color: var(--n-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -4657,7 +4672,80 @@
       reset.addEventListener("click", () => opts.onReset());
       ctl.append(reset);
     }
+    if (typeof opts.filter === "string") row.setAttribute("data-filter", opts.filter);
     return row;
+  }
+  function normalizeInspectorText(text) {
+    return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+  function applyInspectorFilter(query, entries, emptyNote) {
+    const needle = normalizeInspectorText(query.trim());
+    let visible = 0;
+    for (const entry of entries) {
+      const matching = needle === "" ? entry.rows : entry.rows.filter((row) => row.text.includes(needle));
+      const hit = needle === "" || matching.length > 0;
+      entry.section.style.display = hit ? "" : "none";
+      if (entry.head === null) {
+        if (hit) visible += matching.length;
+        continue;
+      }
+      if (needle === "") {
+        if (entry.wasOpen) entry.section.setAttribute("data-open", "");
+        else entry.section.removeAttribute("data-open");
+        entry.body.style.display = entry.wasOpen ? "" : "none";
+        entry.head.setAttribute("aria-expanded", entry.wasOpen ? "true" : "false");
+        for (const row of entry.rows) row.row.style.display = "";
+        continue;
+      }
+      if (!hit) continue;
+      entry.section.setAttribute("data-open", "");
+      entry.body.style.display = "";
+      entry.head.setAttribute("aria-expanded", "true");
+      for (const row of entry.rows) row.row.style.display = row.text.includes(needle) ? "" : "none";
+      visible += matching.length;
+    }
+    emptyNote.style.display = needle !== "" && visible === 0 ? "" : "none";
+  }
+  function wireInspectorFilter(body) {
+    const entries = [];
+    for (const section of body.children) {
+      if (!(section instanceof Element)) continue;
+      if (section.classList.contains("lr-row")) {
+        const label = section.querySelector(".lr-row-label");
+        entries.push({ section, head: null, body: null, wasOpen: false, rows: [{ row: section, text: normalizeInspectorText(`${label?.textContent ?? ""} ${section.getAttribute("data-filter") ?? ""}`) }] });
+        continue;
+      }
+      if (!section.classList.contains("lr-sec")) continue;
+      const head = section.querySelector(".lr-sec-head");
+      const secBody = section.querySelector(".lr-sec-body");
+      if (head === null || secBody === null) continue;
+      const rows = [];
+      for (const row of secBody.children) {
+        if (!(row instanceof Element) || !row.classList.contains("lr-row")) continue;
+        const label = row.querySelector(".lr-row-label");
+        rows.push({ row, text: normalizeInspectorText(`${label?.textContent ?? ""} ${row.getAttribute("data-filter") ?? ""}`) });
+      }
+      if (rows.length === 0) continue;
+      entries.push({ section, head, body: secBody, rows, wasOpen: section.hasAttribute("data-open") });
+    }
+    if (entries.length === 0) return;
+    const emptyNote = el("div", { class: "lr-filter-empty" }, t("inspectorFilterNoResults"));
+    emptyNote.style.display = "none";
+    const input = el("input", { class: "lr-filter", type: "text", placeholder: t("inspectorFilterPlaceholder"), "aria-label": t("inspectorFilterPlaceholder") });
+    const clearBtn = el("button", { class: "lr-filter-clear", type: "button", title: t("inspectorFilterClear"), "aria-label": t("inspectorFilterClear") }, "✕");
+    clearBtn.style.display = "none";
+    const run = () => {
+      clearBtn.style.display = input.value === "" ? "none" : "";
+      applyInspectorFilter(input.value, entries, emptyNote);
+    };
+    input.addEventListener("input", run);
+    clearBtn.addEventListener("click", () => {
+      input.value = "";
+      run();
+      input.focus();
+    });
+    body.before(el("div", { class: "lr-filter-bar" }, input, clearBtn));
+    body.after(emptyNote);
   }
   function lrField(value, onChange, opts = {}) {
     const input = el("input", { class: `lr-field${opts.num ? " lr-field-num" : ""}`, type: "text", spellcheck: "false" });
@@ -5106,6 +5194,7 @@
       onReset: () => adjustReset(prop),
       rerender: adjustRerender,
       refresh: refreshDisplay,
+      filter: `${prop} ${meta.label}`,
       tokens: TOKEN_SUGGESTION_PROPS.has(prop) && value !== "" ? tokenChipRow(adjustTarget, value, (tokenName) => adjustUpdateProperty(prop, `var(${tokenName})`)) : null
     });
   }
@@ -5113,7 +5202,7 @@
     const wrap = quadControl(props4, badges4, props4.map((p) => adjustNumericFallback(p)), min, (prop, next) => adjustUpdateProperty(prop, next));
     const source = props4.map((p) => adjustValues.get(p) ?? "").find((v) => v !== "") ?? "";
     const names = source === "" ? [] : tokenSuggestionsFor(adjustTarget, source, makeTokenProbe);
-    return inspectorRow(label, wrap, { wide: true, staticLabel: true, changed: () => props4.some((p) => adjustChanged(p)), onReset: () => { props4.forEach((p) => adjustReset(p)); wrap.__refresh(); }, rerender: adjustRerender, tokens: tokenChipRowFromNames(names, (tokenName) => {
+    return inspectorRow(label, wrap, { wide: true, staticLabel: true, filter: props4.join(" "), changed: () => props4.some((p) => adjustChanged(p)), onReset: () => { props4.forEach((p) => adjustReset(p)); wrap.__refresh(); }, rerender: adjustRerender, tokens: tokenChipRowFromNames(names, (tokenName) => {
       for (const p of props4) {
         if ((adjustValues.get(p) ?? "") === source) adjustUpdateProperty(p, `var(${tokenName})`);
       }
@@ -5201,7 +5290,7 @@
 
     body.append(inspectorSection(t("secTypography"), true, (sec) => {
       sec.append(propertyRow("font-family"));
-      const styleRow = inspectorRow(t("prop.font-style"), el("span", { class: "lr-row-ctl" }), { changed: () => adjustChanged("font-weight") || adjustChanged("font-style") || adjustChanged("text-decoration"), onReset: () => { adjustReset("font-weight"); adjustReset("font-style"); adjustReset("text-decoration"); }, rerender: adjustRerender });
+      const styleRow = inspectorRow(t("prop.font-style"), el("span", { class: "lr-row-ctl" }), { changed: () => adjustChanged("font-weight") || adjustChanged("font-style") || adjustChanged("text-decoration"), onReset: () => { adjustReset("font-weight"); adjustReset("font-style"); adjustReset("text-decoration"); }, rerender: adjustRerender, filter: "font-weight font-style text-decoration" });
       const group = styleRow.querySelector(".lr-row-ctl");
       const refresh = () => {
         const weight = Number(adjustValues.get("font-weight") ?? "");
@@ -5283,8 +5372,8 @@
     body.append(inspectorSection(t("secEffects"), false, (sec) => {
       const shadowWrap = shadowControl("box-shadow");
       const transformWrap = transformControl("transform");
-      const shadowRowEl = inspectorRow(t("prop.box-shadow"), shadowWrap, { wide: true, staticLabel: true, changed: () => adjustChanged("box-shadow"), onReset: () => { adjustReset("box-shadow"); shadowWrap.__render(); }, rerender: adjustRerender });
-      const transformRowEl = inspectorRow(t("prop.transform"), transformWrap, { wide: true, staticLabel: true, changed: () => adjustChanged("transform"), onReset: () => { adjustReset("transform"); transformWrap.__render(); }, rerender: adjustRerender });
+      const shadowRowEl = inspectorRow(t("prop.box-shadow"), shadowWrap, { wide: true, staticLabel: true, filter: "box-shadow", changed: () => adjustChanged("box-shadow"), onReset: () => { adjustReset("box-shadow"); shadowWrap.__render(); }, rerender: adjustRerender });
+      const transformRowEl = inspectorRow(t("prop.transform"), transformWrap, { wide: true, staticLabel: true, filter: "transform", changed: () => adjustChanged("transform"), onReset: () => { adjustReset("transform"); transformWrap.__render(); }, rerender: adjustRerender });
       sec.append(shadowRowEl, transformRowEl);
     }));
 
@@ -5293,9 +5382,10 @@
       chip.toggleAttribute("data-on", forceStates.has(pseudo));
       chip.addEventListener("click", () => toggleForceState(pseudo));
       return chip;
-    }))));
+    }), { filter: "hover focus active states" })));
 
     panel.append(body);
+    wireInspectorFilter(body);
 
     const footer = el("div", { class: "lr-footer" });
     const cancel = el("button", { class: "lr-cancel", type: "button" }, t("cancelBtn"));
