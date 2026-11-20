@@ -547,6 +547,21 @@ export async function runHostSuite(harness, { pluginDir }) {
         const oversized = formatContext({ pageUrl: "http://127.0.0.1:1/", pageTitle: "Alvo", pins: [{ id: "only", tag: "h1", selector: "body h1", comment: "the only comment", changes: oversizedChanges }], screenshotPath: null });
         harness.check("an oversized single comment is dropped and reported", !oversized.text.includes("the only comment") && oversized.text.includes("1 comment(s) omitted") && oversized.text.length <= MAX_CONTEXT_CHARS && oversized.blocks.length === 1, JSON.stringify({ textLength: oversized.text.length, blocks: oversized.blocks.length }));
       }
+      {
+        const droppedProbe = [];
+        const bigComment = "x".repeat(4000);
+        const overflowPins = [{ id: "fit-1", tag: "h1", selector: "body h1", comment: "cabe" }];
+        for (let index = 0; index < 19; index += 1) overflowPins.push({ id: `b${index}`, tag: "h1", selector: `body h${index}`, comment: bigComment });
+        const overflowSnapshot = { pageUrl: "http://127.0.0.1:1/", pageTitle: "Alvo", screenshotPath: null, pins: overflowPins };
+        const plainFormat = formatContext(overflowSnapshot);
+        const probedFormat = formatContext(overflowSnapshot, (item) => droppedProbe.push(item));
+        const droppedIds = droppedProbe.map((item) => item.id);
+        harness.check("host: formatContext collects the dropped pins without changing the output",
+          plainFormat.text === probedFormat.text && JSON.stringify(plainFormat.blocks) === JSON.stringify(probedFormat.blocks) &&
+          droppedIds.length >= 3 && droppedIds.every((id) => id !== "fit-1") && droppedIds.includes("b18") &&
+          droppedProbe.every((item) => item.reason === "context budget") && typeof droppedProbe[0].label === "string",
+          JSON.stringify({ identical: plainFormat.text === probedFormat.text, droppedIds }));
+      }
     }
     {
       const { text, blocks } = formatContext({ pageUrl: "http://127.0.0.1:1/", pageTitle: "Alvo", pins: [{ id: "1", tag: "h1", selector: "body h1", text: "Alvo", comment: "mude o titulo", changes: [{ prop: "color", before: "#000", after: "red" }], textChange: { before: "a", after: "b" } }], screenshotPath: null });
@@ -662,6 +677,12 @@ export async function runHostSuite(harness, { pluginDir }) {
         reportJson.pins[0].groupId === "grp-proj" && reportJson.pins[0].viewportWidth === 768 &&
         !reportJsonText.includes("data:image"),
         reportJsonText.slice(0, 300));
+      const budgetPreview = await (await fetch(`${base}/.lr/preview?sessionId=session-contract`, { headers: auth })).json();
+      const contractContextLength = (pendingBySession.get("session-contract")?.context ?? "").length;
+      harness.check("host: the preview carries the context budget report",
+        budgetPreview.ok === true && budgetPreview.budget === 61440 && budgetPreview.chars === contractContextLength &&
+        Array.isArray(budgetPreview.dropped) && budgetPreview.dropped.length === 0,
+        JSON.stringify({ chars: budgetPreview.chars, budget: budgetPreview.budget, dropped: budgetPreview.dropped, stored: contractContextLength }));
       await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: json(), body: JSON.stringify({ kind: "view", sessionId: "session-after-deliver" }) });
       await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Entrega", pins: [{ id: "deliver-1", tag: "h1", selector: "#t", comment: "antes da entrega" }], screenshot: null }) });
       const beforeDeliver = await (await fetch(`${base}/.lr/report?sessionId=session-after-deliver`, { headers: auth })).text();
@@ -1433,8 +1454,8 @@ export async function runHostSuite(harness, { pluginDir }) {
         const unknownPreview = await (await fetch(`${base}/.lr/preview?sessionId=session-preview-unknown`, { headers: auth })).json();
         const absentPreview = await (await fetch(`${base}/.lr/preview`, { headers: auth })).json();
         harness.check("the preview route answers the empty shape for an unknown or absent session",
-          JSON.stringify(unknownPreview) === JSON.stringify({ ok: true, context: "", sections: [], bytes: 0, captureQuality: "padrao", pins: [] }) &&
-          JSON.stringify(absentPreview) === JSON.stringify({ ok: true, context: "", sections: [], bytes: 0, captureQuality: "padrao", pins: [] }),
+          JSON.stringify(unknownPreview) === JSON.stringify({ ok: true, context: "", sections: [], bytes: 0, captureQuality: "padrao", chars: 0, budget: 61440, dropped: [], pins: [] }) &&
+          JSON.stringify(absentPreview) === JSON.stringify({ ok: true, context: "", sections: [], bytes: 0, captureQuality: "padrao", chars: 0, budget: 61440, dropped: [], pins: [] }),
           JSON.stringify({ unknown: unknownPreview, absent: absentPreview }));
       }
 

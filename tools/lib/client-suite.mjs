@@ -2360,6 +2360,11 @@ return { run: runPageAudit, probes: () => probes };
       overlay.includes(".lr-audit-progress-track"),
       "audit batching wiring drift");
   }
+  harness.check("the card renders the context budget with removable dropped pins",
+    client.includes("dockPreviewChars") && client.includes("dockPreviewDropped") &&
+    client.includes("lr-preview-dropped-row") && client.includes("removePreviewPin") &&
+    client.includes("chars: Number.isFinite(Number(data.chars))"),
+    "card budget wiring drift");
 
   harness.section("client: overlay ui polish");
   {
