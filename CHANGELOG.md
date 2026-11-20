@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **A property filter in the inspector.** The adjust panel gains a filter box that narrows the visible rows as you type, matching localized labels and property names case- and accent-insensitively; groups with matches stay open and previous open states are restored when the filter clears. ([`916c688`](https://github.com/klaus-2/dsh-redline/commit/916c688))
+- **Edge markers for off-screen pins.** Pins outside the viewport get a compact chip on the nearest edge with a direction arrow, the pin number or the cluster count when neighbouring markers merge into one lane; clicking a chip scrolls the page to the pin and pulses its marker. ([`46475c3`](https://github.com/klaus-2/dsh-redline/commit/46475c3))
+- **Capture quality presets.** A settings row picks light, standard or high crops (max edge and JPEG quality pairs, standard unchanged from before) applied to every capture including the before/after pair; the card preview now shows the chosen preset with the estimated weight of the context images. ([`b292b96`](https://github.com/klaus-2/dsh-redline/commit/b292b96))
+- **A capture timeout with cancel and a simplified fallback.** Every capture races a configurable timeout (0 waits forever): on timeout the render retries once without images, videos and embeds, and a second timeout reports failure. A persistent toast with a Cancel button (and Esc) aborts the render, and cancelling mid before/after still guarantees the element ends with its committed changes applied. ([`bf20bb1`](https://github.com/klaus-2/dsh-redline/commit/bf20bb1))
+- **Identical captures are reused between pins.** Group picking renders the page once per unchanged scroll and viewport and crops every member from that canvas, and the server deduplicates identical shot data URLs into one attachment file that the context references once. ([`459dad1`](https://github.com/klaus-2/dsh-redline/commit/459dad1))
+- **The page audit runs in batches with progress.** The audit panel streams chunked results with a progress bar, a cancel button and a configurable element limit (50 to 2000) instead of one synchronous loop; closing the panel or cancelling keeps the partial results with a note. ([`7e587b5`](https://github.com/klaus-2/dsh-redline/commit/7e587b5))
+- **A context budget warning in the card preview.** The preview shows the context size against the 61440-character budget and lists every pin that the budget would drop, each with a remove button that deletes it from the pending snapshot; the overlay reaps the removal on its next reconcile. ([`b339f5b`](https://github.com/klaus-2/dsh-redline/commit/b339f5b))
+
+### Changed
+
+- **Scroll work is cheaper.** The picker highlight is scheduled once per frame instead of per mousemove event, and pin repositioning is rAF-throttled with an IntersectionObserver so pins far outside the viewport skip the per-event locate and rect work until they approach the screen. ([`c865fa2`](https://github.com/klaus-2/dsh-redline/commit/c865fa2)) ([`46475c3`](https://github.com/klaus-2/dsh-redline/commit/46475c3))
+
+### Fixed
+
+- **Drawing captures no longer composite the drawing canvas twice.** The drawing overlay was drawn onto the capture twice in a duplicated block, doubling its opacity in sent screenshots. ([`bf20bb1`](https://github.com/klaus-2/dsh-redline/commit/bf20bb1))
+
 ## [1.6.0] - 2026-11-19
 
 ### Added
