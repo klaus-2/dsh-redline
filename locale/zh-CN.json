@@ -330,5 +330,7 @@
   "reservedKey": "“{k}”被浏览器或应用保留，无法到达页面。",
   "supportTitle": "在 GitHub 上为项目加星",
   "supportMessage": "如果这个浮层帮你省了时间，去 GitHub 点个 ⭐ 只需几秒，还能帮更多人发现它。",
-  "starAction": "GitHub 加星"
+  "starAction": "GitHub 加星",
+  "supportThanks": "感谢支持！每一颗 Star 都能让项目帮到更多人。",
+  "supportDismiss": "关闭"
 }

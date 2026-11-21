@@ -330,5 +330,7 @@
   "reservedKey": "\"{k}\" is reserved by the browser or the app and never reaches the page.",
   "supportTitle": "Star the project on GitHub",
   "supportMessage": "If the overlay saves you time, a ⭐ on GitHub takes seconds and helps other people find it.",
-  "starAction": "Star on GitHub"
+  "starAction": "Star on GitHub",
+  "supportThanks": "Thank you! Every star helps the project reach more people.",
+  "supportDismiss": "Dismiss"
 }

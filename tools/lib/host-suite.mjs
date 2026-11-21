@@ -293,7 +293,19 @@ export async function runHostSuite(harness, { pluginDir }) {
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "pt", keys: { comment: "x", adjust: "z" }, screenshot: false, cropPad: 96 }) });
       const body = await response.json();
-      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 96, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [], viewportPresets: [], tourDone: false });
+      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 96, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [], viewportPresets: [], tourDone: false, support: "" });
+    }
+    {
+      const thanked = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ support: "thanked" }) })).json();
+      harness.eq("a valid support answer is stored", thanked.settings.support, "thanked");
+      const bogus = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ support: "bogus" }) })).json();
+      harness.eq("an invalid support answer is ignored", bogus.settings.support, "thanked");
+      const reset = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ support: "" }) })).json();
+      harness.eq("the support answer resets to the ask state", reset.settings.support, "");
+      const dismissed = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ support: "dismissed" }) })).json();
+      harness.eq("a dismissed support answer is stored", dismissed.settings.support, "dismissed");
+      const back = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ support: "" }) })).json();
+      harness.eq("the support answer returns to the ask state", back.settings.support, "");
     }
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "klingon", keys: { comment: "xx", adjust: "!" }, screenshot: "yes", cropPad: 5 }) });
@@ -337,7 +349,7 @@ export async function runHostSuite(harness, { pluginDir }) {
       const port2 = server2.port ?? server2.address().port;
       const response = await fetch(`http://127.0.0.1:${port2}/.lr/settings`, { headers: { [secretHeader]: secret } });
       const body = await response.json();
-      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [], viewportPresets: [], tourDone: false });
+      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [], viewportPresets: [], tourDone: false, support: "" });
       server2.close();
     }
     {

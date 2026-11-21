@@ -288,19 +288,23 @@ export async function runClientSuite(harness, { pluginDir }) {
     walkTree(adopted.tree, (element) => { if ("title" in element.props) panelTitles.push(element.props.title); });
     const objectTitles = panelTitles.filter((title) => title !== null && title !== undefined && typeof title !== "string");
     harness.check("no settings row carries an object tooltip on hover", panelTitles.length > 0 && objectTitles.length === 0, JSON.stringify(objectTitles.map((title) => String(title)).slice(0, 2)));
-    let supportAnchor = null;
+    const bannerTree = renderOnce(adopted.stub, adopted.section.component, {}).tree;
+    let supportCta = null;
+    let supportClose = null;
     let supportStyles = null;
-    walkTree(adopted.tree, (element) => {
-      if (typeof element.props.className === "string" && element.props.className.includes("lr-support-star") && supportAnchor === null) supportAnchor = element;
-      if (element.type === "style" && typeof element.props.children === "string" && element.props.children.includes("lr-support-star") && supportStyles === null) supportStyles = element.props.children;
+    walkTree(bannerTree, (element) => {
+      if (typeof element.props.className === "string" && element.props.className.includes("lr-support-cta") && supportCta === null) supportCta = element;
+      if (typeof element.props.className === "string" && element.props.className.includes("lr-support-close") && supportClose === null) supportClose = element;
+      if (element.type === "style" && typeof element.props.children === "string" && element.props.children.includes("lr-support") && supportStyles === null) supportStyles = element.props.children;
     });
-    harness.check("the settings header carries the github star button with a text tooltip and the repo link",
-      supportAnchor !== null && supportAnchor.props.href === "https://github.com/klaus-2/dsh-redline" &&
-      typeof supportAnchor.props["aria-label"] === "string" && supportAnchor.props["aria-label"] !== "" &&
-      typeof supportAnchor.props.title === "string" && supportAnchor.props.title !== "",
-      "star button missing or unlabeled");
-    harness.check("the star button carries its twinkle and pop animations inside the panel",
-      supportStyles !== null && supportStyles.includes("@keyframes lr-star-twinkle") && supportStyles.includes("@keyframes lr-star-pop") && supportStyles.includes("lr-support-star[data-popped]"),
+    harness.check("the settings panel carries the github star banner with a labeled call to action and a dismiss",
+      supportCta !== null && supportCta.props.href === "https://github.com/klaus-2/dsh-redline" &&
+      typeof supportCta.props["aria-label"] === "string" && supportCta.props["aria-label"] !== "" &&
+      typeof supportCta.props.title === "string" && supportCta.props.title !== "" &&
+      supportClose !== null && typeof supportClose.props["aria-label"] === "string" && supportClose.props["aria-label"] !== "",
+      "star banner missing or unlabeled");
+    harness.check("the banner carries its twinkle, sparkle and pop animations with the reduced-motion guard inside the panel",
+      supportStyles !== null && supportStyles.includes("@keyframes lr-support-twinkle") && supportStyles.includes("@keyframes lr-support-pop") && supportStyles.includes("@keyframes lr-support-spark") && supportStyles.includes("prefers-reduced-motion"),
       "support animations missing");
 
     const invalidHealth = [
