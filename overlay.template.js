@@ -56,6 +56,7 @@
     accessibility: Icon(16, '<circle cx="12" cy="4" r="1.6"/>', '<path d="M5 8h14M12 8v5m0 0-3.5 7M12 13l3.5 7"/>'),
     sliders: Icon(16, '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/>', '<path d="M1 14h6M9 8h6M17 16h6"/>'),
     group: Icon(16, '<rect x="3" y="3" width="7" height="7" rx="1.5"/>', '<rect x="14" y="3" width="7" height="7" rx="1.5"/>', '<rect x="3" y="14" width="7" height="7" rx="1.5"/>', '<path d="M17.5 14v7M14 17.5h7"/>'),
+    mic: Icon(14, '<rect x="9" y="2" width="6" height="12" rx="3"/>', '<path d="M5 11a7 7 0 0 0 14 0"/>', '<path d="M12 18v4"/>'),
     code: Icon(12, '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>')
   };
   const ICON_MARKUP = new Set(Object.values(ICONS));
@@ -115,6 +116,11 @@
       "viewportCustomHint": "200–4000 px",
       "viewportCustomAdd": "Save custom width",
       "viewportCustomInvalid": "Width must be between 200 and 4000 px",
+      "dictateTitle": "Dictate the comment",
+      "dictateListening": "Listening…",
+      "dictateDenied": "Microphone access was denied",
+      "dictateError": "Dictation failed",
+      "dictateUnsupported": "Dictation is not supported in this browser",
       "imgDetailsFormat": "Format",
       "imgDetailsSize": "Natural → rendered",
       "imgDetailsUpscaled": "Served smaller than displayed ({p}% larger)",
@@ -359,6 +365,11 @@
       "viewportCustomHint": "200–4000 px",
       "viewportCustomAdd": "Salvar largura própria",
       "viewportCustomInvalid": "A largura deve ficar entre 200 e 4000 px",
+      "dictateTitle": "Ditar o comentário",
+      "dictateListening": "Ouvindo…",
+      "dictateDenied": "O acesso ao microfone foi negado",
+      "dictateError": "Falha no ditado",
+      "dictateUnsupported": "Este navegador não oferece ditado",
       "imgDetailsFormat": "Formato",
       "imgDetailsSize": "Natural → renderizado",
       "imgDetailsUpscaled": "Servida menor que o exibido ({p}% maior)",
@@ -603,6 +614,11 @@
       "viewportCustomHint": "200–4000 px",
       "viewportCustomAdd": "保存自定义宽度",
       "viewportCustomInvalid": "宽度必须在 200 到 4000 px 之间",
+      "dictateTitle": "口述评论",
+      "dictateListening": "正在聆听…",
+      "dictateDenied": "麦克风访问被拒绝",
+      "dictateError": "口述失败",
+      "dictateUnsupported": "此浏览器不支持口述",
       "imgDetailsFormat": "格式",
       "imgDetailsSize": "原始 → 渲染",
       "imgDetailsUpscaled": "原图小于显示尺寸（放大 {p}%）",
@@ -3256,6 +3272,77 @@
     textarea.focus({ preventScroll: true });
   }
 
+  function dictateLocale(lang) {
+    if (lang === "pt") return "pt-BR";
+    if (lang === "zh") return "zh-CN";
+    if (lang === "en") return "en-US";
+    const guess = typeof navigator !== "undefined" && typeof navigator.language === "string" ? navigator.language.toLowerCase() : "";
+    return guess.startsWith("pt") ? "pt-BR" : guess.startsWith("zh") ? "zh-CN" : "en-US";
+  }
+  let dictation = null;
+  function dictateButton(textarea) {
+    const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (typeof SR !== "function") return null;
+    const btn = el("button", { class: "lr-dictate", type: "button", title: t("dictateTitle"), "aria-label": t("dictateTitle") }, ICONS.mic);
+    const finish = (session) => {
+      if (dictation !== session) return;
+      dictation = null;
+      session.btn.classList.remove("lr-dictating");
+      session.textarea.placeholder = session.placeholder;
+    };
+    btn.addEventListener("click", () => {
+      if (dictation !== null) {
+        dictation.stop();
+        finish(dictation);
+        return;
+      }
+      let recognition;
+      try {
+        recognition = new SR();
+      } catch {
+        toast(t("dictateUnsupported"));
+        return;
+      }
+      const session = { btn, textarea, placeholder: textarea.placeholder, recognition, stop: () => { try { recognition.stop(); } catch {} } };
+      recognition.lang = dictateLocale(UI_LANG);
+      recognition.interimResults = true;
+      recognition.continuous = false;
+      const base = textarea.value;
+      let finalText = "";
+      recognition.onresult = (event) => {
+        if (!btn.isConnected) {
+          session.stop();
+          finish(session);
+          return;
+        }
+        let interim = "";
+        for (let index = 0; index < event.results.length; index += 1) {
+          const result = event.results[index];
+          if (result.isFinal === true) finalText += result[0].transcript;
+          else interim += result[0].transcript;
+        }
+        const spoken = (finalText + interim).trim();
+        textarea.value = base === "" ? spoken : `${base} ${spoken}`.trimEnd();
+      };
+      recognition.onerror = (event) => {
+        finish(session);
+        const kind = typeof event?.error === "string" ? event.error : "";
+        if (kind === "not-allowed" || kind === "service-not-allowed") toast(t("dictateDenied"));
+        else if (kind !== "aborted" && kind !== "no-speech" && kind !== "") toast(t("dictateError"));
+      };
+      recognition.onend = () => finish(session);
+      try {
+        recognition.start();
+      } catch {
+        toast(t("dictateError"));
+        return;
+      }
+      textarea.placeholder = t("dictateListening");
+      btn.classList.add("lr-dictating");
+      dictation = session;
+    });
+    return btn;
+  }
   function renderTemplateRow(textarea) {
     const row = el("div", { class: "lr-template-row" });
     const btn = el("button", { class: "lr-template-btn", type: "button", title: t("templatesLabel") }, `⋯ ${t("templatesLabel")}`);
@@ -3360,7 +3447,7 @@
         el("span", { class: "composer-provider" }, el("span", { class: "composer-provider-label" }, t("attachesTo"))),
         el("button", { class: "lr-close", title: t("composerClose"), type: "button", onclick: discardDraft }, "✕")
       ),
-      el("div", { class: "prompt-input" }, pasteChipNode, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }, renderTemplateRow(textarea), shotToggle), submit))
+      el("div", { class: "prompt-input" }, pasteChipNode, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }, renderTemplateRow(textarea), shotToggle, dictateButton(textarea)), submit))
     );
     fixedLayer.append(composerNode);
     applyPanelPosition(composerNode, "composer");

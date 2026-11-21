@@ -41,6 +41,8 @@ const REQUIRED_OVERLAY_SYMBOLS = [
   "function normalizeViewportPresets",
   "function viewportCustomRow",
   "function overflowWidth",
+  "function dictateLocale",
+  "function dictateButton",
   "const EDITABLE_PROPS",
   "const PROP_META",
   "const t = (key) =>"
@@ -1086,6 +1088,25 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("overlay: the overflow scan skips the overlay dom and children of flagged ancestors",
       template.includes("if (rootDiv.contains(element)) continue;") && template.includes("if (hasFlaggedAncestor(element)) continue;") && template.includes('check: "overflow", status: "fail"'),
       "scan wiring missing");
+  }
+
+  harness.section("client: overlay composer dictation");
+  {
+    const localeOf = extractFunction(overlay, "dictateLocale");
+    const run = localeOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`(navigator) => {
+      ${localeOf}
+      return JSON.stringify([dictateLocale("pt"), dictateLocale("zh"), dictateLocale("en"), dictateLocale("auto"), dictateLocale("fr")]);
+    }`, "dictateLocale")({ language: "pt-BR" }));
+    harness.eq("overlay: dictation maps the overlay language to a speech locale, falling back to the navigator", run, ["pt-BR", "zh-CN", "en-US", "pt-BR", "pt-BR"]);
+    harness.check("overlay: the composer carries the dictate control with a feature detect",
+      template.includes("const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;") &&
+      template.includes('renderTemplateRow(textarea), shotToggle, dictateButton(textarea)'),
+      "dictate wiring missing");
+    harness.check("overlay: a detached textarea ends its dictation session",
+      template.includes("if (!btn.isConnected) {") && template.includes("recognition.onend = () => finish(session);"),
+      "session cleanup missing");
   }
 
   harness.section("client: locale integrity");

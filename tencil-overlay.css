@@ -493,6 +493,15 @@ kbd {
   color: var(--n-500);
 }
 .toggle-on { color: var(--n-950); background: var(--n-100); }
+.lr-dictate {
+  all: unset; box-sizing: border-box; cursor: pointer;
+  width: 24px; height: 24px; border-radius: 7px;
+  display: inline-grid; place-items: center;
+  color: var(--n-500);
+}
+.lr-dictate:hover { color: var(--n-950); background: var(--n-100); }
+.lr-dictate.lr-dictating { color: var(--accent); background: var(--accent-soft); animation: lr-dictate-pulse 1.2s ease-in-out infinite; }
+@keyframes lr-dictate-pulse { 50% { opacity: 0.55; } }
 
 .spinner {
   width: 12px; height: 12px; border-radius: 999px;
