@@ -3,7 +3,7 @@ import path from "node:path";
 import assert from "node:assert/strict";
 import vm from "node:vm";
 import { pathToFileURL } from "node:url";
-import { collectCallArguments, createMountModel, createReactStub, evaluateExpression, evaluateObjectLiteral, extractArrowConst, extractFunction, extractObjectLiteral, fakeClientCtx, findByClass, findByText, findElements, flush, freePort, jsonResponse, loadClientModule, makeLocalStorage, renderOnce, runCleanups, storageShim, waitFor, withIsolatedHome } from "./harness.mjs";
+import { collectCallArguments, createMountModel, createReactStub, evaluateExpression, evaluateObjectLiteral, extractArrowConst, extractFunction, extractObjectLiteral, fakeClientCtx, findByClass, findByText, findElements, flush, freePort, jsonResponse, loadClientModule, makeLocalStorage, renderOnce, runCleanups, storageShim, waitFor, walkTree, withIsolatedHome } from "./harness.mjs";
 
 // The bridge relay runs in the page, not in the app: it is loaded in its own
 // sandbox so the suite can drive both transports without a browser.
@@ -247,7 +247,7 @@ export async function runClientSuite(harness, { pluginDir }) {
       const rendered = renderOnce(stub, section.component, {});
       for (const effect of rendered.effects) effect();
       return {
-        calls, intervals, stub, section, effects: rendered.effects,
+        calls, intervals, stub, section, effects: rendered.effects, tree: rendered.tree,
         started: () => observed,
         probes: () => calls.filter((call) => call.url.endsWith("/.lr/health")),
         privateCalls: () => calls.filter((call) => call.url.includes("/.lr/") && !call.url.endsWith("/.lr/health") && !call.url.includes("/.lr/client-ping")),
@@ -284,6 +284,10 @@ export async function runClientSuite(harness, { pluginDir }) {
     const adopted = build((port) => port === 47477 ? validHealth(port) : jsonResponse({}, 503));
     await flush(4);
     harness.check("the client adopts a health answer that identifies redline", adopted.started() && adopted.probes().length === 1 && adopted.secretCalls().length === 1 && adopted.stub.getStates()[0].loaded === true && adopted.privateCalls().length === 2 && adopted.privateCalls().every((call) => call.url.startsWith("http://127.0.0.1:47477/") && call.headers["x-dsh-redline-secret"] === secret), `probes=${adopted.probes().length}, secret acquisitions=${adopted.secretCalls().length}, private requests=${adopted.privateCalls().length}`);
+    const panelTitles = [];
+    walkTree(adopted.tree, (element) => { if ("title" in element.props) panelTitles.push(element.props.title); });
+    const objectTitles = panelTitles.filter((title) => title !== null && title !== undefined && typeof title !== "string");
+    harness.check("no settings row carries an object tooltip on hover", panelTitles.length > 0 && objectTitles.length === 0, JSON.stringify(objectTitles.map((title) => String(title)).slice(0, 2)));
 
     const invalidHealth = [
       ["non-JSON", () => new Response("<html>not Redline</html>", { status: 200 })],
