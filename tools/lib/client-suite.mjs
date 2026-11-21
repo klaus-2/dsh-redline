@@ -40,6 +40,7 @@ const REQUIRED_OVERLAY_SYMBOLS = [
   "function rootFontSizePx",
   "function normalizeViewportPresets",
   "function viewportCustomRow",
+  "function overflowWidth",
   "const EDITABLE_PROPS",
   "const PROP_META",
   "const t = (key) =>"
@@ -1059,6 +1060,32 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("overlay: the host answer updates the saved widths on the next poll",
       template.includes("const presets = normalizeViewportPresets(next.viewportPresets);"),
       "applySettings read missing");
+  }
+
+  harness.section("client: overlay overflow audit");
+  {
+    const widthOf = extractFunction(overlay, "overflowWidth");
+    const run = widthOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${widthOf}
+      const rect = (right, width) => ({ getBoundingClientRect: () => ({ right, width }) });
+      return JSON.stringify([overflowWidth(rect(1300, 800), 1280), overflowWidth(rect(1282, 800), 1280), overflowWidth(rect(1280.5, 800), 1280), overflowWidth(rect(1200, 800), 1280), overflowWidth({}, 1280), overflowWidth(rect(1300, 0), 1280), overflowWidth(rect(1300, 800), NaN)]);
+    }`, "overflowWidth")());
+    harness.eq("overlay: the overflow width measures beyond the viewport with a 1px tolerance", run, [20, 2, null, null, null, null, null]);
+    const groupOf = extractFunction(overlay, "groupAuditFindings");
+    const titles = evaluateObjectLiteral(extractObjectLiteral(overlay, "const A11Y_GROUP_TITLES"), "A11Y_GROUP_TITLES");
+    const labels = evaluateObjectLiteral(extractObjectLiteral(overlay, "const A11Y_ROW_LABELS"), "A11Y_ROW_LABELS");
+    const grouped = groupOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`(A11Y_GROUP_TITLES, A11Y_ROW_LABELS) => {
+      ${groupOf}
+      return JSON.stringify(groupAuditFindings([{ check: "overflow", status: "fail" }, { check: "contrast", status: "fail" }, { check: "overflow", status: "pass" }]).map((group) => ({ check: group.check, title: group.title, count: group.findings.length })));
+    }`, "groupAuditFindings")(titles, labels));
+    harness.eq("overlay: overflow findings group under the localized title", grouped, [{ check: "overflow", title: "a11yAuditGroupOverflow", count: 1 }, { check: "contrast", title: "a11yAuditGroupContrast", count: 1 }]);
+    harness.check("overlay: the overflow scan skips the overlay dom and children of flagged ancestors",
+      template.includes("if (rootDiv.contains(element)) continue;") && template.includes("if (hasFlaggedAncestor(element)) continue;") && template.includes('check: "overflow", status: "fail"'),
+      "scan wiring missing");
   }
 
   harness.section("client: locale integrity");

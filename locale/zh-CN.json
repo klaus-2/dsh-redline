@@ -257,6 +257,7 @@
   "a11yAuditGroupAlt": "图片替代文本",
   "a11yAuditGroupRole": "角色",
   "a11yAuditGroupTargetSize": "目标尺寸",
+  "a11yAuditGroupOverflow": "水平溢出",
   "a11yAuditIssuesCount": "{n} 个问题",
   "title": "指向页面元素 — 智能体直接改代码",
   "lang": "语言",

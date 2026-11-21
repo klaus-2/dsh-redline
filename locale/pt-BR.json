@@ -257,6 +257,7 @@
   "a11yAuditGroupAlt": "Texto alternativo da imagem",
   "a11yAuditGroupRole": "Função",
   "a11yAuditGroupTargetSize": "Tamanho do alvo",
+  "a11yAuditGroupOverflow": "Transbordo horizontal",
   "a11yAuditIssuesCount": "{n} problemas",
   "title": "Aponte para elementos da página — o agente corrige o código",
   "lang": "Idioma",

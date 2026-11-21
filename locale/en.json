@@ -257,6 +257,7 @@
   "a11yAuditGroupAlt": "Image alt",
   "a11yAuditGroupRole": "Role",
   "a11yAuditGroupTargetSize": "Target size",
+  "a11yAuditGroupOverflow": "Horizontal overflow",
   "a11yAuditIssuesCount": "{n} issues",
   "title": "Point at elements on the page — the agent fixes the code",
   "lang": "Language",
