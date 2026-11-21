@@ -68,7 +68,8 @@
       "inject": [
         "@deepseek-ai/dsh-client-locale"
       ],
-      "platform": "web"
+      "platform": "web",
+      "immediately": true
     }
   },
   "engines": {
