@@ -18,7 +18,9 @@ Descrever um problema de UI em palavras perde o ponteiro. "O botão da seção d
 
 ## Como usar
 
-![Loop de demonstração do Redline](docs/assets/demo.svg)
+![Prévia animada do Redline](docs/assets/demo.gif)
+
+<sub>[Assistir ao vídeo promocional em 720p HD (MP4)](docs/assets/promo.mp4)</sub>
 
 1. Em qualquer página aberta no navegador do harness, pressione **C** (comentário) ou **V** (ajuste).
 2. Clique em um elemento. Um popover abre ancorado nele.

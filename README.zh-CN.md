@@ -18,7 +18,9 @@ dsh plugin --profile web add dsh-redline
 
 ## 使用方式
 
-![Redline 演示循环](docs/assets/demo.svg)
+![Redline 动态演示预览](docs/assets/demo.gif)
+
+<sub>[观看完整 720p 高清宣传视频 (MP4)](docs/assets/promo.mp4)</sub>
 
 1. 在 harness 浏览器打开的任意页面按 **C**（评论）或 **V**（调整）。
 2. 点击元素，弹出的面板会锚定在元素上。

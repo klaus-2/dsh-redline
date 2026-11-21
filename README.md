@@ -18,7 +18,9 @@ Describing a UI problem in words loses the pointer. "The button in the middle se
 
 ## Product tour
 
-![Redline demo loop](docs/assets/demo.svg)
+![Redline demo preview](docs/assets/demo.gif)
+
+<sub>[Watch full 720p HD promo video (MP4)](docs/assets/promo.mp4)</sub>
 
 1. Press **C** (comment) or **V** (adjust) in any page opened in the harness browser.
 2. Click an element. A popover opens anchored to it.
