@@ -45,6 +45,9 @@ const REQUIRED_OVERLAY_SYMBOLS = [
   "function dictateButton",
   "function tourSteps",
   "function tourBubblePosition",
+  "function shrinkScale",
+  "function shrinkShot",
+  "function releasePinShots",
   "const EDITABLE_PROPS",
   "const PROP_META",
   "const t = (key) =>"
@@ -1171,6 +1174,24 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("overlay: the filter wiring still mounts on the adjust body",
       template.includes("wireInspectorFilter(body);"),
       "filter mount missing");
+  }
+
+  harness.section("client: overlay capture release");
+  {
+    const scaleOf = extractFunction(overlay, "shrinkScale");
+    const run = scaleOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${scaleOf}
+      return JSON.stringify([shrinkScale(1600, 900, 160), shrinkScale(100, 80, 160), shrinkScale(0, 80, 160), shrinkScale(NaN, 80, 160), shrinkScale(100, 80, 0)]);
+    }`, "shrinkScale")());
+    harness.eq("overlay: the thumbnail scale never upscales and rejects degenerate sizes", run, [0.1, 1, 1, 1, 1]);
+    harness.check("overlay: resolving a pin releases its captures down to thumbnails",
+      template.includes('if (pin.status === "resolvido") releasePinShots(pin);') && template.includes("pin.shotsThumb === true"),
+      "resolve release missing");
+    harness.check("overlay: the group capture canvas is dropped once its reuse window expires",
+      template.includes("Date.now() - reuse.at >= 10000") && template.includes("reuse.canvas = null;"),
+      "cache expiry release missing");
   }
 
   harness.section("client: locale integrity");
