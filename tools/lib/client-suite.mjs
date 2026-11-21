@@ -32,6 +32,9 @@ const REQUIRED_OVERLAY_SYMBOLS = [
   "function setHint",
   "function postSnapshot",
   "function openAdjustPanel",
+  "function imageDetailsSection",
+  "function imageFormatHint",
+  "function imageScaleNote",
   "const EDITABLE_PROPS",
   "const PROP_META",
   "const t = (key) =>"
@@ -958,6 +961,43 @@ export async function runClientSuite(harness, { pluginDir }) {
       }
       harness.check("the translation mirrors match the inline tables", drifted.length === 0, drifted.slice(0, 8).join(", "));
     }
+  }
+
+  harness.section("client: overlay image details");
+  {
+    const formatOf = extractFunction(overlay, "imageFormatHint");
+    const scaleNote = extractFunction(overlay, "imageScaleNote");
+    const runFormat = formatOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${formatOf}
+      return JSON.stringify([imageFormatHint("https://x.test/a.png"), imageFormatHint("https://x.test/a.JPEG?w=9"), imageFormatHint("data:image/webp;base64,AA"), imageFormatHint("blob:https://x.test/9"), imageFormatHint("https://x.test/a.unknownext"), imageFormatHint("https://x.test/noext"), imageFormatHint("")]);
+    }`, "imageFormatHint")());
+    harness.eq("overlay: the image format hint reads extensions, data urls and blob urls",
+      runFormat,
+      ["png", "jpg", "webp", "blob", "", "", ""]);
+    const runScale = scaleNote === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${scaleNote}
+      return JSON.stringify([imageScaleNote(1600, 800), imageScaleNote(400, 800), imageScaleNote(1000, 970), imageScaleNote(640, 640), imageScaleNote(0, 100), imageScaleNote(NaN, 100)]);
+    }`, "imageScaleNote")());
+    harness.eq("overlay: the scale note flags served-vs-displayed divergence beyond tolerance only",
+      runScale,
+      [
+        { key: "imgDetailsDownscaled", p: 50 },
+        { key: "imgDetailsUpscaled", p: 100 },
+        null,
+        null,
+        null,
+        null
+      ]);
+    harness.check("overlay: the pin bubble renders the image details section only for img targets",
+      template.includes('String(auditTarget.tagName ?? "").toUpperCase() === "IMG" ? imageDetailsSection(auditTarget) : null'),
+      "wiring line missing");
+    harness.check("overlay: the image details section warns about a missing alt attribute",
+      template.includes('img.hasAttribute?.("alt") === false ? el("div", { class: "lr-img-note" }, t("imgDetailsAltMissing")) : null'),
+      "alt warning missing");
   }
 
   harness.section("client: locale integrity");

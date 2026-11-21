@@ -110,6 +110,12 @@
       "selectorCopied": "Selector copied",
       "tokenSuggestions": "Design tokens",
       "a11yTitle": "Accessibility",
+      "imgDetails": "Image details",
+      "imgDetailsFormat": "Format",
+      "imgDetailsSize": "Natural → rendered",
+      "imgDetailsUpscaled": "Served smaller than displayed ({p}% larger)",
+      "imgDetailsDownscaled": "Served larger than displayed ({p}% smaller)",
+      "imgDetailsAltMissing": "Missing alt attribute",
       "a11yContrast": "Text contrast",
       "a11yAccessibleName": "Accessible name",
       "a11yImgAlt": "Image alt",
@@ -343,6 +349,12 @@
       "selectorCopied": "Seletor copiado",
       "tokenSuggestions": "Tokens de design",
       "a11yTitle": "Acessibilidade",
+      "imgDetails": "Detalhes da imagem",
+      "imgDetailsFormat": "Formato",
+      "imgDetailsSize": "Natural → renderizado",
+      "imgDetailsUpscaled": "Servida menor que o exibido ({p}% maior)",
+      "imgDetailsDownscaled": "Servida maior que o exibido ({p}% menor)",
+      "imgDetailsAltMissing": "Sem atributo alt",
       "a11yContrast": "Contraste do texto",
       "a11yAccessibleName": "Nome acessível",
       "a11yImgAlt": "Alt da imagem",
@@ -576,6 +588,12 @@
       "selectorCopied": "选择器已复制",
       "tokenSuggestions": "设计令牌",
       "a11yTitle": "无障碍",
+      "imgDetails": "图片详情",
+      "imgDetailsFormat": "格式",
+      "imgDetailsSize": "原始 → 渲染",
+      "imgDetailsUpscaled": "原图小于显示尺寸（放大 {p}%）",
+      "imgDetailsDownscaled": "原图大于显示尺寸（缩小 {p}%）",
+      "imgDetailsAltMissing": "缺少 alt 属性",
       "a11yContrast": "文字对比度",
       "a11yAccessibleName": "可访问名称",
       "a11yImgAlt": "图片 alt",
@@ -3961,6 +3979,41 @@
     });
   }
 
+  function imageFormatHint(src) {
+    const text = String(src ?? "");
+    const dataMatch = /^data:([^;,]+)/.exec(text);
+    if (dataMatch !== null) return dataMatch[1].replace("image/", "");
+    if (/^blob:/i.test(text)) return "blob";
+    const path = text.split(/[?#]/)[0];
+    const ext = /\.([a-z0-9]{2,5})$/i.exec(path);
+    const known = ext === null ? "" : ext[1].toLowerCase();
+    return ["jpg", "jpeg", "png", "webp", "gif", "svg", "avif", "bmp", "ico"].includes(known) ? (known === "jpeg" ? "jpg" : known) : "";
+  }
+  function imageScaleNote(natural, rendered) {
+    natural = Number(natural);
+    rendered = Number(rendered);
+    if (!Number.isFinite(natural) || !Number.isFinite(rendered) || natural <= 0 || rendered <= 0) return null;
+    if (natural / rendered > 1.05) return { key: "imgDetailsDownscaled", p: Math.round((1 - rendered / natural) * 100) };
+    if (rendered / natural > 1.05) return { key: "imgDetailsUpscaled", p: Math.round((rendered / natural - 1) * 100) };
+    return null;
+  }
+  function imageDetailsSection(img) {
+    const src = String(img.currentSrc ?? img.getAttribute?.("src") ?? img.src ?? "");
+    const rect = img.getBoundingClientRect?.();
+    const renderedW = Math.round(Number(rect?.width ?? img.width ?? 0));
+    const renderedH = Math.round(Number(rect?.height ?? img.height ?? 0));
+    const naturalW = Number(img.naturalWidth ?? 0);
+    const naturalH = Number(img.naturalHeight ?? 0);
+    const format = imageFormatHint(src);
+    const scale = imageScaleNote(naturalW, renderedW);
+    return el("div", { class: "lr-img" },
+      el("div", { class: "lr-a11y-title" }, t("imgDetails")),
+      el("div", { class: "lr-img-row" }, el("span", { class: "lr-a11y-label" }, "src"), el("span", { class: "lr-a11y-value" }, src.length > 72 ? `${src.slice(0, 72)}…` : src)),
+      el("div", { class: "lr-img-row" }, el("span", { class: "lr-a11y-label" }, t("imgDetailsFormat")), el("span", { class: "lr-a11y-value" }, format === "" ? "—" : format)),
+      el("div", { class: "lr-img-row" }, el("span", { class: "lr-a11y-label" }, t("imgDetailsSize")), el("span", { class: "lr-a11y-value" }, `${naturalW}×${naturalH} → ${renderedW}×${renderedH}`)),
+      scale !== null ? el("div", { class: "lr-img-note" }, t(scale.key).replace("{p}", String(scale.p))) : null,
+      img.hasAttribute?.("alt") === false ? el("div", { class: "lr-img-note" }, t("imgDetailsAltMissing")) : null);
+  }
   function a11yAuditSection(target) {
     const rows = auditElement(target);
     if (rows.length === 0) return null;
@@ -4234,6 +4287,7 @@
     panel.append(
       el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, `${pins.filter((p) => p.status !== "resolvido").indexOf(pin) + 1} · ${quickLabel(locate(pin.selector) ?? pin.tag)}`), el("button", { class: "lr-close", title: t("panelClose"), type: "button", onclick: () => closePinPanel() }, "✕")),
       el("div", { class: "pin-bubble-body" }, trail, el("div", { class: "pin-bubble-meta" }, `${pin.selector.slice(0, 90)}${pin.component ? ` · ${pin.component}` : ""}`), el("div", { class: "pin-bubble-meta" }, `${t("pinDimensions")}: ${pinDimensions(pin)} px`), pin.stale === true ? el("div", { class: "pin-bubble-stale" }, t("pinStale")) : null, ambiguousCount > 1 ? el("div", { class: "pin-bubble-warning" }, `${t("ambiguousSelectorWarning").replace("{n}", ambiguousCount)} ${t("ambiguousSelectorDetail").replace("{selector}", pin.selector)}`) : null, changesText !== "" ? el("div", { class: "pin-bubble-changes" }, changesText) : null, textChangeText !== "" ? el("div", { class: "pin-bubble-changes" }, textChangeText) : null),
+      auditTarget !== null && pin.tag !== "canvas" && String(auditTarget.tagName ?? "").toUpperCase() === "IMG" ? imageDetailsSection(auditTarget) : null,
       auditTarget === null || pin.tag === "canvas" ? null : a11yAuditSection(auditTarget),
       el("div", { class: "prompt-input" }, renderTemplateRow(textarea), textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }), submit)),
       el(

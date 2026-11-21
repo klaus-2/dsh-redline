@@ -453,6 +453,9 @@ kbd {
 .lr-a11y-chip.warn { background: color-mix(in oklab, var(--warn), white 75%); color: var(--warn); }
 .lr-a11y-chip.unknown { background: var(--n-200); color: var(--n-600); }
 .lr-a11y-chip.na { background: var(--n-200); color: var(--n-600); }
+.lr-img { display: grid; gap: 3px; padding: 6px 8px; border-radius: 8px; background: var(--n-100); }
+.lr-img-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--n-600); }
+.lr-img-note { font-size: 11px; color: var(--warn); }
 
 .prompt-input {
   display: grid; gap: 6px;
