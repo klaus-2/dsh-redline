@@ -1142,6 +1142,16 @@ export async function runClientSuite(harness, { pluginDir }) {
       "replay row missing");
   }
 
+  harness.section("client: panel hotkeys cover every mode");
+  {
+    harness.check("panel: the capture rows carry comment, adjust, draw and hidePins",
+      ["captureKey(\"comment\")", "captureKey(\"adjust\")", "captureKey(\"draw\")", "captureKey(\"hidePins\")"].every((call) => client.includes(call)),
+      "capture row missing");
+    harness.check("panel: a key the browser reserves is reported instead of silently dropped",
+      client.includes("keyHint") && client.includes("L.reservedKey"),
+      "reserved key hint missing");
+  }
+
   harness.section("client: locale integrity");
   {
     const overlayLiteral = extractObjectLiteral(overlay, "const UI_LOCALES");

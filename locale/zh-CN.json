@@ -325,5 +325,7 @@
   "tplPlaceholder": "模板文本"
 ,
   "tourReplay": "再次显示引导",
-  "tourReplayDesc": "引导会在下一个注入浮层的页面重新出现。"
+  "tourReplayDesc": "引导会在下一个注入浮层的页面重新出现。",
+  "hotkeyHidePins": "隐藏标注键",
+  "reservedKey": "“{k}”被浏览器或应用保留，无法到达页面。"
 }

@@ -325,5 +325,7 @@
   "tplPlaceholder": "Texto do modelo"
 ,
   "tourReplay": "Ver o tour novamente",
-  "tourReplayDesc": "O tour volta na próxima página em que o overlay for injetado."
+  "tourReplayDesc": "O tour volta na próxima página em que o overlay for injetado.",
+  "hotkeyHidePins": "Tecla de ocultar pins",
+  "reservedKey": "\"{k}\" é reservado pelo navegador ou pelo app e nunca chega à página."
 }

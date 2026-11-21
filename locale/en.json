@@ -325,5 +325,7 @@
   "tplPlaceholder": "Template text"
 ,
   "tourReplay": "Show the tour again",
-  "tourReplayDesc": "The intro tour returns on the next page the overlay injects."
+  "tourReplayDesc": "The intro tour returns on the next page the overlay injects.",
+  "hotkeyHidePins": "Hide pins key",
+  "reservedKey": "\"{k}\" is reserved by the browser or the app and never reaches the page."
 }
