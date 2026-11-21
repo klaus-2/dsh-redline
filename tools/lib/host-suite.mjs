@@ -331,6 +331,15 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [] });
       server2.close();
     }
+    {
+      const conflicted = await import(`${moduleUrl}?conflict=1`);
+      const first = await conflicted.startServer({ port: await freePort() });
+      const second = await conflicted.startServer({ port: first.port });
+      const conflictHealth = await (await fetch(`http://127.0.0.1:${second.port}/.lr/health`)).json();
+      harness.check("a second instance skips a port answered by another boot", second.port > first.port && conflictHealth.ok === true && typeof conflictHealth.bootId === "string", JSON.stringify({ first: first.port, second: second.port, bootId: conflictHealth.bootId }));
+      first.close();
+      second.close();
+    }
 
     harness.section("host: hotkeys");
     {

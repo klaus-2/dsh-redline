@@ -81,7 +81,7 @@ export async function runClientSuite(harness, { pluginDir }) {
   {
     const secretHeader = /SECRET_HEADER = "([^"]+)"/.exec(client)?.[1] ?? "";
     harness.check("the client knows the secret header", secretHeader !== "");
-    harness.includes("the client reads the secret from the host", client, "/api/dsh-redline.secret");
+    harness.includes("the client reads the secret from the host", client, "/api/${j.name}.secret");
     harness.excludes("the client never hands the secret to the page", client, "secret: INSTANCE_SECRET");
     harness.excludes("the page config never carries a secret", client, "__LR__.secret");
     harness.includes("the client keeps the page config it finds", client, "Object.assign({}, window.__LR__ || {}");
