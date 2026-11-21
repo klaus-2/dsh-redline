@@ -2158,14 +2158,16 @@
     ];
     return steps.filter((step) => step.target !== null && step.target !== undefined);
   }
-  function tourBubblePosition(rect, viewportWidth, viewportHeight) {
-    const width = 260;
+  function tourBubblePosition(rect, viewportWidth, viewportHeight, bubbleHeight) {
+    const width = 280;
+    const height = Number.isFinite(Number(bubbleHeight)) && Number(bubbleHeight) > 0 ? Number(bubbleHeight) : 104;
     const vw = Number(viewportWidth);
     const vh = Number(viewportHeight);
     const left = Math.min(Math.max(8, rect.left - 40), Math.max(8, (Number.isFinite(vw) ? vw : 0) - width - 8));
-    const above = rect.top > 220;
-    const top = above ? Math.max(8, rect.top - 96) : Math.min(Math.max(8, rect.bottom + 8), Math.max(8, (Number.isFinite(vh) ? vh : 0) - 120));
-    return { left, top, above };
+    const fitsAbove = rect.top - height - 10 >= 8;
+    const belowTop = Math.min(Math.max(8, rect.bottom + 10), Math.max(8, (Number.isFinite(vh) ? vh : 0) - height - 8));
+    const top = fitsAbove ? Math.max(8, rect.top - height - 10) : belowTop;
+    return { left, top, above: fitsAbove };
   }
   let tourShown = false;
   let tourNode = null;
@@ -2190,22 +2192,28 @@
     mountShadow();
     let index = 0;
     const textNode = el("div", { class: "lr-tour-text" });
-    const countNode = el("span", { class: "lr-tour-count" });
+    const dots = el("span", { class: "lr-tour-dots" });
+    for (let dot = 0; dot < steps.length; dot += 1) dots.append(el("span", { class: "lr-tour-dot" }));
     const skipBtn = el("button", { class: "lr-tour-btn", type: "button" }, t("tourSkip"));
     const nextBtn = el("button", { class: "lr-tour-btn", type: "button", "data-primary": "" }, t("tourNext"));
-    const bubble = el("div", { class: "popover lr-tour" }, textNode, el("div", { class: "lr-tour-foot" }, countNode, skipBtn, nextBtn));
+    const bubble = el("div", { class: "popover lr-tour" }, textNode, el("div", { class: "lr-tour-foot" }, dots, skipBtn, nextBtn));
     const place = () => {
       const target = steps[index].target;
       const rect = typeof target.getBoundingClientRect === "function" ? target.getBoundingClientRect() : { left: 8, top: 8, right: 8, bottom: 8 };
       const vw = document.documentElement?.clientWidth || (typeof window === "object" ? window.innerWidth : 0) || 0;
       const vh = document.documentElement?.clientHeight || (typeof window === "object" ? window.innerHeight : 0) || 0;
-      const position = tourBubblePosition(rect, vw, vh);
+      const position = tourBubblePosition(rect, vw, vh, bubble.offsetHeight || 104);
       bubble.style.left = `${position.left}px`;
       bubble.style.top = `${position.top}px`;
+      bubble.style.visibility = "";
     };
     const renderStep = () => {
       textNode.textContent = t(steps[index].key);
-      countNode.textContent = `${index + 1}/${steps.length}`;
+      for (let dot = 0; dot < steps.length; dot += 1) {
+        if (dot === index) dots.children[dot].setAttribute("data-on", "");
+        else dots.children[dot].removeAttribute("data-on");
+      }
+      dots.setAttribute("aria-label", `${index + 1}/${steps.length}`);
       nextBtn.textContent = index === steps.length - 1 ? t("tourFinish") : t("tourNext");
       place();
     };
@@ -2230,8 +2238,9 @@
     document.addEventListener("keydown", onKey, true);
     tourCleanup = () => document.removeEventListener("keydown", onKey, true);
     tourNode = bubble;
-    renderStep();
+    bubble.style.visibility = "hidden";
     fixedLayer.append(bubble);
+    renderStep();
   }
   function scheduleTour() {
     if (tourShown || tourNode !== null) return;

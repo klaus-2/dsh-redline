@@ -1142,13 +1142,17 @@ export async function runClientSuite(harness, { pluginDir }) {
       ? undefined
       : JSON.parse(evaluateExpression(`() => {
       ${positionOf}
-      return JSON.stringify([tourBubblePosition({ left: 100, top: 300, bottom: 330 }, 1280, 800), tourBubblePosition({ left: 40, top: 50, bottom: 80 }, 1280, 800), tourBubblePosition({ left: 1500, top: 400, bottom: 430 }, 1280, 800)]);
+      return JSON.stringify([tourBubblePosition({ left: 100, top: 300, bottom: 330 }, 1280, 800), tourBubblePosition({ left: 40, top: 50, bottom: 80 }, 1280, 800), tourBubblePosition({ left: 1500, top: 400, bottom: 430 }, 1280, 800), tourBubblePosition({ left: 100, top: 300, bottom: 330 }, 1280, 800, 150)]);
     }`, "tourBubblePosition")());
-    harness.eq("overlay: the tour bubble clamps to the viewport and flips above tall targets", runPos, [
-      { left: 60, top: 204, above: true },
-      { left: 8, top: 88, above: false },
-      { left: 1012, top: 304, above: true }
+    harness.eq("overlay: the tour bubble measures its own height, clamps to the viewport and flips when the top does not fit", runPos, [
+      { left: 60, top: 186, above: true },
+      { left: 8, top: 90, above: false },
+      { left: 992, top: 286, above: true },
+      { left: 60, top: 140, above: true }
     ]);
+    harness.check("overlay: the tour bubble pads itself, marks the step with dots and places after measuring",
+      template.includes('class: "lr-tour-dot"') && template.includes("bubble.offsetHeight || 104") && template.includes('bubble.style.visibility = "hidden";'),
+      "tour bubble layout wiring missing");
     harness.check("overlay: the first settings answer arms the tour when the flag is still false",
       template.includes("if (next.tourDone === false && !tourShown && tourNode === null) scheduleTour();") &&
       template.includes('bridgeSend("settings.update", { tourDone: true })'),

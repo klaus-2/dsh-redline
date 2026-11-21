@@ -503,11 +503,13 @@ kbd {
 .lr-dictate:hover { color: var(--n-950); background: var(--n-100); }
 .lr-dictate.lr-dictating { color: var(--accent); background: var(--accent-soft); animation: lr-dictate-pulse 1.2s ease-in-out infinite; }
 @keyframes lr-dictate-pulse { 50% { opacity: 0.55; } }
-.lr-tour { width: 260px; z-index: 2147483640; }
-.lr-tour-text { font-size: 12px; color: var(--n-700); line-height: 1.5; }
-.lr-tour-foot { display: flex; align-items: center; gap: 8px; padding-top: 8px; }
-.lr-tour-count { flex: 1; font-size: 10px; color: var(--n-400); }
-.lr-tour-btn { all: unset; box-sizing: border-box; cursor: pointer; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; color: var(--n-600); }
+.lr-tour { width: 280px; max-width: calc(100vw - 16px); padding: 14px 14px 12px; display: grid; gap: 10px; border: 1px solid var(--line); z-index: 2147483640; }
+.lr-tour-text { font-size: 12.5px; color: var(--n-700); line-height: 1.55; }
+.lr-tour-foot { display: flex; align-items: center; gap: 8px; }
+.lr-tour-dots { display: inline-flex; gap: 5px; flex: 1; }
+.lr-tour-dot { width: 6px; height: 6px; border-radius: 999px; background: var(--n-200); transition: background 150ms ease; }
+.lr-tour-dot[data-on] { background: var(--accent); }
+.lr-tour-btn { all: unset; box-sizing: border-box; cursor: pointer; padding: 5px 12px; border-radius: 9px; font-size: 11.5px; font-weight: 600; color: var(--n-600); }
 .lr-tour-btn:hover { color: var(--n-950); background: var(--n-100); }
 .lr-tour-btn[data-primary] { background: var(--accent); color: #fff; }
 .lr-tour-btn[data-primary]:hover { filter: brightness(1.1); color: #fff; }
