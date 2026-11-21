@@ -289,14 +289,18 @@ export async function runClientSuite(harness, { pluginDir }) {
     const objectTitles = panelTitles.filter((title) => title !== null && title !== undefined && typeof title !== "string");
     harness.check("no settings row carries an object tooltip on hover", panelTitles.length > 0 && objectTitles.length === 0, JSON.stringify(objectTitles.map((title) => String(title)).slice(0, 2)));
     let supportAnchor = null;
-    walkTree(adopted.tree, (element) => { if (typeof element.props.className === "string" && element.props.className.includes("lr-support-star") && supportAnchor === null) supportAnchor = element; });
+    let supportStyles = null;
+    walkTree(adopted.tree, (element) => {
+      if (typeof element.props.className === "string" && element.props.className.includes("lr-support-star") && supportAnchor === null) supportAnchor = element;
+      if (element.type === "style" && typeof element.props.children === "string" && element.props.children.includes("lr-support-star") && supportStyles === null) supportStyles = element.props.children;
+    });
     harness.check("the settings header carries the github star button with a text tooltip and the repo link",
       supportAnchor !== null && supportAnchor.props.href === "https://github.com/klaus-2/dsh-redline" &&
       typeof supportAnchor.props["aria-label"] === "string" && supportAnchor.props["aria-label"] !== "" &&
       typeof supportAnchor.props.title === "string" && supportAnchor.props.title !== "",
       "star button missing or unlabeled");
-    harness.check("the star button carries its twinkle and pop animations through an injected stylesheet",
-      client.includes("lr-support-styles") && client.includes("@keyframes lr-star-twinkle") && client.includes("@keyframes lr-star-pop") && client.includes("lr-support-star[data-popped]"),
+    harness.check("the star button carries its twinkle and pop animations inside the panel",
+      supportStyles !== null && supportStyles.includes("@keyframes lr-star-twinkle") && supportStyles.includes("@keyframes lr-star-pop") && supportStyles.includes("lr-support-star[data-popped]"),
       "support animations missing");
 
     const invalidHealth = [
