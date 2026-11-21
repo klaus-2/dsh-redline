@@ -220,7 +220,7 @@ await withIsolatedHome(async (home) => {
       const foreign = await bridgePost("state.get", {}, { origin: "https://evil.example" });
       check("bridge: origem de terceiro → 401", foreign.status === 401);
 
-      const unsupported = await bridgePost("settings.update", {}, { ...auth });
+      const unsupported = await bridgePost("nosuch.message", {}, { ...auth });
       check("bridge: tipo fora da allowlist → 400", unsupported.status === 400);
 
       const read = await fetch(`${base}/.lr/status`, { headers: { origin: base } });

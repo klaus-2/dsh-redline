@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Image details in the pin popover.** Popovers on an `img` target show the source URL, the detected format and the natural versus rendered size, and warn when the file is served larger or smaller than displayed (beyond a 5% tolerance) or when the `alt` attribute is missing. ([`795604b`](https://github.com/klaus-2/dsh-redline/commit/795604b))
+- **Custom preview widths.** The responsive preview menu accepts a typed width (200–4000 px) and keeps up to three saved widths persisted in the host settings; the page writes them through the bridge with a strict one-field whitelist, so nothing else in the settings is reachable from a page. ([`a4bb40d`](https://github.com/klaus-2/dsh-redline/commit/a4bb40d))
+- **A horizontal overflow check in the page audit.** The audit scans up to 3000 elements, reports each outermost element wider than the viewport with the overflow in px (children of a flagged element are skipped), and clicking a finding locates and highlights it on the page. ([`bd69914`](https://github.com/klaus-2/dsh-redline/commit/bd69914))
+- **Voice dictation in the composer.** A microphone button transcribes speech into the comment through the Web Speech API in the overlay language with live interim text; browsers without support render no button, and denied microphones report back instead of failing silently. ([`5ee7318`](https://github.com/klaus-2/dsh-redline/commit/5ee7318))
+- **A guided intro tour.** On first use the toolbar walks through the comment, adjust and draw modes and the pending counter with skippable bubbles; finishing or skipping is remembered in the settings, and the panel replays the tour on the next injected page on demand. ([`e7a3efe`](https://github.com/klaus-2/dsh-redline/commit/e7a3efe))
+- **The hide-pins shortcut is configurable.** The settings panel captures the hide-pins key like the other modes, and a key the browser or the app keeps for itself is reported instead of silently dropped. ([`98529d4`](https://github.com/klaus-2/dsh-redline/commit/98529d4))
+
+### Changed
+
+- **px and rem display toggle in the inspector.** Every numeric field shows px or rem through a unit chip, converting the displayed value through the root font size while applying the same result; the choice resets with the adjust panel. ([`2b52363`](https://github.com/klaus-2/dsh-redline/commit/2b52363))
+
+### Performance
+
+- **Popovers contain their layout** so their reflows and repaints stay out of the page, and the pin layer renders on its own compositing layer. ([`688eb79`](https://github.com/klaus-2/dsh-redline/commit/688eb79))
+- **Inspector sections build on first expand.** Closed sections defer their controls until opened, and the property filter force-builds deferred sections before matching. ([`9496c10`](https://github.com/klaus-2/dsh-redline/commit/9496c10))
+- **Captures are released to thumbnails once a pin resolves**, keeping the sent full-size shots only until then, and the group-capture canvas is dropped when its reuse window expires. ([`1dd22f7`](https://github.com/klaus-2/dsh-redline/commit/1dd22f7))
+- **An idle overlay suspends its observers.** With the overlay hidden and no draft, panel, mode or queued pin, the page MutationObserver, the pin IntersectionObserver and the status poll stop touching the page; any interaction resumes them. ([`f9c7b57`](https://github.com/klaus-2/dsh-redline/commit/f9c7b57))
+- **Pasted images decode in a worker.** Decoding and resizing move to an OffscreenCanvas worker, falling back to the main thread where blob workers are forbidden. ([`736d2f0`](https://github.com/klaus-2/dsh-redline/commit/736d2f0))
+
 ## [1.7.0] - 2026-11-21
 
 ### Added

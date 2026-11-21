@@ -32,6 +32,27 @@ const REQUIRED_OVERLAY_SYMBOLS = [
   "function setHint",
   "function postSnapshot",
   "function openAdjustPanel",
+  "function imageDetailsSection",
+  "function imageFormatHint",
+  "function imageScaleNote",
+  "function pxToRem",
+  "function remToPx",
+  "function rootFontSizePx",
+  "function normalizeViewportPresets",
+  "function viewportCustomRow",
+  "function overflowWidth",
+  "function dictateLocale",
+  "function dictateButton",
+  "function tourSteps",
+  "function tourBubblePosition",
+  "function shrinkScale",
+  "function shrinkShot",
+  "function releasePinShots",
+  "function overlaySuspended",
+  "function syncOverlaySuspension",
+  "function pasteWorkerSource",
+  "function decodePastedImageInWorker",
+  "function bufferToBase64",
   "const EDITABLE_PROPS",
   "const PROP_META",
   "const t = (key) =>"
@@ -435,7 +456,7 @@ export async function runClientSuite(harness, { pluginDir }) {
     // The relay failure paths: a page must never wait forever.
     const emptyError = await mediated.window.__LR_BRIDGE__.send("", {}).then(() => "resolved", (error) => String(error?.message ?? error));
     harness.check("the relay refuses a message without a type", emptyError.includes("without a type"), emptyError);
-    const unknownError = await mediated.window.__LR_BRIDGE__.send("settings.update", {}).then(() => "resolved", (error) => String(error?.message ?? error));
+    const unknownError = await mediated.window.__LR_BRIDGE__.send("nosuch.message", {}).then(() => "resolved", (error) => String(error?.message ?? error));
     harness.check("the relay refuses a message outside the allowlist", unknownError.includes("does not carry"), unknownError);
 
     const timers = [];
@@ -958,6 +979,283 @@ export async function runClientSuite(harness, { pluginDir }) {
       }
       harness.check("the translation mirrors match the inline tables", drifted.length === 0, drifted.slice(0, 8).join(", "));
     }
+  }
+
+  harness.section("client: overlay image details");
+  {
+    const formatOf = extractFunction(overlay, "imageFormatHint");
+    const scaleNote = extractFunction(overlay, "imageScaleNote");
+    const runFormat = formatOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${formatOf}
+      return JSON.stringify([imageFormatHint("https://x.test/a.png"), imageFormatHint("https://x.test/a.JPEG?w=9"), imageFormatHint("data:image/webp;base64,AA"), imageFormatHint("blob:https://x.test/9"), imageFormatHint("https://x.test/a.unknownext"), imageFormatHint("https://x.test/noext"), imageFormatHint("")]);
+    }`, "imageFormatHint")());
+    harness.eq("overlay: the image format hint reads extensions, data urls and blob urls",
+      runFormat,
+      ["png", "jpg", "webp", "blob", "", "", ""]);
+    const runScale = scaleNote === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${scaleNote}
+      return JSON.stringify([imageScaleNote(1600, 800), imageScaleNote(400, 800), imageScaleNote(1000, 970), imageScaleNote(640, 640), imageScaleNote(0, 100), imageScaleNote(NaN, 100)]);
+    }`, "imageScaleNote")());
+    harness.eq("overlay: the scale note flags served-vs-displayed divergence beyond tolerance only",
+      runScale,
+      [
+        { key: "imgDetailsDownscaled", p: 50 },
+        { key: "imgDetailsUpscaled", p: 100 },
+        null,
+        null,
+        null,
+        null
+      ]);
+    harness.check("overlay: the pin bubble renders the image details section only for img targets",
+      template.includes('String(auditTarget.tagName ?? "").toUpperCase() === "IMG" ? imageDetailsSection(auditTarget) : null'),
+      "wiring line missing");
+    harness.check("overlay: the image details section warns about a missing alt attribute",
+      template.includes('img.hasAttribute?.("alt") === false ? el("div", { class: "lr-img-note" }, t("imgDetailsAltMissing")) : null'),
+      "alt warning missing");
+  }
+
+  harness.section("client: overlay layout containment");
+  {
+    const popoverRule = /\.popover \{[^}]*\}/.exec(overlay)?.[0] ?? "";
+    harness.check("overlay: popovers contain their layout to keep page reflows out", popoverRule.includes("contain: layout"), popoverRule.slice(0, 90));
+    const absText = /absLayer\.style\.cssText = "([^"]*)"/.exec(overlay)?.[1] ?? "";
+    harness.check("overlay: the pin layer promotes itself to its own compositing layer", absText.includes("will-change:transform"), absText);
+  }
+
+  harness.section("client: overlay px rem toggle");
+  {
+    const toRem = extractFunction(overlay, "pxToRem");
+    const toPx = extractFunction(overlay, "remToPx");
+    const run = toRem === undefined || toPx === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${toRem}
+      ${toPx}
+      return JSON.stringify([pxToRem(32, 16), remToPx(2, 16), pxToRem(18, 18), remToPx(1.5, 0), pxToRem(32, NaN)]);
+    }`, "pxRemConverters")());
+    harness.eq("overlay: px and rem convert through the root font size with a 16px default", run, [2, 32, 1, 24, 2]);
+    const rootOf = extractFunction(overlay, "rootFontSizePx");
+    let calls = 0;
+    const runRoot = rootOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`(getComputedStyle, document) => {
+      ${rootOf}
+      return JSON.stringify([rootFontSizePx(), rootFontSizePx(), rootFontSizePx()]);
+    }`, "rootFontSizePx")(
+        () => ({ fontSize: ["18px", "0px", "bogus"][calls++] }),
+        { documentElement: {} }
+      ));
+    harness.eq("overlay: the root font size falls back to 16px when unreadable", runRoot, [18, 16, 16]);
+    harness.check("overlay: the unit toggle state resets with the adjust panel",
+      (template.match(/adjustUnitRem = new Set\(\)/gu) ?? []).length >= 2,
+      "declaration and reset sites missing");
+    harness.check("overlay: the rem display converts back to px before applying",
+      template.includes("adjustUpdateProperty(prop, toApply(next))") && template.includes("(meta.step ?? 1) / rootFontSizePx()"),
+      "apply conversion or step scaling missing");
+    harness.check("overlay: the row refresh re-renders through the unit display",
+      template.includes('scrub.__refresh(toDisplay(adjustValues.get(prop) ?? ""))'),
+      "refresh conversion missing");
+  }
+
+  harness.section("client: overlay custom viewport widths");
+  {
+    const normalize = extractFunction(overlay, "normalizeViewportPresets");
+    const run = normalize === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${normalize}
+      return JSON.stringify([normalizeViewportPresets([100, 5000, "x", 900, 900, 1000]), normalizeViewportPresets([800.7, 200]), normalizeViewportPresets(null)]);
+    }`, "normalizeViewportPresets")());
+    harness.eq("overlay: custom widths clamp to three integers between 200 and 4000", run, [[900, 1000], [801, 200], []]);
+    harness.check("overlay: the viewport menu lists the saved widths and the custom input row",
+      template.includes('...viewportPresets.map((px) => ({ value: { kind: "width", px }, label: `${px}px` }))') && template.includes("{ node: viewportCustomRow() }"),
+      "custom rows missing");
+    harness.check("overlay: a saved width persists through the settings bridge message",
+      template.includes('bridgeSend("settings.update", { viewportPresets })'),
+      "bridge send missing");
+    harness.check("overlay: the host answer updates the saved widths on the next poll",
+      template.includes("const presets = normalizeViewportPresets(next.viewportPresets);"),
+      "applySettings read missing");
+  }
+
+  harness.section("client: overlay overflow audit");
+  {
+    const widthOf = extractFunction(overlay, "overflowWidth");
+    const run = widthOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${widthOf}
+      const rect = (right, width) => ({ getBoundingClientRect: () => ({ right, width }) });
+      return JSON.stringify([overflowWidth(rect(1300, 800), 1280), overflowWidth(rect(1282, 800), 1280), overflowWidth(rect(1280.5, 800), 1280), overflowWidth(rect(1200, 800), 1280), overflowWidth({}, 1280), overflowWidth(rect(1300, 0), 1280), overflowWidth(rect(1300, 800), NaN)]);
+    }`, "overflowWidth")());
+    harness.eq("overlay: the overflow width measures beyond the viewport with a 1px tolerance", run, [20, 2, null, null, null, null, null]);
+    const groupOf = extractFunction(overlay, "groupAuditFindings");
+    const titles = evaluateObjectLiteral(extractObjectLiteral(overlay, "const A11Y_GROUP_TITLES"), "A11Y_GROUP_TITLES");
+    const labels = evaluateObjectLiteral(extractObjectLiteral(overlay, "const A11Y_ROW_LABELS"), "A11Y_ROW_LABELS");
+    const grouped = groupOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`(A11Y_GROUP_TITLES, A11Y_ROW_LABELS) => {
+      ${groupOf}
+      return JSON.stringify(groupAuditFindings([{ check: "overflow", status: "fail" }, { check: "contrast", status: "fail" }, { check: "overflow", status: "pass" }]).map((group) => ({ check: group.check, title: group.title, count: group.findings.length })));
+    }`, "groupAuditFindings")(titles, labels));
+    harness.eq("overlay: overflow findings group under the localized title", grouped, [{ check: "overflow", title: "a11yAuditGroupOverflow", count: 1 }, { check: "contrast", title: "a11yAuditGroupContrast", count: 1 }]);
+    harness.check("overlay: the overflow scan skips the overlay dom and children of flagged ancestors",
+      template.includes("if (rootDiv.contains(element)) continue;") && template.includes("if (hasFlaggedAncestor(element)) continue;") && template.includes('check: "overflow", status: "fail"'),
+      "scan wiring missing");
+  }
+
+  harness.section("client: overlay composer dictation");
+  {
+    const localeOf = extractFunction(overlay, "dictateLocale");
+    const run = localeOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`(navigator) => {
+      ${localeOf}
+      return JSON.stringify([dictateLocale("pt"), dictateLocale("zh"), dictateLocale("en"), dictateLocale("auto"), dictateLocale("fr")]);
+    }`, "dictateLocale")({ language: "pt-BR" }));
+    harness.eq("overlay: dictation maps the overlay language to a speech locale, falling back to the navigator", run, ["pt-BR", "zh-CN", "en-US", "pt-BR", "pt-BR"]);
+    harness.check("overlay: the composer carries the dictate control with a feature detect",
+      template.includes("const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;") &&
+      template.includes('renderTemplateRow(textarea), shotToggle, dictateButton(textarea)'),
+      "dictate wiring missing");
+    harness.check("overlay: a detached textarea ends its dictation session",
+      template.includes("if (!btn.isConnected) {") && template.includes("recognition.onend = () => finish(session);"),
+      "session cleanup missing");
+  }
+
+  harness.section("client: overlay intro tour");
+  {
+    const stepsOf = extractFunction(overlay, "tourSteps");
+    const run = stepsOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${stepsOf}
+      return JSON.stringify([tourSteps({ comment: "c", adjust: "a", draw: null, pending: "p" }).map((step) => step.key), tourSteps({}).length]);
+    }`, "tourSteps")());
+    harness.eq("overlay: the tour skips steps whose anchor is missing", run, [["tourComment", "tourAdjust", "tourSend"], 0]);
+    const positionOf = extractFunction(overlay, "tourBubblePosition");
+    const runPos = positionOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${positionOf}
+      return JSON.stringify([tourBubblePosition({ left: 100, top: 300, bottom: 330 }, 1280, 800), tourBubblePosition({ left: 40, top: 50, bottom: 80 }, 1280, 800), tourBubblePosition({ left: 1500, top: 400, bottom: 430 }, 1280, 800)]);
+    }`, "tourBubblePosition")());
+    harness.eq("overlay: the tour bubble clamps to the viewport and flips above tall targets", runPos, [
+      { left: 60, top: 204, above: true },
+      { left: 8, top: 88, above: false },
+      { left: 1012, top: 304, above: true }
+    ]);
+    harness.check("overlay: the first settings answer arms the tour when the flag is still false",
+      template.includes("if (next.tourDone === false && !tourShown && tourNode === null) scheduleTour();") &&
+      template.includes('bridgeSend("settings.update", { tourDone: true })'),
+      "tour trigger missing");
+    harness.check("overlay: the settings panel replays the tour",
+      client.includes("save({ tourDone: false })") && client.includes("tourReplay"),
+      "replay row missing");
+  }
+
+  harness.section("client: panel hotkeys cover every mode");
+  {
+    harness.check("panel: the capture rows carry comment, adjust, draw and hidePins",
+      ["captureKey(\"comment\")", "captureKey(\"adjust\")", "captureKey(\"draw\")", "captureKey(\"hidePins\")"].every((call) => client.includes(call)),
+      "capture row missing");
+    harness.check("panel: a key the browser reserves is reported instead of silently dropped",
+      client.includes("keyHint") && client.includes("L.reservedKey"),
+      "reserved key hint missing");
+  }
+
+  harness.section("client: overlay inspector lazy sections");
+  {
+    harness.check("overlay: closed inspector sections defer their build until expanded",
+      template.includes("section.__ensure = ensureBuild;") && template.includes("if (built) build(body);") && template.includes("ensureBuild();"),
+      "lazy build missing");
+    harness.check("overlay: the filter force-builds deferred sections before matching",
+      template.includes("known.has(section)") && template.includes("section.__ensure();") && template.includes("const entry = sectionEntry(section);"),
+      "filter force-build missing");
+    harness.check("overlay: the filter wiring still mounts on the adjust body",
+      template.includes("wireInspectorFilter(body);"),
+      "filter mount missing");
+  }
+
+  harness.section("client: overlay capture release");
+  {
+    const scaleOf = extractFunction(overlay, "shrinkScale");
+    const run = scaleOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${scaleOf}
+      return JSON.stringify([shrinkScale(1600, 900, 160), shrinkScale(100, 80, 160), shrinkScale(0, 80, 160), shrinkScale(NaN, 80, 160), shrinkScale(100, 80, 0)]);
+    }`, "shrinkScale")());
+    harness.eq("overlay: the thumbnail scale never upscales and rejects degenerate sizes", run, [0.1, 1, 1, 1, 1]);
+    harness.check("overlay: resolving a pin releases its captures down to thumbnails",
+      template.includes('if (pin.status === "resolvido") releasePinShots(pin);') && template.includes("pin.shotsThumb === true"),
+      "resolve release missing");
+    harness.check("overlay: the group capture canvas is dropped once its reuse window expires",
+      template.includes("Date.now() - reuse.at >= 10000") && template.includes("reuse.canvas = null;"),
+      "cache expiry release missing");
+  }
+
+  harness.section("client: overlay idle suspension");
+  {
+    const suspendedOf = extractFunction(overlay, "overlaySuspended");
+    const run = suspendedOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${suspendedOf}
+      let hidden = true, drawMode = false, draft = null, adjustPanel = null, composerNode = null, openPinId = null, groupComposerNode = null;
+      const pins = [];
+      const results = [overlaySuspended()];
+      pins.push({ status: "queued" });
+      results.push(overlaySuspended());
+      pins[0].status = "resolvido";
+      draft = { anchorEl: {} };
+      results.push(overlaySuspended());
+      draft = null;
+      hidden = false;
+      results.push(overlaySuspended());
+      return JSON.stringify(results);
+    }`, "overlaySuspended")());
+    harness.eq("overlay: suspension requires a hidden overlay with nothing outstanding", run, [true, false, false, false]);
+    harness.check("overlay: suspending disconnects the page and pin observers and reobserves on resume",
+      template.includes("pageObserver.disconnect();") && template.includes("pinObserver?.disconnect();") &&
+      (template.match(/pageObserver\.observe\(/gu) ?? []).length >= 2,
+      "observer suspension wiring missing");
+    harness.check("overlay: the status poll skips network while suspended",
+      template.includes("async function pollStatus() {\n    if (overlaySuspended()) return;"),
+      "poll guard missing");
+    harness.check("overlay: every interaction entry point resyncs the suspension",
+      (template.match(/syncOverlaySuspension\(\);/gu) ?? []).length >= 7,
+      "resume call sites missing");
+  }
+
+  harness.section("client: overlay paste worker");
+  {
+    const b64Of = extractFunction(overlay, "bufferToBase64");
+    const run = b64Of === undefined
+      ? undefined
+      : evaluateExpression(`(btoa) => {
+      ${b64Of}
+      return bufferToBase64(new Uint8Array([104, 105]).buffer);
+    }`, "bufferToBase64")((binary) => Buffer.from(binary, "binary").toString("base64"));
+    harness.eq("overlay: the worker answer encodes the jpeg buffer as base64", run, "aGk=");
+    const source = extractFunction(overlay, "pasteWorkerSource");
+    const workerSource = source === undefined ? "" : evaluateExpression(`() => {
+      ${source}
+      return pasteWorkerSource();
+    }`, "pasteWorkerSource")();
+    harness.check("overlay: the paste worker decodes and resizes off the main thread",
+      workerSource.includes("createImageBitmap(event.data)") && workerSource.includes("new OffscreenCanvas") && workerSource.includes("convertToBlob"),
+      "worker source missing");
+    harness.check("overlay: the paste decode tries the worker first and falls back to the main thread",
+      template.includes('typeof Worker === "function" && typeof OffscreenCanvas === "function"') && template.includes("return await decodePastedImageInWorker(file);") && template.includes("canvas.toDataURL(\"image/jpeg\", 0.8)"),
+      "worker fallback missing");
+    harness.check("overlay: a worker answer is terminated after one message",
+      template.includes("worker.terminate();"),
+      "worker teardown missing");
   }
 
   harness.section("client: locale integrity");

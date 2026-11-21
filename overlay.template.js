@@ -56,6 +56,7 @@
     accessibility: Icon(16, '<circle cx="12" cy="4" r="1.6"/>', '<path d="M5 8h14M12 8v5m0 0-3.5 7M12 13l3.5 7"/>'),
     sliders: Icon(16, '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/>', '<path d="M1 14h6M9 8h6M17 16h6"/>'),
     group: Icon(16, '<rect x="3" y="3" width="7" height="7" rx="1.5"/>', '<rect x="14" y="3" width="7" height="7" rx="1.5"/>', '<rect x="3" y="14" width="7" height="7" rx="1.5"/>', '<path d="M17.5 14v7M14 17.5h7"/>'),
+    mic: Icon(14, '<rect x="9" y="2" width="6" height="12" rx="3"/>', '<path d="M5 11a7 7 0 0 0 14 0"/>', '<path d="M12 18v4"/>'),
     code: Icon(12, '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>')
   };
   const ICON_MARKUP = new Set(Object.values(ICONS));
@@ -110,6 +111,28 @@
       "selectorCopied": "Selector copied",
       "tokenSuggestions": "Design tokens",
       "a11yTitle": "Accessibility",
+      "imgDetails": "Image details",
+      "unitToggle": "Toggle px / rem",
+      "viewportCustomHint": "200–4000 px",
+      "viewportCustomAdd": "Save custom width",
+      "viewportCustomInvalid": "Width must be between 200 and 4000 px",
+      "dictateTitle": "Dictate the comment",
+      "dictateListening": "Listening…",
+      "dictateDenied": "Microphone access was denied",
+      "dictateError": "Dictation failed",
+      "dictateUnsupported": "Dictation is not supported in this browser",
+      "tourSkip": "Skip",
+      "tourNext": "Next",
+      "tourFinish": "Finish",
+      "tourComment": "Comment mode: point at any element and write what should change.",
+      "tourAdjust": "Adjust mode: edit styles live with undo and redo.",
+      "tourDraw": "Draw mode: sketch over the page with brush and eraser.",
+      "tourSend": "Send the comment and the pending counter appears here until the agent resolves it.",
+      "imgDetailsFormat": "Format",
+      "imgDetailsSize": "Natural → rendered",
+      "imgDetailsUpscaled": "Served smaller than displayed ({p}% larger)",
+      "imgDetailsDownscaled": "Served larger than displayed ({p}% smaller)",
+      "imgDetailsAltMissing": "Missing alt attribute",
       "a11yContrast": "Text contrast",
       "a11yAccessibleName": "Accessible name",
       "a11yImgAlt": "Image alt",
@@ -167,6 +190,7 @@
       "a11yAuditGroupAlt": "Image alt",
       "a11yAuditGroupRole": "Role",
       "a11yAuditGroupTargetSize": "Target size",
+      "a11yAuditGroupOverflow": "Horizontal overflow",
       "a11yAuditIssuesCount": "{n} issues",
     "drawTool": "Draw",
     "drawTitle": "Free canvas",
@@ -343,6 +367,28 @@
       "selectorCopied": "Seletor copiado",
       "tokenSuggestions": "Tokens de design",
       "a11yTitle": "Acessibilidade",
+      "imgDetails": "Detalhes da imagem",
+      "unitToggle": "Alternar px / rem",
+      "viewportCustomHint": "200–4000 px",
+      "viewportCustomAdd": "Salvar largura própria",
+      "viewportCustomInvalid": "A largura deve ficar entre 200 e 4000 px",
+      "dictateTitle": "Ditar o comentário",
+      "dictateListening": "Ouvindo…",
+      "dictateDenied": "O acesso ao microfone foi negado",
+      "dictateError": "Falha no ditado",
+      "dictateUnsupported": "Este navegador não oferece ditado",
+      "tourSkip": "Pular",
+      "tourNext": "Próximo",
+      "tourFinish": "Concluir",
+      "tourComment": "Modo comentário: aponte para qualquer elemento e escreva o que deve mudar.",
+      "tourAdjust": "Modo ajuste: edite estilos ao vivo com desfazer e refazer.",
+      "tourDraw": "Modo desenho: rabisque sobre a página com pincel e borracha.",
+      "tourSend": "Envie o comentário e o contador de pendentes aparece aqui até o agente resolver.",
+      "imgDetailsFormat": "Formato",
+      "imgDetailsSize": "Natural → renderizado",
+      "imgDetailsUpscaled": "Servida menor que o exibido ({p}% maior)",
+      "imgDetailsDownscaled": "Servida maior que o exibido ({p}% menor)",
+      "imgDetailsAltMissing": "Sem atributo alt",
       "a11yContrast": "Contraste do texto",
       "a11yAccessibleName": "Nome acessível",
       "a11yImgAlt": "Alt da imagem",
@@ -400,6 +446,7 @@
       "a11yAuditGroupAlt": "Texto alternativo da imagem",
       "a11yAuditGroupRole": "Função",
       "a11yAuditGroupTargetSize": "Tamanho do alvo",
+      "a11yAuditGroupOverflow": "Transbordo horizontal",
       "a11yAuditIssuesCount": "{n} problemas",
     "drawTool": "Desenhar",
     "drawTitle": "Canvas livre",
@@ -576,6 +623,28 @@
       "selectorCopied": "选择器已复制",
       "tokenSuggestions": "设计令牌",
       "a11yTitle": "无障碍",
+      "imgDetails": "图片详情",
+      "unitToggle": "切换 px / rem",
+      "viewportCustomHint": "200–4000 px",
+      "viewportCustomAdd": "保存自定义宽度",
+      "viewportCustomInvalid": "宽度必须在 200 到 4000 px 之间",
+      "dictateTitle": "口述评论",
+      "dictateListening": "正在聆听…",
+      "dictateDenied": "麦克风访问被拒绝",
+      "dictateError": "口述失败",
+      "dictateUnsupported": "此浏览器不支持口述",
+      "tourSkip": "跳过",
+      "tourNext": "下一步",
+      "tourFinish": "完成",
+      "tourComment": "评论模式：指向任意元素并写下要修改的内容。",
+      "tourAdjust": "调整模式：实时编辑样式，支持撤销与重做。",
+      "tourDraw": "绘制模式：用画笔和橡皮在页面上涂画。",
+      "tourSend": "发送评论后，待处理计数会显示在这里，直到智能体处理完成。",
+      "imgDetailsFormat": "格式",
+      "imgDetailsSize": "原始 → 渲染",
+      "imgDetailsUpscaled": "原图小于显示尺寸（放大 {p}%）",
+      "imgDetailsDownscaled": "原图大于显示尺寸（缩小 {p}%）",
+      "imgDetailsAltMissing": "缺少 alt 属性",
       "a11yContrast": "文字对比度",
       "a11yAccessibleName": "可访问名称",
       "a11yImgAlt": "图片 alt",
@@ -633,6 +702,7 @@
       "a11yAuditGroupAlt": "图片替代文本",
       "a11yAuditGroupRole": "角色",
       "a11yAuditGroupTargetSize": "目标尺寸",
+      "a11yAuditGroupOverflow": "水平溢出",
       "a11yAuditIssuesCount": "{n} 个问题",
     "drawTool": "绘制",
     "drawTitle": "自由画布",
@@ -1131,6 +1201,9 @@
     .lr-menu { all: unset; box-sizing: border-box; flex: 1; min-width: 0; height: 26px; padding: 0 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--n-100); color: var(--n-950); font-size: 12px; cursor: pointer; }
     .lr-menu:focus { border-color: var(--accent); }
     .lr-scrub .lr-menu { flex: none; width: 64px; }
+    .lr-unit-box { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; }
+    .lr-unit { all: unset; box-sizing: border-box; cursor: pointer; flex: none; width: 30px; height: 26px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--line); background: var(--n-100); color: var(--n-600); font-size: 10px; font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .lr-unit:hover { border-color: var(--accent); color: var(--accent); }
     .lr-color { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
     .lr-swatch { position: relative; flex: none; width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--n-700); overflow: hidden; cursor: pointer; }
     .lr-swatch input { position: absolute; inset: -8px; width: 44px; height: 44px; border: none; padding: 0; cursor: pointer; background: none; }
@@ -1197,10 +1270,18 @@
 .lr-ditem { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 9px; border-radius: 6px; color: var(--n-700); font-size: 12px; }
 .lr-ditem:hover { background: var(--n-100); color: var(--n-950); }
 .lr-ditem[data-on] { background: var(--n-100); color: var(--n-950); }
+.lr-ditem-static { cursor: default; }
+.lr-ditem-static:hover { background: none; color: var(--n-700); }
+.lr-vp-custom { display: flex; align-items: center; gap: 4px; width: 100%; }
+.lr-vp-input { all: unset; box-sizing: border-box; flex: 1; min-width: 0; height: 24px; padding: 0 7px; border-radius: 6px; border: 1px solid var(--line); background: var(--n-100); color: var(--n-950); font-size: 11px; font-family: inherit; text-align: right; appearance: textfield; }
+.lr-vp-input::-webkit-outer-spin-button, .lr-vp-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.lr-vp-input:focus { border-color: var(--accent); }
+.lr-vp-add { all: unset; box-sizing: border-box; cursor: pointer; flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; border: 1px solid var(--line); background: var(--n-100); color: var(--n-600); font-size: 12px; font-weight: 600; }
+.lr-vp-add:hover { border-color: var(--accent); color: var(--accent); }
   
 `;
   const absLayer = document.createElement("div");
-  absLayer.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;z-index:2147483600;";
+  absLayer.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;z-index:2147483600;will-change:transform;";
   const fixedLayer = document.createElement("div");
   fixedLayer.style.cssText = "position:fixed;left:0;top:0;width:0;height:0;z-index:2147483600;";
   shadow.append(styleEl, rootDiv);
@@ -1564,6 +1645,7 @@
 
   function toggleDraw(on) {
     drawMode = typeof on === "boolean" ? on : !drawMode;
+    syncOverlaySuspension();
     if (drawMode) { setMode(null); if (groupMode) setGroupMode(false); closePanels(); }
     closeDrawMenu();
     drawSel = null;
@@ -1613,6 +1695,10 @@
     closeDrawMenu();
     drawMenu = el("div", { class: "lr-dmenu" });
     for (const row of rows) {
+      if (row.node !== undefined) {
+        drawMenu.append(el("div", { class: "lr-ditem lr-ditem-static" }, row.node));
+        continue;
+      }
       const parts = [];
       if (row.icon !== undefined) { const ic = el("span", { class: "lr-dicon" }); ic.innerHTML = row.icon; parts.push(ic); }
       if (row.color !== undefined) { const dot = el("span", { class: "lr-dcolor" }); dot.style.background = row.color; parts.push(dot); }
@@ -2016,7 +2102,9 @@
     const rows = [
       { value: { kind: "reset" }, label: "100%" },
       ...VIEWPORT_PRESETS.map((px) => ({ value: { kind: "width", px }, label: `${px}px` })),
+      ...viewportPresets.map((px) => ({ value: { kind: "width", px }, label: `${px}px` })),
       ...VIEWPORT_ZOOMS.map((pct) => ({ value: { kind: "zoom", pct }, label: `${pct}%` })),
+      { node: viewportCustomRow() },
     ];
     openDrawMenu(viewportBtn, rows, (value) => {
       if (!value || value.kind === "reset") applyViewportState({ w: null, z: 100 });
@@ -2037,6 +2125,119 @@
     else if (vpZoom !== 100) label = `${vpZoom}%`;
     viewportBtn.querySelector(".lr-viewport-label").textContent = label;
     viewportBtn.classList.toggle("tool-active", !vpIsDefault());
+  }
+  function viewportCustomRow() {
+    const field = el("input", { class: "lr-vp-input", type: "number", min: 200, max: 4000, step: 1, placeholder: t("viewportCustomHint"), "aria-label": t("viewportCustomAdd") });
+    const add = el("button", { class: "lr-vp-add", type: "button", title: t("viewportCustomAdd") }, "＋");
+    const submit = () => {
+      const px = Math.round(Number(field.value));
+      if (!Number.isFinite(px) || px < 200 || px > 4000) {
+        toast(t("viewportCustomInvalid"));
+        return;
+      }
+      viewportPresets = normalizeViewportPresets([...viewportPresets, px]);
+      bridgeSend("settings.update", { viewportPresets }).catch(() => {});
+      applyViewportState({ w: px, z: 100 });
+      closeDrawMenu();
+    };
+    add.addEventListener("click", submit);
+    field.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submit();
+      }
+    });
+    return el("span", { class: "lr-vp-custom" }, field, add);
+  }
+  function tourSteps(present) {
+    const steps = [
+      { key: "tourComment", target: present.comment },
+      { key: "tourAdjust", target: present.adjust },
+      { key: "tourDraw", target: present.draw },
+      { key: "tourSend", target: present.pending }
+    ];
+    return steps.filter((step) => step.target !== null && step.target !== undefined);
+  }
+  function tourBubblePosition(rect, viewportWidth, viewportHeight) {
+    const width = 260;
+    const vw = Number(viewportWidth);
+    const vh = Number(viewportHeight);
+    const left = Math.min(Math.max(8, rect.left - 40), Math.max(8, (Number.isFinite(vw) ? vw : 0) - width - 8));
+    const above = rect.top > 220;
+    const top = above ? Math.max(8, rect.top - 96) : Math.min(Math.max(8, rect.bottom + 8), Math.max(8, (Number.isFinite(vh) ? vh : 0) - 120));
+    return { left, top, above };
+  }
+  let tourShown = false;
+  let tourNode = null;
+  let tourCleanup = null;
+  function markTourDone() {
+    bridgeSend("settings.update", { tourDone: true }).catch(() => {});
+  }
+  function endTour() {
+    if (tourCleanup !== null) tourCleanup();
+    tourNode?.remove();
+    tourNode = null;
+    tourCleanup = null;
+  }
+  function startTour() {
+    if (tourShown || tourNode !== null) return;
+    tourShown = true;
+    const steps = tourSteps({ comment: commentBtn, adjust: adjustBtn, draw: drawBtn, pending: pendingSpan });
+    if (steps.length === 0) {
+      markTourDone();
+      return;
+    }
+    mountShadow();
+    let index = 0;
+    const textNode = el("div", { class: "lr-tour-text" });
+    const countNode = el("span", { class: "lr-tour-count" });
+    const skipBtn = el("button", { class: "lr-tour-btn", type: "button" }, t("tourSkip"));
+    const nextBtn = el("button", { class: "lr-tour-btn", type: "button", "data-primary": "" }, t("tourNext"));
+    const bubble = el("div", { class: "popover lr-tour" }, textNode, el("div", { class: "lr-tour-foot" }, countNode, skipBtn, nextBtn));
+    const place = () => {
+      const target = steps[index].target;
+      const rect = typeof target.getBoundingClientRect === "function" ? target.getBoundingClientRect() : { left: 8, top: 8, right: 8, bottom: 8 };
+      const vw = document.documentElement?.clientWidth || (typeof window === "object" ? window.innerWidth : 0) || 0;
+      const vh = document.documentElement?.clientHeight || (typeof window === "object" ? window.innerHeight : 0) || 0;
+      const position = tourBubblePosition(rect, vw, vh);
+      bubble.style.left = `${position.left}px`;
+      bubble.style.top = `${position.top}px`;
+    };
+    const renderStep = () => {
+      textNode.textContent = t(steps[index].key);
+      countNode.textContent = `${index + 1}/${steps.length}`;
+      nextBtn.textContent = index === steps.length - 1 ? t("tourFinish") : t("tourNext");
+      place();
+    };
+    skipBtn.addEventListener("click", () => {
+      endTour();
+      markTourDone();
+    });
+    nextBtn.addEventListener("click", () => {
+      if (index === steps.length - 1) {
+        endTour();
+        markTourDone();
+        return;
+      }
+      index += 1;
+      renderStep();
+    });
+    const onKey = (event) => {
+      if (event.key !== "Escape") return;
+      endTour();
+      markTourDone();
+    };
+    document.addEventListener("keydown", onKey, true);
+    tourCleanup = () => document.removeEventListener("keydown", onKey, true);
+    tourNode = bubble;
+    renderStep();
+    fixedLayer.append(bubble);
+  }
+  function scheduleTour() {
+    if (tourShown || tourNode !== null) return;
+    setTimeout(() => {
+      if (!tourShown && tourNode === null) startTour();
+    }, 1200);
   }
   const gridBtn = el("button", { class: "tool", title: t("layoutGrid"), "aria-label": t("layoutGrid"), html: ICONS_CANVAS.grid });
   gridBtn.addEventListener("click", () => {
@@ -2148,6 +2349,9 @@
     if (Number.isFinite(Number(next.auditLimit))) auditLimit = Math.max(50, Math.min(2000, Math.round(Number(next.auditLimit))));
     if (typeof next.drawDock === "string") drawDock = ["left", "top", "right", "bottom"].includes(next.drawDock) ? next.drawDock : "left";
     drawBar?.setAttribute("data-dock", drawDock);
+    if (next.tourDone === false && !tourShown && tourNode === null) scheduleTour();
+    const presets = normalizeViewportPresets(next.viewportPresets);
+    if (JSON.stringify(presets) !== JSON.stringify(viewportPresets)) viewportPresets = presets;
     if (next.keys === null || typeof next.keys !== "object") return;
     let changed = false;
     const comment = parseHotkey(next.keys.comment);
@@ -2358,6 +2562,22 @@
     return true;
   }
 
+  function overlaySuspended() {
+    return hidden === true && drawMode === false && draft === null && adjustPanel === null && composerNode === null && openPinId === null && groupComposerNode === null && !pins.some((p) => p.status === "queued");
+  }
+  let pageObserverActive = true;
+  function syncOverlaySuspension() {
+    const suspended = overlaySuspended();
+    if (suspended === pageObserverActive) return;
+    pageObserverActive = !suspended;
+    if (suspended) {
+      pageObserver.disconnect();
+      pinObserver?.disconnect();
+    } else {
+      pageObserver.observe(document.body ?? document.documentElement, { childList: true, subtree: true, attributes: true });
+      syncPinObserver();
+    }
+  }
   function setHidden(next) {
     hidden = next;
     if (hidden) {
@@ -2370,6 +2590,7 @@
       discardDraft();
       if (groupComposerNode !== null) setGroupMode(false);
     }
+    syncOverlaySuspension();
     updateToolbar();
     renderPins();
   }
@@ -2630,6 +2851,7 @@
 
   function setMode(next) {
     mode = mode === next ? null : next;
+    syncOverlaySuspension();
     if (mode !== "picking" && duplicateArmed !== null) duplicateArmed = null;
     if (mode !== "picking" && mode !== "adjust") clearHighlight();
     if (mode === "picking") {
@@ -2911,13 +3133,14 @@
   window.addEventListener("scroll", scheduleReposition, { passive: true });
   window.addEventListener("resize", scheduleReposition);
   let mutationTimer = null;
-  new MutationObserver(() => {
+  const pageObserver = new MutationObserver(() => {
     clearTimeout(mutationTimer);
     mutationTimer = setTimeout(() => {
       scheduleReposition();
       auditPinAnchors();
     }, 400);
-  }).observe(document.body ?? document.documentElement, { childList: true, subtree: true, attributes: true });
+  });
+  pageObserver.observe(document.body ?? document.documentElement, { childList: true, subtree: true, attributes: true });
 
 
   const DRAG_THRESHOLD = 4;
@@ -3119,7 +3342,52 @@
   let composerNode = null;
   let placeComposerDefault = null;
 
+  function bufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let index = 0; index < bytes.length; index += 0x8000) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(index, index + 0x8000));
+    }
+    return btoa(binary);
+  }
+  function pasteWorkerSource() {
+    return "self.onmessage = async (event) => { try { const bitmap = await createImageBitmap(event.data); const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height)); const canvas = new OffscreenCanvas(Math.max(1, Math.round(bitmap.width * scale)), Math.max(1, Math.round(bitmap.height * scale))); canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close(); const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.8 }); const buffer = await blob.arrayBuffer(); self.postMessage({ ok: true, buffer }, [buffer]); } catch (error) { self.postMessage({ ok: false, error: String(error) }); } };";
+  }
+  let pasteWorkerUrl = null;
+  function decodePastedImageInWorker(file) {
+    return new Promise((resolve, reject) => {
+      if (pasteWorkerUrl === null) {
+        pasteWorkerUrl = URL.createObjectURL(new Blob([pasteWorkerSource()], { type: "text/javascript" }));
+      }
+      let worker;
+      try {
+        worker = new Worker(pasteWorkerUrl);
+      } catch (error) {
+        reject(error);
+        return;
+      }
+      worker.onmessage = (event) => {
+        worker.terminate();
+        const data = event.data;
+        if (data !== null && typeof data === "object" && data.ok === true) resolve(`data:image/jpeg;base64,${bufferToBase64(data.buffer)}`);
+        else reject(new Error(String(data?.error ?? "the paste worker failed")));
+      };
+      worker.onerror = (event) => {
+        worker.terminate();
+        reject(new Error(String(event?.message ?? "the paste worker crashed")));
+      };
+      worker.postMessage(file);
+    });
+  }
   async function decodePastedImage(file) {
+    if (typeof Worker === "function" && typeof OffscreenCanvas === "function") {
+      try {
+        return await decodePastedImageInWorker(file);
+      } catch {
+        // A page that forbids blob workers (or an unsupported build) falls back
+        // to decoding on the main thread; the paste still works either way.
+      }
+    }
     let bitmap = null;
     try {
       bitmap = await createImageBitmap(file);
@@ -3153,6 +3421,46 @@
     if (pasteChipNode !== null) pasteChipNode.style.display = "none";
   }
 
+  function shrinkScale(width, height, maxEdge) {
+    const w = Number(width);
+    const h = Number(height);
+    const edge = Number(maxEdge);
+    if (!Number.isFinite(w) || !Number.isFinite(h) || !Number.isFinite(edge) || w <= 0 || h <= 0 || edge <= 0) return 1;
+    return Math.min(1, edge / Math.max(w, h));
+  }
+  const SHOT_THUMB_EDGE = 160;
+  async function shrinkShot(dataUrl, maxEdge) {
+    if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) return null;
+    const image = new Image();
+    await new Promise((resolve) => {
+      image.onload = resolve;
+      image.onerror = resolve;
+      image.src = dataUrl;
+    });
+    if (!image.naturalWidth || !image.naturalHeight) return null;
+    const scale = shrinkScale(image.naturalWidth, image.naturalHeight, maxEdge);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.7);
+  }
+  function releasePinShots(pin) {
+    if (pin.shotsThumb === true) return;
+    pin.shotsThumb = true;
+    void (async () => {
+      const [shot, afterShot, pastedShot] = await Promise.all([
+        shrinkShot(pin.shot, SHOT_THUMB_EDGE),
+        shrinkShot(pin.afterShot, SHOT_THUMB_EDGE),
+        shrinkShot(pin.pastedShot, SHOT_THUMB_EDGE)
+      ]);
+      pin.shot = shot;
+      pin.afterShot = afterShot;
+      pin.pastedShot = pastedShot;
+      savePins();
+    })();
+  }
+
   function discardDraft() {
     pastedShot = null;
     draft = null;
@@ -3181,6 +3489,77 @@
     textarea.focus({ preventScroll: true });
   }
 
+  function dictateLocale(lang) {
+    if (lang === "pt") return "pt-BR";
+    if (lang === "zh") return "zh-CN";
+    if (lang === "en") return "en-US";
+    const guess = typeof navigator !== "undefined" && typeof navigator.language === "string" ? navigator.language.toLowerCase() : "";
+    return guess.startsWith("pt") ? "pt-BR" : guess.startsWith("zh") ? "zh-CN" : "en-US";
+  }
+  let dictation = null;
+  function dictateButton(textarea) {
+    const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (typeof SR !== "function") return null;
+    const btn = el("button", { class: "lr-dictate", type: "button", title: t("dictateTitle"), "aria-label": t("dictateTitle") }, ICONS.mic);
+    const finish = (session) => {
+      if (dictation !== session) return;
+      dictation = null;
+      session.btn.classList.remove("lr-dictating");
+      session.textarea.placeholder = session.placeholder;
+    };
+    btn.addEventListener("click", () => {
+      if (dictation !== null) {
+        dictation.stop();
+        finish(dictation);
+        return;
+      }
+      let recognition;
+      try {
+        recognition = new SR();
+      } catch {
+        toast(t("dictateUnsupported"));
+        return;
+      }
+      const session = { btn, textarea, placeholder: textarea.placeholder, recognition, stop: () => { try { recognition.stop(); } catch {} } };
+      recognition.lang = dictateLocale(UI_LANG);
+      recognition.interimResults = true;
+      recognition.continuous = false;
+      const base = textarea.value;
+      let finalText = "";
+      recognition.onresult = (event) => {
+        if (!btn.isConnected) {
+          session.stop();
+          finish(session);
+          return;
+        }
+        let interim = "";
+        for (let index = 0; index < event.results.length; index += 1) {
+          const result = event.results[index];
+          if (result.isFinal === true) finalText += result[0].transcript;
+          else interim += result[0].transcript;
+        }
+        const spoken = (finalText + interim).trim();
+        textarea.value = base === "" ? spoken : `${base} ${spoken}`.trimEnd();
+      };
+      recognition.onerror = (event) => {
+        finish(session);
+        const kind = typeof event?.error === "string" ? event.error : "";
+        if (kind === "not-allowed" || kind === "service-not-allowed") toast(t("dictateDenied"));
+        else if (kind !== "aborted" && kind !== "no-speech" && kind !== "") toast(t("dictateError"));
+      };
+      recognition.onend = () => finish(session);
+      try {
+        recognition.start();
+      } catch {
+        toast(t("dictateError"));
+        return;
+      }
+      textarea.placeholder = t("dictateListening");
+      btn.classList.add("lr-dictating");
+      dictation = session;
+    });
+    return btn;
+  }
   function renderTemplateRow(textarea) {
     const row = el("div", { class: "lr-template-row" });
     const btn = el("button", { class: "lr-template-btn", type: "button", title: t("templatesLabel") }, `⋯ ${t("templatesLabel")}`);
@@ -3285,7 +3664,7 @@
         el("span", { class: "composer-provider" }, el("span", { class: "composer-provider-label" }, t("attachesTo"))),
         el("button", { class: "lr-close", title: t("composerClose"), type: "button", onclick: discardDraft }, "✕")
       ),
-      el("div", { class: "prompt-input" }, pasteChipNode, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }, renderTemplateRow(textarea), shotToggle), submit))
+      el("div", { class: "prompt-input" }, pasteChipNode, textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }, renderTemplateRow(textarea), shotToggle, dictateButton(textarea)), submit))
     );
     fixedLayer.append(composerNode);
     applyPanelPosition(composerNode, "composer");
@@ -3455,6 +3834,10 @@
     captureCancelled = false;
     let simplified = false;
     for (;;) {
+      if (reuse !== null && reuse.canvas !== null && Date.now() - reuse.at >= 10000) {
+        reuse.canvas = null;
+        reuse.key = null;
+      }
       if (reuse !== null && simplified === false && reuse.canvas !== null && reuse.key === groupCanvasKey() && Date.now() - reuse.at < 10000) {
         try {
           return cropCanvas(reuse.canvas, rect, cropPad);
@@ -3676,7 +4059,7 @@
     const list = Array.isArray(candidates) ? candidates : [];
     return list.slice(0, cap);
   }
-  const A11Y_GROUP_TITLES = { contrast: "a11yAuditGroupContrast", name: "a11yAuditGroupName", imgAlt: "a11yAuditGroupAlt", role: "a11yAuditGroupRole", targetSize: "a11yAuditGroupTargetSize" };
+  const A11Y_GROUP_TITLES = { contrast: "a11yAuditGroupContrast", name: "a11yAuditGroupName", imgAlt: "a11yAuditGroupAlt", role: "a11yAuditGroupRole", targetSize: "a11yAuditGroupTargetSize", overflow: "a11yAuditGroupOverflow" };
   function groupAuditFindings(findings) {
     const groups = [];
     const byCheck = new Map();
@@ -3691,12 +4074,22 @@
     }
     return groups;
   }
+  function overflowWidth(element, viewportWidth) {
+    const rect = element.getBoundingClientRect?.();
+    if (rect === undefined || rect === null) return null;
+    const viewport = Number(viewportWidth);
+    if (!Number.isFinite(viewport) || viewport <= 0) return null;
+    const overflow = Math.ceil(rect.right) - Math.floor(viewport);
+    if (!Number.isFinite(overflow) || overflow <= 1 || rect.width <= 0) return null;
+    return overflow;
+  }
   let groupMode = false;
   let groupPicks = [];
   let groupComposerNode = null;
   function setGroupMode(on) {
     if (on === groupMode) return;
     groupMode = on;
+    syncOverlaySuspension();
     if (on) {
       setMode(null);
       if (drawMode) toggleDraw(false);
@@ -3833,6 +4226,18 @@
   let viewportPresetWidth = null;
   const VIEWPORT_PRESETS = [375, 768, 1280];
   const VIEWPORT_ZOOMS = [50, 75, 125, 150, 200];
+  let viewportPresets = [];
+  function normalizeViewportPresets(list) {
+    const seen = new Set();
+    const collected = [];
+    for (const entry of Array.isArray(list) ? list : []) {
+      const px = Math.round(Number(entry));
+      if (!Number.isInteger(px) || px < 200 || px > 4000 || seen.has(px)) continue;
+      seen.add(px);
+      collected.push(px);
+    }
+    return collected.slice(-3);
+  }
   function vpIsDefault() { return vpWidth === null && vpZoom === 100; }
   function vpPayload() { return { w: vpWidth, z: vpZoom }; }
   function normVpW(v) {
@@ -3961,6 +4366,41 @@
     });
   }
 
+  function imageFormatHint(src) {
+    const text = String(src ?? "");
+    const dataMatch = /^data:([^;,]+)/.exec(text);
+    if (dataMatch !== null) return dataMatch[1].replace("image/", "");
+    if (/^blob:/i.test(text)) return "blob";
+    const path = text.split(/[?#]/)[0];
+    const ext = /\.([a-z0-9]{2,5})$/i.exec(path);
+    const known = ext === null ? "" : ext[1].toLowerCase();
+    return ["jpg", "jpeg", "png", "webp", "gif", "svg", "avif", "bmp", "ico"].includes(known) ? (known === "jpeg" ? "jpg" : known) : "";
+  }
+  function imageScaleNote(natural, rendered) {
+    natural = Number(natural);
+    rendered = Number(rendered);
+    if (!Number.isFinite(natural) || !Number.isFinite(rendered) || natural <= 0 || rendered <= 0) return null;
+    if (natural / rendered > 1.05) return { key: "imgDetailsDownscaled", p: Math.round((1 - rendered / natural) * 100) };
+    if (rendered / natural > 1.05) return { key: "imgDetailsUpscaled", p: Math.round((rendered / natural - 1) * 100) };
+    return null;
+  }
+  function imageDetailsSection(img) {
+    const src = String(img.currentSrc ?? img.getAttribute?.("src") ?? img.src ?? "");
+    const rect = img.getBoundingClientRect?.();
+    const renderedW = Math.round(Number(rect?.width ?? img.width ?? 0));
+    const renderedH = Math.round(Number(rect?.height ?? img.height ?? 0));
+    const naturalW = Number(img.naturalWidth ?? 0);
+    const naturalH = Number(img.naturalHeight ?? 0);
+    const format = imageFormatHint(src);
+    const scale = imageScaleNote(naturalW, renderedW);
+    return el("div", { class: "lr-img" },
+      el("div", { class: "lr-a11y-title" }, t("imgDetails")),
+      el("div", { class: "lr-img-row" }, el("span", { class: "lr-a11y-label" }, "src"), el("span", { class: "lr-a11y-value" }, src.length > 72 ? `${src.slice(0, 72)}…` : src)),
+      el("div", { class: "lr-img-row" }, el("span", { class: "lr-a11y-label" }, t("imgDetailsFormat")), el("span", { class: "lr-a11y-value" }, format === "" ? "—" : format)),
+      el("div", { class: "lr-img-row" }, el("span", { class: "lr-a11y-label" }, t("imgDetailsSize")), el("span", { class: "lr-a11y-value" }, `${naturalW}×${naturalH} → ${renderedW}×${renderedH}`)),
+      scale !== null ? el("div", { class: "lr-img-note" }, t(scale.key).replace("{p}", String(scale.p))) : null,
+      img.hasAttribute?.("alt") === false ? el("div", { class: "lr-img-note" }, t("imgDetailsAltMissing")) : null);
+  }
   function a11yAuditSection(target) {
     const rows = auditElement(target);
     if (rows.length === 0) return null;
@@ -4090,6 +4530,20 @@
     const findings = [];
     const chunk = 40;
     let audited = 0;
+    const docViewport = Number(document.documentElement?.clientWidth);
+    const winViewport = typeof window === "object" ? Number(window.innerWidth) : NaN;
+    const viewportWidth = Number.isFinite(docViewport) && docViewport > 0 ? docViewport : Number.isFinite(winViewport) ? winViewport : 0;
+    const overflowList = pickAuditCandidates(Array.from(root.querySelectorAll("*")), 3000);
+    const total = inspectionList.length + overflowList.length;
+    const overflowFlagged = new Set();
+    const hasFlaggedAncestor = (node) => {
+      let parent = node?.parentElement ?? null;
+      while (parent !== null && parent !== undefined) {
+        if (overflowFlagged.has(parent)) return true;
+        parent = parent.parentElement ?? null;
+      }
+      return false;
+    };
     for (let index = 0; index < inspectionList.length; index += chunk) {
       if (shouldStop !== null && shouldStop() === true) break;
       const slice = inspectionList.slice(index, index + chunk);
@@ -4099,7 +4553,21 @@
         }
       }
       audited += slice.length;
-      onProgress?.({ done: audited, total: inspectionList.length, findings });
+      onProgress?.({ done: audited, total, findings });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    for (let index = 0; index < overflowList.length; index += 100) {
+      if (shouldStop !== null && shouldStop() === true) break;
+      for (const element of overflowList.slice(index, index + 100)) {
+        audited += 1;
+        if (rootDiv.contains(element)) continue;
+        if (hasFlaggedAncestor(element)) continue;
+        const overflow = overflowWidth(element, viewportWidth);
+        if (overflow === null) continue;
+        overflowFlagged.add(element);
+        findings.push({ check: "overflow", status: "fail", value: `+${overflow}px`, selector: cssPath(element), label: quickLabel(element), element });
+      }
+      onProgress?.({ done: audited, total, findings });
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
     return { scanned: audited, collected: collected.length, findings, stopped: shouldStop !== null && shouldStop() === true };
@@ -4107,6 +4575,7 @@
   function openAuditPanel() {
     closeAuditPanel();
     mountShadow();
+    syncOverlaySuspension();
     const token = auditRunToken + 1;
     auditRunToken = token;
     a11yFixHandler.current = {
@@ -4234,6 +4703,7 @@
     panel.append(
       el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, `${pins.filter((p) => p.status !== "resolvido").indexOf(pin) + 1} · ${quickLabel(locate(pin.selector) ?? pin.tag)}`), el("button", { class: "lr-close", title: t("panelClose"), type: "button", onclick: () => closePinPanel() }, "✕")),
       el("div", { class: "pin-bubble-body" }, trail, el("div", { class: "pin-bubble-meta" }, `${pin.selector.slice(0, 90)}${pin.component ? ` · ${pin.component}` : ""}`), el("div", { class: "pin-bubble-meta" }, `${t("pinDimensions")}: ${pinDimensions(pin)} px`), pin.stale === true ? el("div", { class: "pin-bubble-stale" }, t("pinStale")) : null, ambiguousCount > 1 ? el("div", { class: "pin-bubble-warning" }, `${t("ambiguousSelectorWarning").replace("{n}", ambiguousCount)} ${t("ambiguousSelectorDetail").replace("{selector}", pin.selector)}`) : null, changesText !== "" ? el("div", { class: "pin-bubble-changes" }, changesText) : null, textChangeText !== "" ? el("div", { class: "pin-bubble-changes" }, textChangeText) : null),
+      auditTarget !== null && pin.tag !== "canvas" && String(auditTarget.tagName ?? "").toUpperCase() === "IMG" ? imageDetailsSection(auditTarget) : null,
       auditTarget === null || pin.tag === "canvas" ? null : a11yAuditSection(auditTarget),
       el("div", { class: "prompt-input" }, renderTemplateRow(textarea), textarea, el("div", { class: "prompt-actions" }, el("div", { class: "prompt-extras" }), submit)),
       el(
@@ -4244,6 +4714,7 @@
         el("button", {
           onclick: () => {
             pin.status = pin.status === "resolvido" ? "queued" : "resolvido";
+            if (pin.status === "resolvido") releasePinShots(pin);
             savePins();
             postSnapshot();
             openPinId = null;
@@ -4379,6 +4850,18 @@
   function formatNumeric(number, unit) {
     const rounded = Math.round(number * 1000) / 1000;
     return `${Object.is(rounded, -0) ? 0 : rounded}${unit}`;
+  }
+  function pxToRem(px, root) {
+    const base = Number(root);
+    return Number(px) / (Number.isFinite(base) && base > 0 ? base : 16);
+  }
+  function remToPx(rem, root) {
+    const base = Number(root);
+    return Number(rem) * (Number.isFinite(base) && base > 0 ? base : 16);
+  }
+  function rootFontSizePx() {
+    const size = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+    return Number.isFinite(size) && size > 0 ? size : 16;
   }
   function parseColor(value) {
     const hex = /^#([\da-f]{6})([\da-f]{2})?$/iu.exec(value.trim());
@@ -4579,6 +5062,7 @@
   const adjustSeen = { flex: false, layout: false, positioned: false };
   let adjustUndoStack = [];
   let adjustRedoStack = [];
+  let adjustUnitRem = new Set();
 
   function adjustBaseline(prop) {
     const ledger = adjustTarget !== null ? adjustLedger.get(adjustTargetSelector) : undefined;
@@ -4809,14 +5293,22 @@
     const head = secHead(label, open);
     const body = el("div", { class: "lr-sec-body" });
     if (!open) body.style.display = "none";
+    let built = open === true;
+    const ensureBuild = () => {
+      if (built) return;
+      built = true;
+      build(body);
+    };
     head.addEventListener("click", () => {
       const isOpen = section.hasAttribute("data-open");
       if (isOpen) section.removeAttribute("data-open");
       else section.setAttribute("data-open", "");
       body.style.display = isOpen ? "none" : "";
       head.setAttribute("aria-expanded", isOpen ? "false" : "true");
+      ensureBuild();
     });
-    build(body);
+    section.__ensure = ensureBuild;
+    if (built) build(body);
     section.append(head, body);
     return section;
   }
@@ -4873,6 +5365,19 @@
     emptyNote.style.display = needle !== "" && visible === 0 ? "" : "none";
   }
   function wireInspectorFilter(body) {
+    const sectionEntry = (section) => {
+      const head = section.querySelector(".lr-sec-head");
+      const secBody = section.querySelector(".lr-sec-body");
+      if (head === null || secBody === null) return null;
+      const rows = [];
+      for (const row of secBody.children) {
+        if (!(row instanceof Element) || !row.classList.contains("lr-row")) continue;
+        const label = row.querySelector(".lr-row-label");
+        rows.push({ row, text: normalizeInspectorText(`${label?.textContent ?? ""} ${row.getAttribute("data-filter") ?? ""}`) });
+      }
+      if (rows.length === 0) return null;
+      return { section, head, body: secBody, rows, wasOpen: section.hasAttribute("data-open") };
+    };
     const entries = [];
     for (const section of body.children) {
       if (!(section instanceof Element)) continue;
@@ -4882,19 +5387,12 @@
         continue;
       }
       if (!section.classList.contains("lr-sec")) continue;
-      const head = section.querySelector(".lr-sec-head");
-      const secBody = section.querySelector(".lr-sec-body");
-      if (head === null || secBody === null) continue;
-      const rows = [];
-      for (const row of secBody.children) {
-        if (!(row instanceof Element) || !row.classList.contains("lr-row")) continue;
-        const label = row.querySelector(".lr-row-label");
-        rows.push({ row, text: normalizeInspectorText(`${label?.textContent ?? ""} ${row.getAttribute("data-filter") ?? ""}`) });
-      }
-      if (rows.length === 0) continue;
-      entries.push({ section, head, body: secBody, rows, wasOpen: section.hasAttribute("data-open") });
+      const entry = sectionEntry(section);
+      if (entry === null) continue;
+      entries.push(entry);
     }
     if (entries.length === 0) return;
+    const known = new Set(entries.map((entry) => entry.section));
     const emptyNote = el("div", { class: "lr-filter-empty" }, t("inspectorFilterNoResults"));
     emptyNote.style.display = "none";
     const input = el("input", { class: "lr-filter", type: "text", placeholder: t("inspectorFilterPlaceholder"), "aria-label": t("inspectorFilterPlaceholder") });
@@ -4902,6 +5400,16 @@
     clearBtn.style.display = "none";
     const run = () => {
       clearBtn.style.display = input.value === "" ? "none" : "";
+      if (input.value !== "") {
+        for (const section of body.children) {
+          if (!(section instanceof Element) || known.has(section) || typeof section.__ensure !== "function") continue;
+          section.__ensure();
+          const entry = sectionEntry(section);
+          if (entry === null) continue;
+          known.add(section);
+          entries.push(entry);
+        }
+      }
       applyInspectorFilter(input.value, entries, emptyNote);
     };
     input.addEventListener("input", run);
@@ -5347,9 +5855,24 @@
       control = scrub;
       refreshDisplay = () => scrub.__refresh(toDisplay(adjustValues.get(prop) ?? "1"));
     } else if (meta.kind === "number") {
-      const scrub = scrubControl({ label, value, fallback: adjustNumericFallback(prop), step: meta.step ?? 1, min: meta.min, max: meta.max, glyph: meta.glyph, options: meta.options ?? [], onChange: (next) => adjustUpdateProperty(prop, next) });
-      control = scrub;
-      refreshDisplay = () => scrub.__refresh(adjustValues.get(prop) ?? "");
+      const remMode = () => adjustUnitRem.has(prop);
+      const toDisplay = (raw) => {
+        const parsed = parseNumeric(raw);
+        return remMode() && parsed !== null && parsed.unit === "px" ? formatNumeric(pxToRem(parsed.number, rootFontSizePx()), "rem") : raw;
+      };
+      const toApply = (next) => {
+        const parsed = parseNumeric(next);
+        return remMode() && parsed !== null && parsed.unit === "rem" ? formatNumeric(remToPx(parsed.number, rootFontSizePx()), "px") : next;
+      };
+      const scrub = scrubControl({ label, value: toDisplay(value), fallback: toDisplay(adjustNumericFallback(prop)), step: remMode() ? (meta.step ?? 1) / rootFontSizePx() : (meta.step ?? 1), min: meta.min, max: meta.max, glyph: meta.glyph, options: meta.options ?? [], onChange: (next) => adjustUpdateProperty(prop, toApply(next)) });
+      const unitBtn = el("button", { class: "lr-unit", type: "button", title: t("unitToggle"), onclick: () => {
+        if (remMode()) adjustUnitRem.delete(prop);
+        else adjustUnitRem.add(prop);
+        refreshDisplay();
+        unitBtn.textContent = remMode() ? "rem" : "px";
+      } }, remMode() ? "rem" : "px");
+      control = el("span", { class: "lr-unit-box" }, scrub, unitBtn);
+      refreshDisplay = () => scrub.__refresh(toDisplay(adjustValues.get(prop) ?? ""));
     } else {
       const field = lrField(value, (next) => adjustUpdateProperty(prop, next), { escapeRestore: true });
       control = field;
@@ -5397,10 +5920,12 @@
     adjustRedoBtn = null;
     adjustUndoStack = [];
     adjustRedoStack = [];
+    adjustUnitRem = new Set();
   }
 
   function openAdjustPanel(target) {
     closePanels();
+    syncOverlaySuspension();
     adjustTarget = target ?? document.body;
     forceTarget = adjustTarget;
     forceStates = new Set();
@@ -5638,6 +6163,7 @@
 
 
   async function pollStatus() {
+    if (overlaySuspended()) return;
     try {
       const data = await bridgeSend("state.get", {});
       if (data === null || typeof data !== "object" || data.ok !== true) return;
@@ -5661,6 +6187,7 @@
           closePanels();
           clearHighlight();
           toast(t("deliveredToast"), 3200);
+          syncOverlaySuspension();
         }
       }
       if (data.active === true) lastAgentActivity = Date.now();

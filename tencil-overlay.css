@@ -326,6 +326,7 @@ kbd {
   background: var(--n-50);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  contain: layout;
   transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
   @starting-style { opacity: 0; transform: scale(0.96); }
 }
@@ -453,6 +454,9 @@ kbd {
 .lr-a11y-chip.warn { background: color-mix(in oklab, var(--warn), white 75%); color: var(--warn); }
 .lr-a11y-chip.unknown { background: var(--n-200); color: var(--n-600); }
 .lr-a11y-chip.na { background: var(--n-200); color: var(--n-600); }
+.lr-img { display: grid; gap: 3px; padding: 6px 8px; border-radius: 8px; background: var(--n-100); }
+.lr-img-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--n-600); }
+.lr-img-note { font-size: 11px; color: var(--warn); }
 
 .prompt-input {
   display: grid; gap: 6px;
@@ -490,6 +494,23 @@ kbd {
   color: var(--n-500);
 }
 .toggle-on { color: var(--n-950); background: var(--n-100); }
+.lr-dictate {
+  all: unset; box-sizing: border-box; cursor: pointer;
+  width: 24px; height: 24px; border-radius: 7px;
+  display: inline-grid; place-items: center;
+  color: var(--n-500);
+}
+.lr-dictate:hover { color: var(--n-950); background: var(--n-100); }
+.lr-dictate.lr-dictating { color: var(--accent); background: var(--accent-soft); animation: lr-dictate-pulse 1.2s ease-in-out infinite; }
+@keyframes lr-dictate-pulse { 50% { opacity: 0.55; } }
+.lr-tour { width: 260px; z-index: 2147483640; }
+.lr-tour-text { font-size: 12px; color: var(--n-700); line-height: 1.5; }
+.lr-tour-foot { display: flex; align-items: center; gap: 8px; padding-top: 8px; }
+.lr-tour-count { flex: 1; font-size: 10px; color: var(--n-400); }
+.lr-tour-btn { all: unset; box-sizing: border-box; cursor: pointer; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; color: var(--n-600); }
+.lr-tour-btn:hover { color: var(--n-950); background: var(--n-100); }
+.lr-tour-btn[data-primary] { background: var(--accent); color: #fff; }
+.lr-tour-btn[data-primary]:hover { filter: brightness(1.1); color: #fff; }
 
 .spinner {
   width: 12px; height: 12px; border-radius: 999px;
