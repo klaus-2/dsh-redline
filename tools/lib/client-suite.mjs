@@ -1266,6 +1266,16 @@ export async function runClientSuite(harness, { pluginDir }) {
       "worker teardown missing");
   }
 
+  harness.section("client: overlay states row wiring");
+  {
+    harness.check("overlay: the states row passes its filter options to the row, not to the chip span",
+      template.includes('})), { filter: "hover focus active states" }));') && !template.includes('}), { filter: "hover focus active states" }'),
+      "misplaced options object");
+    harness.check("overlay: the states chips toggle the force states and filter by pseudo names",
+      template.includes('chip.addEventListener("click", () => toggleForceState(pseudo));') && template.includes('"data-lr-pseudo": pseudo'),
+      "states row wiring missing");
+  }
+
   harness.section("client: locale integrity");
   {
     const overlayLiteral = extractObjectLiteral(overlay, "const UI_LOCALES");

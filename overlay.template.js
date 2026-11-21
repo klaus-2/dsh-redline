@@ -6148,7 +6148,7 @@
       chip.toggleAttribute("data-on", forceStates.has(pseudo));
       chip.addEventListener("click", () => toggleForceState(pseudo));
       return chip;
-    }), { filter: "hover focus active states" })));
+    })), { filter: "hover focus active states" }));
 
     panel.append(body);
     wireInspectorFilter(body);
