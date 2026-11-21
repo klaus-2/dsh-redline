@@ -1142,13 +1142,14 @@ export async function runClientSuite(harness, { pluginDir }) {
       ? undefined
       : JSON.parse(evaluateExpression(`() => {
       ${positionOf}
-      return JSON.stringify([tourBubblePosition({ left: 100, top: 300, bottom: 330 }, 1280, 800), tourBubblePosition({ left: 40, top: 50, bottom: 80 }, 1280, 800), tourBubblePosition({ left: 1500, top: 400, bottom: 430 }, 1280, 800), tourBubblePosition({ left: 100, top: 300, bottom: 330 }, 1280, 800, 150)]);
+      return JSON.stringify([tourBubblePosition({ left: 100, top: 300, bottom: 330 }, 1280, 800), tourBubblePosition({ left: 40, top: 50, bottom: 80 }, 1280, 800), tourBubblePosition({ left: 1500, top: 400, bottom: 430 }, 1280, 800), tourBubblePosition({ left: 100, top: 300, bottom: 330 }, 1280, 800, 150), tourBubblePosition({ left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }, 929, 861)]);
     }`, "tourBubblePosition")());
-    harness.eq("overlay: the tour bubble measures its own height, clamps to the viewport and flips when the top does not fit", runPos, [
+    harness.eq("overlay: the tour bubble measures its own height, clamps to the viewport, flips when the top does not fit and centres over a hidden anchor", runPos, [
       { left: 60, top: 186, above: true },
       { left: 8, top: 90, above: false },
       { left: 992, top: 286, above: true },
-      { left: 60, top: 140, above: true }
+      { left: 60, top: 140, above: true },
+      { left: 325, top: 661, above: false }
     ]);
     harness.check("overlay: the tour bubble pads itself, marks the step with dots and places after measuring",
       template.includes('class: "lr-tour-dot"') && template.includes("bubble.offsetHeight || 104") && template.includes('bubble.style.visibility = "hidden";'),

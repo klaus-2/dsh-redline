@@ -2163,6 +2163,11 @@
     const height = Number.isFinite(Number(bubbleHeight)) && Number(bubbleHeight) > 0 ? Number(bubbleHeight) : 104;
     const vw = Number(viewportWidth);
     const vh = Number(viewportHeight);
+    const zeroWidth = Number.isFinite(Number(rect.width)) && Number(rect.width) === 0;
+    const zeroHeight = Number.isFinite(Number(rect.height)) && Number(rect.height) === 0;
+    if (zeroWidth && zeroHeight) {
+      return { left: Math.max(8, Math.round(((Number.isFinite(vw) ? vw : 0) - width) / 2)), top: Math.max(8, (Number.isFinite(vh) ? vh : 0) - height - 96), above: false };
+    }
     const left = Math.min(Math.max(8, rect.left - 40), Math.max(8, (Number.isFinite(vw) ? vw : 0) - width - 8));
     const fitsAbove = rect.top - height - 10 >= 8;
     const belowTop = Math.min(Math.max(8, rect.bottom + 10), Math.max(8, (Number.isFinite(vh) ? vh : 0) - height - 8));
