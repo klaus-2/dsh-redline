@@ -2235,6 +2235,67 @@
       index += 1;
       renderStep();
     });
+    let dragSource = null;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragBaseLeft = 0;
+    let dragBaseTop = 0;
+    let dragMoved = false;
+    let dragFrame = 0;
+    let dragLeft = 0;
+    let dragTop = 0;
+    const dragPaint = () => {
+      dragFrame = 0;
+      bubble.style.left = `${dragLeft}px`;
+      bubble.style.top = `${dragTop}px`;
+    };
+    const dragStroke = (x, y) => {
+      const dx = x - dragStartX;
+      const dy = y - dragStartY;
+      if (!dragMoved) {
+        if (Math.hypot(dx, dy) < PANEL_DRAG_THRESHOLD) return;
+        dragMoved = true;
+        bubble.setAttribute("data-dragging", "");
+        bubble.style.transform = "none";
+        dragBaseLeft = bubble.offsetLeft;
+        dragBaseTop = bubble.offsetTop;
+      }
+      dragLeft = clampPanelAxis(dragBaseLeft + dx, bubble.offsetWidth, window.innerWidth, 8);
+      dragTop = clampPanelAxis(dragBaseTop + dy, bubble.offsetHeight, window.innerHeight, 8);
+      if (dragFrame === 0) dragFrame = requestAnimationFrame(dragPaint);
+    };
+    const dragEnd = () => {
+      dragSource = null;
+      bubble.removeEventListener("pointermove", dragMove);
+      bubble.removeEventListener("pointerup", dragEnd);
+      bubble.removeEventListener("pointercancel", dragEnd);
+      bubble.removeEventListener("lostpointercapture", dragEnd);
+      bubble.removeAttribute("data-dragging");
+      if (dragFrame !== 0) {
+        cancelAnimationFrame(dragFrame);
+        dragFrame = 0;
+        dragPaint();
+      }
+    };
+    const dragMove = (event) => {
+      if (event.pointerId !== dragSource) return;
+      dragStroke(event.clientX, event.clientY);
+    };
+    bubble.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || isInteractivePanelTarget(event.target) || dragSource !== null) return;
+      dragSource = event.pointerId;
+      dragStartX = event.clientX;
+      dragStartY = event.clientY;
+      dragMoved = false;
+      event.preventDefault();
+      try {
+        bubble.setPointerCapture(event.pointerId);
+      } catch {}
+      bubble.addEventListener("pointermove", dragMove);
+      bubble.addEventListener("pointerup", dragEnd);
+      bubble.addEventListener("pointercancel", dragEnd);
+      bubble.addEventListener("lostpointercapture", dragEnd);
+    });
     const onKey = (event) => {
       if (event.key !== "Escape") return;
       endTour();

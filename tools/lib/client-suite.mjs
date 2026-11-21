@@ -1154,6 +1154,9 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("overlay: the tour bubble pads itself, marks the step with dots and places after measuring",
       template.includes('class: "lr-tour-dot"') && template.includes("bubble.offsetHeight || 104") && template.includes('bubble.style.visibility = "hidden";'),
       "tour bubble layout wiring missing");
+    harness.check("overlay: the tour bubble drags with the shared panel drag discipline and buttons stay interactive",
+      template.includes("isInteractivePanelTarget(event.target) || dragSource !== null") && template.includes("dragLeft = clampPanelAxis(dragBaseLeft + dx, bubble.offsetWidth, window.innerWidth, 8)") && overlay.includes(".lr-tour button { cursor: pointer; touch-action: auto; }"),
+      "tour drag wiring missing");
     harness.check("overlay: the first settings answer arms the tour when the flag is still false",
       template.includes("if (next.tourDone === false && !tourShown && tourNode === null) scheduleTour();") &&
       template.includes('bridgeSend("settings.update", { tourDone: true })'),
