@@ -1281,7 +1281,7 @@
   
 `;
   const absLayer = document.createElement("div");
-  absLayer.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;z-index:2147483600;";
+  absLayer.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;z-index:2147483600;will-change:transform;";
   const fixedLayer = document.createElement("div");
   fixedLayer.style.cssText = "position:fixed;left:0;top:0;width:0;height:0;z-index:2147483600;";
   shadow.append(styleEl, rootDiv);

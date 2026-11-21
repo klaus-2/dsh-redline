@@ -1010,6 +1010,14 @@ export async function runClientSuite(harness, { pluginDir }) {
       "alt warning missing");
   }
 
+  harness.section("client: overlay layout containment");
+  {
+    const popoverRule = /\.popover \{[^}]*\}/.exec(overlay)?.[0] ?? "";
+    harness.check("overlay: popovers contain their layout to keep page reflows out", popoverRule.includes("contain: layout"), popoverRule.slice(0, 90));
+    const absText = /absLayer\.style\.cssText = "([^"]*)"/.exec(overlay)?.[1] ?? "";
+    harness.check("overlay: the pin layer promotes itself to its own compositing layer", absText.includes("will-change:transform"), absText);
+  }
+
   harness.section("client: overlay px rem toggle");
   {
     const toRem = extractFunction(overlay, "pxToRem");
