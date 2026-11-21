@@ -49,6 +49,7 @@
   "tokenSuggestions": "Design tokens",
   "a11yTitle": "Accessibility",
   "imgDetails": "Image details",
+  "unitToggle": "Toggle px / rem",
   "imgDetailsFormat": "Format",
   "imgDetailsSize": "Natural → rendered",
   "imgDetailsUpscaled": "Served smaller than displayed ({p}% larger)",

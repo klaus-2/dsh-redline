@@ -49,6 +49,7 @@
   "tokenSuggestions": "设计令牌",
   "a11yTitle": "无障碍",
   "imgDetails": "图片详情",
+  "unitToggle": "切换 px / rem",
   "imgDetailsFormat": "格式",
   "imgDetailsSize": "原始 → 渲染",
   "imgDetailsUpscaled": "原图小于显示尺寸（放大 {p}%）",

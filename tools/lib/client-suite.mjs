@@ -35,6 +35,9 @@ const REQUIRED_OVERLAY_SYMBOLS = [
   "function imageDetailsSection",
   "function imageFormatHint",
   "function imageScaleNote",
+  "function pxToRem",
+  "function remToPx",
+  "function rootFontSizePx",
   "const EDITABLE_PROPS",
   "const PROP_META",
   "const t = (key) =>"
@@ -998,6 +1001,41 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("overlay: the image details section warns about a missing alt attribute",
       template.includes('img.hasAttribute?.("alt") === false ? el("div", { class: "lr-img-note" }, t("imgDetailsAltMissing")) : null'),
       "alt warning missing");
+  }
+
+  harness.section("client: overlay px rem toggle");
+  {
+    const toRem = extractFunction(overlay, "pxToRem");
+    const toPx = extractFunction(overlay, "remToPx");
+    const run = toRem === undefined || toPx === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${toRem}
+      ${toPx}
+      return JSON.stringify([pxToRem(32, 16), remToPx(2, 16), pxToRem(18, 18), remToPx(1.5, 0), pxToRem(32, NaN)]);
+    }`, "pxRemConverters")());
+    harness.eq("overlay: px and rem convert through the root font size with a 16px default", run, [2, 32, 1, 24, 2]);
+    const rootOf = extractFunction(overlay, "rootFontSizePx");
+    let calls = 0;
+    const runRoot = rootOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`(getComputedStyle, document) => {
+      ${rootOf}
+      return JSON.stringify([rootFontSizePx(), rootFontSizePx(), rootFontSizePx()]);
+    }`, "rootFontSizePx")(
+        () => ({ fontSize: ["18px", "0px", "bogus"][calls++] }),
+        { documentElement: {} }
+      ));
+    harness.eq("overlay: the root font size falls back to 16px when unreadable", runRoot, [18, 16, 16]);
+    harness.check("overlay: the unit toggle state resets with the adjust panel",
+      (template.match(/adjustUnitRem = new Set\(\)/gu) ?? []).length >= 2,
+      "declaration and reset sites missing");
+    harness.check("overlay: the rem display converts back to px before applying",
+      template.includes("adjustUpdateProperty(prop, toApply(next))") && template.includes("(meta.step ?? 1) / rootFontSizePx()"),
+      "apply conversion or step scaling missing");
+    harness.check("overlay: the row refresh re-renders through the unit display",
+      template.includes('scrub.__refresh(toDisplay(adjustValues.get(prop) ?? ""))'),
+      "refresh conversion missing");
   }
 
   harness.section("client: locale integrity");
