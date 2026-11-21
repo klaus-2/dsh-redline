@@ -144,6 +144,16 @@
       "gridOutline": "Outline",
       "distanceMeter": "Hold Alt with a panel open to measure distances",
       "inspectorStates": "States",
+      "inspectorFilterPlaceholder": "Filter properties",
+      "inspectorFilterNoResults": "No properties match this filter",
+      "inspectorFilterClear": "Clear the filter",
+      "captureRunning": "Capturing the page…",
+      "captureSimplified": "Capturing without images…",
+      "captureCancel": "Cancel",
+      "captureTimeoutFallback": "The capture took too long; trying without images",
+      "captureTimeoutFailed": "The capture did not finish in time",
+      "auditCancel": "Cancel",
+      "auditPartial": "Partial results; the audit was interrupted",
       "eyeTitle": "Show/hide pins",
       "statusTitle": "Live Review active",
       "pendingTitle": "Annotations waiting for your next prompt in the chat",
@@ -367,6 +377,16 @@
       "gridOutline": "Contorno",
       "distanceMeter": "Segure Alt com um painel aberto para medir distâncias",
       "inspectorStates": "Estados",
+      "inspectorFilterPlaceholder": "Filtrar propriedades",
+      "inspectorFilterNoResults": "Nenhuma propriedade corresponde ao filtro",
+      "inspectorFilterClear": "Limpar o filtro",
+      "captureRunning": "Capturando a página…",
+      "captureSimplified": "Capturando sem imagens…",
+      "captureCancel": "Cancelar",
+      "captureTimeoutFallback": "A captura demorou; tentando sem imagens",
+      "captureTimeoutFailed": "A captura não terminou a tempo",
+      "auditCancel": "Cancelar",
+      "auditPartial": "Resultado parcial; a auditoria foi interrompida",
       "eyeTitle": "Mostrar/ocultar pins",
       "statusTitle": "Live Review ativo",
       "pendingTitle": "Anotações aguardando seu próximo prompt no chat",
@@ -590,6 +610,16 @@
       "gridOutline": "轮廓",
       "distanceMeter": "按住 Alt 并打开面板以测量距离",
       "inspectorStates": "状态",
+      "inspectorFilterPlaceholder": "筛选属性",
+      "inspectorFilterNoResults": "没有匹配的属性",
+      "inspectorFilterClear": "清除筛选",
+      "captureRunning": "正在截取页面…",
+      "captureSimplified": "正在截取（不含图片）…",
+      "captureCancel": "取消",
+      "captureTimeoutFallback": "截图超时，正在尝试不含图片",
+      "captureTimeoutFailed": "截图未按时完成",
+      "auditCancel": "取消",
+      "auditPartial": "部分结果；审计已中断",
       "eyeTitle": "显示/隐藏图钉",
       "statusTitle": "Live Review 运行中",
       "pendingTitle": "标注将随你的下一条消息发送",
@@ -1036,6 +1066,12 @@
     .lr-audit-value { max-width: 110px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--n-500); }
     .lr-audit-row .lr-a11y-fix { margin-left: auto; }
     .lr-audit-summary { color: var(--n-500); font-size: 11px; padding: 2px 0 6px; }
+    .lr-audit-partial { color: #e69a10; }
+    .lr-audit-progress { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+    .lr-audit-progress-track { flex: 1; height: 6px; border-radius: 3px; background: var(--n-100); overflow: hidden; }
+    .lr-audit-progress-fill { width: 0%; height: 100%; border-radius: 3px; background: var(--accent); transition: width 120ms var(--ease-out); }
+    .lr-audit-progress-label { font-size: 11px; color: var(--n-500); font-variant-numeric: tabular-nums; }
+    .lr-audit-cancel { all: unset; cursor: pointer; padding: 2px 10px; border-radius: 999px; background: var(--n-950); color: var(--n-50); font-size: 11px; }
     .lr-focus-spotlight { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none;
       border-radius: 6px; outline: 2px solid rgba(255,255,255,0.9); box-shadow: 0 0 0 100vmax rgba(0,0,0,0.55); z-index: 2147483603; }
     .lr-focus-hint { position: fixed; left: 50%; top: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
@@ -1043,6 +1079,8 @@
     .lr-focus-hint .lr-close { pointer-events: auto; }
     .lr-toast-stack { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); pointer-events: none; display: grid; gap: 8px; z-index: 2147483602; }
     .lr-toast-stack .toast { position: static; left: auto; bottom: auto; transform: none; }
+    .lr-capture-toast { pointer-events: auto; display: flex; align-items: center; gap: 10px; }
+    .lr-capture-cancel { all: unset; cursor: pointer; padding: 2px 10px; border-radius: 999px; background: var(--n-950); color: var(--n-50); font-size: 11px; }
     .lr-template-row { display: flex; align-items: center; gap: 5px; min-width: 0; }
     .lr-template-label { display: none; }
     .lr-template-btn { all: unset; box-sizing: border-box; cursor: pointer; padding: 1px 8px; border-radius: 999px; background: var(--n-100); color: var(--n-600); font-size: 10px; white-space: nowrap; }
@@ -1060,6 +1098,12 @@
     .lr-sec-chev { color: var(--n-500); font-size: 10px; transition: transform .15s; }
     .lr-sec[data-open] .lr-sec-chev { transform: rotate(180deg); }
     .lr-sec-body { display: flex; flex-direction: column; gap: 6px; padding: 2px 0 8px; }
+    .lr-filter-bar { display: flex; align-items: center; gap: 4px; padding: 6px 0; }
+    .lr-filter { all: unset; box-sizing: border-box; flex: 1; min-width: 0; height: 26px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--n-50); color: var(--n-900); font-size: 12px; }
+    .lr-filter:focus { border-color: var(--accent); }
+    .lr-filter-clear { all: unset; box-sizing: border-box; cursor: pointer; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 5px; color: var(--n-500); font-size: 11px; }
+    .lr-filter-clear:hover { background: var(--n-100); color: var(--n-900); }
+    .lr-filter-empty { padding: 8px 2px; font-size: 12px; color: var(--n-500); }
     .lr-row { display: flex; align-items: center; gap: 8px; min-height: 28px; min-width: 0; flex-wrap: wrap; }
     .lr-row-wide { flex-direction: column; align-items: stretch; gap: 4px; }
     .lr-row-label { flex: none; width: 88px; min-width: 0; max-width: 40%; font-size: 11px; color: var(--n-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1129,7 +1173,11 @@
 .popover { z-index: 2147483601; }
 .toolbar-wrap { z-index: 2147483602; }
 .root.lr-drawing .pin { pointer-events: none; }
-.lr-drawbar { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); display: none; flex-direction: row; align-items: center; gap: 2px; background: var(--n-100); border: 1px solid var(--line); border-radius: 12px; padding: 4px 6px; box-shadow: var(--shadow); z-index: 2147483601; max-width: calc(100vw - 16px); overflow-x: auto; }
+.lr-drawbar { position: fixed; left: 12px; top: 50%; transform: translateY(-50%); display: none; flex-direction: column; gap: 4px; background: var(--n-100); border: 1px solid var(--line); border-radius: 12px; padding: 6px; box-shadow: var(--shadow); z-index: 2147483601; }
+.lr-drawbar[data-dock="top"], .lr-drawbar[data-dock="bottom"] { left: 50%; transform: translateX(-50%); flex-direction: row; align-items: center; gap: 2px; padding: 4px 6px; max-width: calc(100vw - 16px); overflow-x: auto; }
+.lr-drawbar[data-dock="top"] { top: 12px; }
+.lr-drawbar[data-dock="bottom"] { top: auto; bottom: 74px; }
+.lr-drawbar[data-dock="right"] { left: auto; right: 12px; }
 .lr-drawbar[data-on] { display: flex; }
 .lr-dicon { display: inline-flex; width: 14px; height: 14px; }
 .lr-dicon svg { display: block; }
@@ -1190,6 +1238,7 @@
   let drawCanvas = null;
   let drawCtx = null;
   let drawBar = null;
+  let drawDock = "left";
   let drawBtn = null;
   let drawLive = null;
   let drawMenu = null;
@@ -1630,6 +1679,7 @@
 
   function buildDrawBar() {
     drawBar = el("div", { class: "lr-drawbar" });
+    drawBar.setAttribute("data-dock", drawDock);
     drawBar.toggleAttribute("data-on", drawMode);
     const addTool = (id, labelKey, icon, onPick) => {
       const btn = el("button", { class: "lr-dtool", type: "button", title: t(labelKey) });
@@ -2093,6 +2143,11 @@
     }
     rootDiv.className = themeRootClass(next.theme);
     if (Array.isArray(next.templates)) customTemplates = normalizeTemplates(next.templates);
+    if (typeof next.captureQuality === "string") captureQuality = ["leve", "padrao", "alta"].includes(next.captureQuality) ? next.captureQuality : "padrao";
+    if (Number.isFinite(Number(next.captureTimeout))) captureTimeout = Math.max(0, Math.min(60, Math.round(Number(next.captureTimeout))));
+    if (Number.isFinite(Number(next.auditLimit))) auditLimit = Math.max(50, Math.min(2000, Math.round(Number(next.auditLimit))));
+    if (typeof next.drawDock === "string") drawDock = ["left", "top", "right", "bottom"].includes(next.drawDock) ? next.drawDock : "left";
+    drawBar?.setAttribute("data-dock", drawDock);
     if (next.keys === null || typeof next.keys !== "object") return;
     let changed = false;
     const comment = parseHotkey(next.keys.comment);
@@ -2322,7 +2377,26 @@
 
   let highlightEl = null;
   let highlightLabel = null;
+  let hoverRaf = null;
+  let hoverPendingTarget = null;
+  function scheduleHighlight(target) {
+    hoverPendingTarget = target;
+    if (hoverRaf !== null) return;
+    hoverRaf = requestAnimationFrame(() => {
+      hoverRaf = null;
+      const pending = hoverPendingTarget;
+      hoverPendingTarget = null;
+      if (pending === null) return;
+      if ((mode === null && !groupMode) || draft !== null) return;
+      showHighlight(pending);
+    });
+  }
   function clearHighlight() {
+    if (hoverRaf !== null) {
+      cancelAnimationFrame(hoverRaf);
+      hoverRaf = null;
+    }
+    hoverPendingTarget = null;
     highlightEl?.remove();
     highlightLabel?.remove();
     highlightEl = null;
@@ -2420,7 +2494,7 @@
       if (inHost) return;
       const target = event.target instanceof Element ? event.target : null;
       if (!target || target === hovered) return;
-      showHighlight(target);
+      scheduleHighlight(target);
     },
     true
   );
@@ -2491,6 +2565,12 @@
       const from = event.composedPath?.()[0] ?? event.target;
       const tag = from?.tagName;
       if (meterAltKeydown(event)) return;
+      if (event.key === "Escape" && captureAbort !== null) {
+        event.preventDefault();
+        event.stopPropagation();
+        captureAbort();
+        return;
+      }
       if (tag === "INPUT" || tag === "TEXTAREA" || from?.isContentEditable === true) return;
       if (adjustPanel !== null && (event.ctrlKey || event.metaKey) && !event.altKey) {
         const undoKey = event.key.toLowerCase();
@@ -2618,6 +2698,14 @@
   }
 
   const pinNodes = new Map();
+  const pinIoIds = new Map();
+  const pinIoNear = new Map();
+  const pinIoRects = new Map();
+  const pinLastPoints = new Map();
+  const edgeChips = [];
+  const pulseTimers = new Map();
+  let repositionRaf = null;
+  let pinObserver = null;
 
   function renderPins() {
     mountShadow();
@@ -2651,18 +2739,36 @@
       if (!alive.has(id)) {
         entry.node.remove();
         pinNodes.delete(id);
+        pinIoNear.delete(id);
+        pinIoRects.delete(id);
+        pinLastPoints.delete(id);
       }
     }
+    if (!hidden) syncPinObserver();
     updateToolbar();
+    updateEdgeMarkers();
   }
 
+  function scheduleReposition() {
+    if (repositionRaf !== null) return;
+    repositionRaf = requestAnimationFrame(() => {
+      repositionRaf = null;
+      repositionPins();
+    });
+  }
+  function pinIsFar(id) {
+    const rect = pinIoRects.get(id);
+    return pinIoNear.get(id) === false && rect !== undefined && (rect.width > 0 || rect.height > 0);
+  }
   function repositionPins() {
     for (const [id, entry] of pinNodes) {
       const pin = pins.find((p) => p.id === id);
       if (!pin) continue;
+      if (pinIsFar(id)) continue;
       const point = anchorPoint(pin);
       if (point) {
         entry.node.style.transform = `translate(${point.x}px, ${point.y}px)`;
+        pinLastPoints.set(id, point);
         if (pin.stale === true) {
           pin.stale = false;
           entry.node.classList.remove("lr-pin-stale");
@@ -2671,6 +2777,109 @@
     }
     repositionDraft();
     repositionFocus();
+    updateEdgeMarkers();
+  }
+  function syncPinObserver() {
+    if (typeof IntersectionObserver !== "function") return;
+    if (pinObserver === null) {
+      pinObserver = new IntersectionObserver((entries) => {
+        let entered = false;
+        for (const entry of entries) {
+          const id = pinIoIds.get(entry.target);
+          if (id === undefined) continue;
+          pinIoRects.set(id, entry.boundingClientRect);
+          pinIoNear.set(id, entry.isIntersecting);
+          if (entry.isIntersecting) entered = true;
+        }
+        if (entered) scheduleReposition();
+      }, { rootMargin: "480px" });
+    }
+    const wanted = new Map();
+    for (const pin of pins) {
+      if (pin.status === "resolvido" || pin.tag === "canvas") continue;
+      const element = locate(pin.selector);
+      if (element !== null) wanted.set(element, pin.id);
+    }
+    for (const [element, id] of [...pinIoIds]) {
+      if (wanted.has(element)) continue;
+      pinObserver.unobserve(element);
+      pinIoIds.delete(element);
+      pinIoNear.delete(id);
+      pinIoRects.delete(id);
+    }
+    for (const [element, id] of wanted) {
+      if (pinIoIds.has(element)) continue;
+      pinIoIds.set(element, id);
+      pinObserver.observe(element);
+    }
+  }
+  function updateEdgeMarkers() {
+    for (const node of edgeChips) node.remove();
+    edgeChips.length = 0;
+    if (hidden) return;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const lanes = new Map();
+    for (const pin of pins) {
+      if (pin.status === "resolvido") continue;
+      const ioRect = pinIoRects.get(pin.id);
+      let point = pinIsFar(pin.id) && ioRect ? { x: ioRect.left + ioRect.width / 2, y: ioRect.top + ioRect.height / 2 } : pinLastPoints.get(pin.id) ?? null;
+      if (point === null && pin.rect) point = { x: pin.rect.x, y: pin.rect.y };
+      if (point === null) continue;
+      if (point.x >= 0 && point.x <= vw && point.y >= 0 && point.y <= vh) continue;
+      const overLeft = -point.x;
+      const overRight = point.x - vw;
+      const overTop = -point.y;
+      const overBottom = point.y - vh;
+      const overX = Math.max(overLeft, overRight);
+      const overY = Math.max(overTop, overBottom);
+      const side = overX >= overY ? (overLeft >= overRight ? "left" : "right") : (overTop >= overBottom ? "top" : "bottom");
+      const along = side === "left" || side === "right" ? Math.min(Math.max(24, point.y), vh - 24) : Math.min(Math.max(24, point.x), vw - 24);
+      const laneKey = `${side}:${Math.round(along / 32)}`;
+      const lane = lanes.get(laneKey);
+      if (lane) lane.pins.push(pin);
+      else lanes.set(laneKey, { side, along, pins: [pin] });
+    }
+    for (const lane of lanes.values()) {
+      const count = lane.pins.length;
+      const number = pins.filter((p) => p.status !== "resolvido").indexOf(lane.pins[0]) + 1;
+      const chip = el("button", { class: "lr-edge-pin", "data-side": lane.side, type: "button", title: lane.pins[0].comment });
+      chip.append(el("span", { class: "lr-edge-arrow", html: ICONS_CANVAS.chev }), el("span", { class: "lr-edge-count" }, count > 1 ? String(count) : String(number || "•")));
+      chip.addEventListener("click", () => {
+        const pin = lane.pins[0];
+        const element = pin.tag === "canvas" ? null : locate(pin.selector);
+        if (element !== null) element.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+        else if (pin.rect) window.scrollTo({ top: Math.max(0, pin.rect.y - window.innerHeight / 2), behavior: "smooth" });
+        scheduleReposition();
+        pulsePin(pin.id);
+      });
+      if (lane.side === "left" || lane.side === "right") {
+        if (lane.side === "left") chip.style.left = "3px";
+        else chip.style.right = "3px";
+        chip.style.top = `${lane.along - 11}px`;
+      } else if (lane.side === "top") {
+        chip.style.top = "3px";
+        chip.style.left = `${lane.along}px`;
+        chip.style.transform = "translateX(-50%)";
+      } else {
+        chip.style.bottom = "3px";
+        chip.style.left = `${lane.along}px`;
+        chip.style.transform = "translateX(-50%)";
+      }
+      fixedLayer.append(chip);
+      edgeChips.push(chip);
+    }
+  }
+  function pulsePin(id) {
+    const entry = pinNodes.get(id);
+    if (!entry) return;
+    entry.node.classList.add("lr-pin-pulse");
+    const timer = pulseTimers.get(id);
+    if (timer !== undefined) clearTimeout(timer);
+    pulseTimers.set(id, setTimeout(() => {
+      pulseTimers.delete(id);
+      entry.node.classList.remove("lr-pin-pulse");
+    }, 1400));
   }
   function repositionDraft() {
     if (draft === null || draftNode === null || composerNode === null) return;
@@ -2699,13 +2908,13 @@
       }
     }
   }
-  window.addEventListener("scroll", repositionPins, { passive: true });
-  window.addEventListener("resize", repositionPins);
+  window.addEventListener("scroll", scheduleReposition, { passive: true });
+  window.addEventListener("resize", scheduleReposition);
   let mutationTimer = null;
   new MutationObserver(() => {
     clearTimeout(mutationTimer);
     mutationTimer = setTimeout(() => {
-      repositionPins();
+      scheduleReposition();
       auditPinAnchors();
     }, 400);
   }).observe(document.body ?? document.documentElement, { childList: true, subtree: true, attributes: true });
@@ -3197,13 +3406,65 @@
 
 
   let CROP_PAD = 72;
-  const CROP_MAX_EDGE = 900;
+  let captureQuality = "padrao";
+  function capturePreset(quality) {
+    if (quality === "leve") return { maxEdge: 640, quality: 0.7 };
+    if (quality === "alta") return { maxEdge: 1400, quality: 0.92 };
+    return { maxEdge: 900, quality: 0.8 };
+  }
 
-  async function captureCropFor(rect, cropPad = CROP_PAD, withDrawings = false) {
+  let captureTimeout = 12;
+  let captureCancelled = false;
+  let captureAbort = null;
+  const CAPTURE_SIMPLIFIED_TAGS = new Set(["IMG", "VIDEO", "IFRAME", "OBJECT", "EMBED"]);
+  function raceCapture(renderPromise, ms) {
+    return new Promise((resolve) => {
+      let settled = false;
+      let timer = null;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        captureAbort = null;
+        if (timer !== null) clearTimeout(timer);
+        resolve(value);
+      };
+      if (ms > 0) timer = setTimeout(() => finish({ status: "timeout" }), ms);
+      captureAbort = () => finish({ status: "cancelled" });
+      renderPromise.then((canvas) => finish({ status: "done", canvas })).catch((error) => finish({ status: "error", error }));
+    });
+  }
+  let captureToastNode = null;
+  function showCaptureToast(simplified) {
+    hideCaptureToast();
+    captureToastNode = el("div", { class: "toast lr-capture-toast" },
+      el("span", { class: "lr-capture-label" }, simplified ? t("captureSimplified") : t("captureRunning")),
+      el("button", { class: "lr-capture-cancel", type: "button", onclick: () => captureAbort?.() }, t("captureCancel")));
+    toastStack.append(captureToastNode);
+  }
+  function hideCaptureToast() {
+    captureToastNode?.remove();
+    captureToastNode = null;
+  }
+  const groupCaptureCache = { canvas: null, key: null, at: 0 };
+  function groupCanvasKey() {
+    return `${window.scrollX}|${window.scrollY}|${window.innerWidth}|${window.innerHeight}`;
+  }
+  async function captureCropFor(rect, cropPad = CROP_PAD, withDrawings = false, reuse = null) {
     const ok = await ensureHtml2Canvas();
     if (!ok || typeof window.html2canvas !== "function") return null;
-    try {
-      const canvas = await window.html2canvas(document.body, {
+    captureCancelled = false;
+    let simplified = false;
+    for (;;) {
+      if (reuse !== null && simplified === false && reuse.canvas !== null && reuse.key === groupCanvasKey() && Date.now() - reuse.at < 10000) {
+        try {
+          return cropCanvas(reuse.canvas, rect, cropPad);
+        } catch (error) {
+          reportDiag(`crop: ${String(error && error.message ? error.message : error).slice(0, 200)}`);
+          return null;
+        }
+      }
+      showCaptureToast(simplified);
+      const outcome = await raceCapture(window.html2canvas(document.body, {
         backgroundColor: "#ffffff",
         scale: Math.min(1, 1600 / window.innerWidth),
         width: window.innerWidth,
@@ -3213,26 +3474,50 @@
         scrollX: window.scrollX,
         scrollY: window.scrollY,
         useCORS: true,
-        ignoreElements: (element) => element.id === "dsh-redline-host"
-      });
-      if (withDrawings && drawCtx !== null && drawItems.length > 0) {
-        const dscale = canvas.width / Math.max(1, drawCanvas.width);
-        canvas.getContext("2d").drawImage(drawCanvas, 0, 0, drawCanvas.width * dscale, drawCanvas.height * dscale);
+        ignoreElements: simplified
+          ? (element) => element.id === "dsh-redline-host" || CAPTURE_SIMPLIFIED_TAGS.has(element.tagName)
+          : (element) => element.id === "dsh-redline-host"
+      }), captureTimeout > 0 ? captureTimeout * 1000 : 0);
+      hideCaptureToast();
+      if (outcome.status === "cancelled") {
+        captureCancelled = true;
+        return null;
       }
-      if (withDrawings && drawCtx !== null && drawItems.length > 0) {
-        const dscale = canvas.width / Math.max(1, drawCanvas.width);
-        canvas.getContext("2d").drawImage(drawCanvas, 0, 0, drawCanvas.width * dscale, drawCanvas.height * dscale);
+      if (outcome.status === "timeout") {
+        if (simplified) {
+          toast(t("captureTimeoutFailed"));
+          return null;
+        }
+        simplified = true;
+        toast(t("captureTimeoutFallback"));
+        continue;
       }
-      const data = cropCanvas(canvas, rect, cropPad);
-      return data;
-    } catch (error) {
-      reportDiag(`capture: exceção ${String(error && error.message ? error.message : error).slice(0, 200)}`);
-      return null;
+      if (outcome.status === "error") {
+        reportDiag(`capture: exceção ${String(outcome.error && outcome.error.message ? outcome.error.message : outcome.error).slice(0, 200)}`);
+        return null;
+      }
+      try {
+        const canvas = outcome.canvas;
+        if (reuse !== null && simplified === false) {
+          reuse.canvas = canvas;
+          reuse.key = groupCanvasKey();
+          reuse.at = Date.now();
+        }
+        if (withDrawings && drawCtx !== null && drawItems.length > 0) {
+          const dscale = canvas.width / Math.max(1, drawCanvas.width);
+          canvas.getContext("2d").drawImage(drawCanvas, 0, 0, drawCanvas.width * dscale, drawCanvas.height * dscale);
+        }
+        return cropCanvas(canvas, rect, cropPad);
+      } catch (error) {
+        reportDiag(`crop: ${String(error && error.message ? error.message : error).slice(0, 200)}`);
+        return null;
+      }
     }
   }
 
   function cropCanvas(canvas, rect, pad = CROP_PAD) {
     try {
+      const preset = capturePreset(captureQuality);
       const scale = canvas.width / Math.max(1, window.innerWidth);
       let sx = (rect.x - pad) * scale;
       let sy = (rect.y - pad) * scale;
@@ -3242,7 +3527,7 @@
       sy = Math.max(0, Math.min(sy, canvas.height - 1));
       sw = Math.max(32, Math.min(sw, canvas.width - sx));
       sh = Math.max(32, Math.min(sh, canvas.height - sy));
-      const shrink = Math.min(1, CROP_MAX_EDGE / Math.max(sw, sh));
+      const shrink = Math.min(1, preset.maxEdge / Math.max(sw, sh));
       const out = document.createElement("canvas");
       out.width = Math.max(1, Math.round(sw * shrink));
       out.height = Math.max(1, Math.round(sh * shrink));
@@ -3250,7 +3535,7 @@
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, out.width, out.height);
       ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, out.width, out.height);
-      return out.toDataURL("image/jpeg", 0.8);
+      return out.toDataURL("image/jpeg", preset.quality);
     } catch (error) {
       reportDiag(`crop: ${String(error && error.message ? error.message : error).slice(0, 200)}`);
       return null;
@@ -3417,8 +3702,10 @@
       if (drawMode) toggleDraw(false);
       if (draft !== null) discardDraft();
       closePanels();
+      groupCaptureCache.canvas = null;
       setHint(t("groupHint"));
     } else {
+      groupCaptureCache.canvas = null;
       clearGroupPicks();
       groupComposerNode?.remove();
       groupComposerNode = null;
@@ -3451,7 +3738,7 @@
     if (!(target instanceof Element) || target.tagName.toLowerCase() === "canvas") return;
     if (groupPicks.some((pick) => pick.target === target)) return;
     const rect = target.getBoundingClientRect();
-    const shot = screenshotOnSend ? await captureCropFor({ x: rect.left, y: rect.top, w: rect.width, h: rect.height }) : null;
+    const shot = screenshotOnSend ? await captureCropFor({ x: rect.left, y: rect.top, w: rect.width, h: rect.height }, CROP_PAD, false, groupCaptureCache) : null;
     if (!groupMode) return;
     const pick = {
       target,
@@ -3780,32 +4067,48 @@
 
   let auditPanelNode = null;
   let auditPlaceDefault = null;
+  let auditRunToken = 0;
+  let auditLimit = 400;
   function closeAuditPanel() {
+    auditRunToken += 1;
     auditPanelNode?.remove();
     auditPanelNode = null;
     auditPlaceDefault = null;
   }
-  function runPageAudit() {
+  async function runPageAudit(options) {
+    const safe = options !== null && typeof options === "object" ? options : {};
+    const limit = Number.isFinite(Number(safe.limit)) ? Number(safe.limit) : 400;
+    const onProgress = typeof safe.onProgress === "function" ? safe.onProgress : null;
+    const shouldStop = typeof safe.shouldStop === "function" ? safe.shouldStop : null;
     const root = document.body ?? document.documentElement;
-    const interactive = () => Array.from(root.querySelectorAll(A11Y_AUDIT_FAMILY_SELECTORS.interactive)).slice(0, 400);
-    const images = () => Array.from(root.querySelectorAll(A11Y_AUDIT_FAMILY_SELECTORS.images)).slice(0, 400);
-    const semantic = () => Array.from(root.querySelectorAll(A11Y_AUDIT_FAMILY_SELECTORS.semantic)).slice(0, 400);
+    const interactive = () => Array.from(root.querySelectorAll(A11Y_AUDIT_FAMILY_SELECTORS.interactive)).slice(0, limit);
+    const images = () => Array.from(root.querySelectorAll(A11Y_AUDIT_FAMILY_SELECTORS.images)).slice(0, limit);
+    const semantic = () => Array.from(root.querySelectorAll(A11Y_AUDIT_FAMILY_SELECTORS.semantic)).slice(0, limit);
     const textBearing = () => root;
     const collected = collectAuditCandidates({ interactive, images, semantic, textBearing }, 400);
-    const inspectionList = pickAuditCandidates(collected, 400);
+    const inspectionList = pickAuditCandidates(collected, limit);
     const findings = [];
-    for (const element of inspectionList) {
-      for (const row of auditElement(element)) {
-        if (row.status === "fail") findings.push({ check: row.check, status: row.status, value: row.value, selector: cssPath(element), label: quickLabel(element), element });
+    const chunk = 40;
+    let audited = 0;
+    for (let index = 0; index < inspectionList.length; index += chunk) {
+      if (shouldStop !== null && shouldStop() === true) break;
+      const slice = inspectionList.slice(index, index + chunk);
+      for (const element of slice) {
+        for (const row of auditElement(element)) {
+          if (row.status === "fail") findings.push({ check: row.check, status: row.status, value: row.value, selector: cssPath(element), label: quickLabel(element), element });
+        }
       }
+      audited += slice.length;
+      onProgress?.({ done: audited, total: inspectionList.length, findings });
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
-    return { scanned: inspectionList.length, collected: collected.length, findings };
+    return { scanned: audited, collected: collected.length, findings, stopped: shouldStop !== null && shouldStop() === true };
   }
   function openAuditPanel() {
     closeAuditPanel();
     mountShadow();
-    const result = runPageAudit();
-    const groups = groupAuditFindings(result.findings);
+    const token = auditRunToken + 1;
+    auditRunToken = token;
     a11yFixHandler.current = {
       ensurePin: (element, check) => {
         const selector = cssPath(element);
@@ -3844,25 +4147,30 @@
       panel.style.transform = "none";
     };
     auditPlaceDefault = placeDefault;
-    const body = el("div", { class: "lr-audit-body" }, el("div", { class: "lr-audit-summary" }, t("a11yAuditScanned").replace("{scanned}", result.scanned).replace("{findings}", result.findings.length)));
-    if (groups.length === 0) {
-      body.append(el("div", { class: "lr-audit-summary" }, t("a11yAuditNoIssues")));
-    }
-    for (const group of groups) {
-      const section = el("div", { class: "lr-audit-group" }, el("div", { class: "lr-audit-group-title" }, t(group.title), el("span", { class: "lr-audit-count" }, t("a11yAuditIssuesCount").replace("{n}", group.findings.length))));
-      for (const finding of group.findings) {
-        section.append(el("button", { class: "lr-audit-row", type: "button", onclick: () => revealSelector(finding.selector) },
-          el("span", { class: "lr-audit-label" }, finding.label),
-          el("span", { class: "lr-audit-value" }, finding.value),
-          A11Y_FIXABLE_CHECKS.has(group.check) ? el("button", { class: "lr-a11y-fix", type: "button", onclick: (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            revealSelector(finding.selector);
-            showA11yFixPreview(section, section, finding.element, group.check);
-          } }, t("a11yFixApply")) : null));
+    const progressFill = el("div", { class: "lr-audit-progress-fill" });
+    const progressLabel = el("span", { class: "lr-audit-progress-label" });
+    const progressWrap = el("div", { class: "lr-audit-progress" }, el("div", { class: "lr-audit-progress-track" }, progressFill), progressLabel, el("button", { class: "lr-audit-cancel", type: "button", onclick: () => { auditRunToken += 1; } }, t("auditCancel")));
+    const resultsBox = el("div", { class: "lr-audit-results" });
+    const body = el("div", { class: "lr-audit-body" }, progressWrap, resultsBox);
+    const renderAuditGroups = (findings) => {
+      const box = el("div", { class: "lr-audit-results" });
+      for (const group of groupAuditFindings(findings)) {
+        const section = el("div", { class: "lr-audit-group" }, el("div", { class: "lr-audit-group-title" }, t(group.title), el("span", { class: "lr-audit-count" }, t("a11yAuditIssuesCount").replace("{n}", group.findings.length))));
+        for (const finding of group.findings) {
+          section.append(el("button", { class: "lr-audit-row", type: "button", onclick: () => revealSelector(finding.selector) },
+            el("span", { class: "lr-audit-label" }, finding.label),
+            el("span", { class: "lr-audit-value" }, finding.value),
+            A11Y_FIXABLE_CHECKS.has(group.check) ? el("button", { class: "lr-a11y-fix", type: "button", onclick: (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              revealSelector(finding.selector);
+              showA11yFixPreview(section, section, finding.element, group.check);
+            } }, t("a11yFixApply")) : null));
+        }
+        box.append(section);
       }
-      body.append(section);
-    }
+      return box;
+    };
     panel.append(
       el("div", { class: "composer-target" }, el("span", { class: "chip" }, ICONS.code, t("a11yAuditPage")), el("button", { class: "lr-close", title: t("panelClose"), type: "button", onclick: () => closeAuditPanel() }, "✕")),
       body
@@ -3872,6 +4180,25 @@
     placeDefault();
     applyPanelPosition(panel, "audit");
     wirePanelDrag(panel, "audit", () => auditPlaceDefault?.());
+    runPageAudit({
+      limit: auditLimit,
+      onProgress: (update) => {
+        if (auditRunToken !== token) return;
+        progressFill.style.width = `${Math.round((update.done / Math.max(1, update.total)) * 100)}%`;
+        progressLabel.textContent = `${update.done}/${update.total}`;
+        resultsBox.replaceChildren(renderAuditGroups(update.findings));
+      },
+      shouldStop: () => auditRunToken !== token
+    }).then((result) => {
+      if (auditRunToken !== token) return;
+      progressWrap.remove();
+      const box = el("div", { class: "lr-audit-results" }, el("div", { class: "lr-audit-summary" }, t("a11yAuditScanned").replace("{scanned}", result.scanned).replace("{findings}", result.findings.length)));
+      if (result.stopped === true) box.append(el("div", { class: "lr-audit-summary lr-audit-partial" }, t("auditPartial")));
+      const groups = renderAuditGroups(result.findings);
+      if (groups.children.length === 0) box.append(el("div", { class: "lr-audit-summary" }, t("a11yAuditNoIssues")));
+      for (const child of [...groups.children]) box.append(child);
+      resultsBox.replaceChildren(box);
+    });
   }
 
   function renderPinPanel(pin) {
@@ -4236,8 +4563,10 @@
     const after = await captureCropFor(box);
     if (after !== null) pin.afterShot = after;
     restoreAll(patch);
-    const before = await captureCropFor(box);
-    if (before !== null) pin.shot = before;
+    if (!captureCancelled) {
+      const before = await captureCropFor(box);
+      if (before !== null) pin.shot = before;
+    }
     applyCommitted(patch, pin.changes, pin.textChange);
   }
 
@@ -4509,7 +4838,80 @@
       reset.addEventListener("click", () => opts.onReset());
       ctl.append(reset);
     }
+    if (typeof opts.filter === "string") row.setAttribute("data-filter", opts.filter);
     return row;
+  }
+  function normalizeInspectorText(text) {
+    return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+  function applyInspectorFilter(query, entries, emptyNote) {
+    const needle = normalizeInspectorText(query.trim());
+    let visible = 0;
+    for (const entry of entries) {
+      const matching = needle === "" ? entry.rows : entry.rows.filter((row) => row.text.includes(needle));
+      const hit = needle === "" || matching.length > 0;
+      entry.section.style.display = hit ? "" : "none";
+      if (entry.head === null) {
+        if (hit) visible += matching.length;
+        continue;
+      }
+      if (needle === "") {
+        if (entry.wasOpen) entry.section.setAttribute("data-open", "");
+        else entry.section.removeAttribute("data-open");
+        entry.body.style.display = entry.wasOpen ? "" : "none";
+        entry.head.setAttribute("aria-expanded", entry.wasOpen ? "true" : "false");
+        for (const row of entry.rows) row.row.style.display = "";
+        continue;
+      }
+      if (!hit) continue;
+      entry.section.setAttribute("data-open", "");
+      entry.body.style.display = "";
+      entry.head.setAttribute("aria-expanded", "true");
+      for (const row of entry.rows) row.row.style.display = row.text.includes(needle) ? "" : "none";
+      visible += matching.length;
+    }
+    emptyNote.style.display = needle !== "" && visible === 0 ? "" : "none";
+  }
+  function wireInspectorFilter(body) {
+    const entries = [];
+    for (const section of body.children) {
+      if (!(section instanceof Element)) continue;
+      if (section.classList.contains("lr-row")) {
+        const label = section.querySelector(".lr-row-label");
+        entries.push({ section, head: null, body: null, wasOpen: false, rows: [{ row: section, text: normalizeInspectorText(`${label?.textContent ?? ""} ${section.getAttribute("data-filter") ?? ""}`) }] });
+        continue;
+      }
+      if (!section.classList.contains("lr-sec")) continue;
+      const head = section.querySelector(".lr-sec-head");
+      const secBody = section.querySelector(".lr-sec-body");
+      if (head === null || secBody === null) continue;
+      const rows = [];
+      for (const row of secBody.children) {
+        if (!(row instanceof Element) || !row.classList.contains("lr-row")) continue;
+        const label = row.querySelector(".lr-row-label");
+        rows.push({ row, text: normalizeInspectorText(`${label?.textContent ?? ""} ${row.getAttribute("data-filter") ?? ""}`) });
+      }
+      if (rows.length === 0) continue;
+      entries.push({ section, head, body: secBody, rows, wasOpen: section.hasAttribute("data-open") });
+    }
+    if (entries.length === 0) return;
+    const emptyNote = el("div", { class: "lr-filter-empty" }, t("inspectorFilterNoResults"));
+    emptyNote.style.display = "none";
+    const input = el("input", { class: "lr-filter", type: "text", placeholder: t("inspectorFilterPlaceholder"), "aria-label": t("inspectorFilterPlaceholder") });
+    const clearBtn = el("button", { class: "lr-filter-clear", type: "button", title: t("inspectorFilterClear"), "aria-label": t("inspectorFilterClear") }, "✕");
+    clearBtn.style.display = "none";
+    const run = () => {
+      clearBtn.style.display = input.value === "" ? "none" : "";
+      applyInspectorFilter(input.value, entries, emptyNote);
+    };
+    input.addEventListener("input", run);
+    clearBtn.addEventListener("click", () => {
+      input.value = "";
+      run();
+      input.focus();
+    });
+    body.before(el("div", { class: "lr-filter-bar" }, input, clearBtn));
+    body.after(emptyNote);
   }
   function lrField(value, onChange, opts = {}) {
     const input = el("input", { class: `lr-field${opts.num ? " lr-field-num" : ""}`, type: "text", spellcheck: "false" });
@@ -4958,6 +5360,7 @@
       onReset: () => adjustReset(prop),
       rerender: adjustRerender,
       refresh: refreshDisplay,
+      filter: `${prop} ${meta.label}`,
       tokens: TOKEN_SUGGESTION_PROPS.has(prop) && value !== "" ? tokenChipRow(adjustTarget, value, (tokenName) => adjustUpdateProperty(prop, `var(${tokenName})`)) : null
     });
   }
@@ -4965,7 +5368,7 @@
     const wrap = quadControl(props4, badges4, props4.map((p) => adjustNumericFallback(p)), min, (prop, next) => adjustUpdateProperty(prop, next));
     const source = props4.map((p) => adjustValues.get(p) ?? "").find((v) => v !== "") ?? "";
     const names = source === "" ? [] : tokenSuggestionsFor(adjustTarget, source, makeTokenProbe);
-    return inspectorRow(label, wrap, { wide: true, staticLabel: true, changed: () => props4.some((p) => adjustChanged(p)), onReset: () => { props4.forEach((p) => adjustReset(p)); wrap.__refresh(); }, rerender: adjustRerender, tokens: tokenChipRowFromNames(names, (tokenName) => {
+    return inspectorRow(label, wrap, { wide: true, staticLabel: true, filter: props4.join(" "), changed: () => props4.some((p) => adjustChanged(p)), onReset: () => { props4.forEach((p) => adjustReset(p)); wrap.__refresh(); }, rerender: adjustRerender, tokens: tokenChipRowFromNames(names, (tokenName) => {
       for (const p of props4) {
         if ((adjustValues.get(p) ?? "") === source) adjustUpdateProperty(p, `var(${tokenName})`);
       }
@@ -5053,7 +5456,7 @@
 
     body.append(inspectorSection(t("secTypography"), true, (sec) => {
       sec.append(propertyRow("font-family"));
-      const styleRow = inspectorRow(t("prop.font-style"), el("span", { class: "lr-row-ctl" }), { changed: () => adjustChanged("font-weight") || adjustChanged("font-style") || adjustChanged("text-decoration"), onReset: () => { adjustReset("font-weight"); adjustReset("font-style"); adjustReset("text-decoration"); }, rerender: adjustRerender });
+      const styleRow = inspectorRow(t("prop.font-style"), el("span", { class: "lr-row-ctl" }), { changed: () => adjustChanged("font-weight") || adjustChanged("font-style") || adjustChanged("text-decoration"), onReset: () => { adjustReset("font-weight"); adjustReset("font-style"); adjustReset("text-decoration"); }, rerender: adjustRerender, filter: "font-weight font-style text-decoration" });
       const group = styleRow.querySelector(".lr-row-ctl");
       const refresh = () => {
         const weight = Number(adjustValues.get("font-weight") ?? "");
@@ -5135,8 +5538,8 @@
     body.append(inspectorSection(t("secEffects"), false, (sec) => {
       const shadowWrap = shadowControl("box-shadow");
       const transformWrap = transformControl("transform");
-      const shadowRowEl = inspectorRow(t("prop.box-shadow"), shadowWrap, { wide: true, staticLabel: true, changed: () => adjustChanged("box-shadow"), onReset: () => { adjustReset("box-shadow"); shadowWrap.__render(); }, rerender: adjustRerender });
-      const transformRowEl = inspectorRow(t("prop.transform"), transformWrap, { wide: true, staticLabel: true, changed: () => adjustChanged("transform"), onReset: () => { adjustReset("transform"); transformWrap.__render(); }, rerender: adjustRerender });
+      const shadowRowEl = inspectorRow(t("prop.box-shadow"), shadowWrap, { wide: true, staticLabel: true, filter: "box-shadow", changed: () => adjustChanged("box-shadow"), onReset: () => { adjustReset("box-shadow"); shadowWrap.__render(); }, rerender: adjustRerender });
+      const transformRowEl = inspectorRow(t("prop.transform"), transformWrap, { wide: true, staticLabel: true, filter: "transform", changed: () => adjustChanged("transform"), onReset: () => { adjustReset("transform"); transformWrap.__render(); }, rerender: adjustRerender });
       sec.append(shadowRowEl, transformRowEl);
     }));
 
@@ -5145,9 +5548,10 @@
       chip.toggleAttribute("data-on", forceStates.has(pseudo));
       chip.addEventListener("click", () => toggleForceState(pseudo));
       return chip;
-    }))));
+    }), { filter: "hover focus active states" })));
 
     panel.append(body);
+    wireInspectorFilter(body);
 
     const footer = el("div", { class: "lr-footer" });
     const cancel = el("button", { class: "lr-cancel", type: "button" }, t("cancelBtn"));

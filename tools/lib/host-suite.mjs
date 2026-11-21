@@ -11,6 +11,7 @@ import { evaluateExpression, extractFunction, flush, freePort, storageShim, with
 
 const enc = (value) => Buffer.from(value, "utf8").toString("base64url");
 const SHOT = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwcJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==";
+const SHOT_ALT = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwcJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2w==";
 
 const PROTECTED_ROUTES = [
   { path: "/.lr/status", method: "GET" },
@@ -276,14 +277,14 @@ export async function runHostSuite(harness, { pluginDir }) {
     {
       const response = await fetch(`${base}/.lr/settings`, { headers: auth });
       const body = await response.json();
-      harness.check("the defaults come back", body.ok === true && body.settings.lang === "auto" && body.settings.keys.comment === "c" && body.settings.keys.adjust === "v" && body.settings.keys.draw === "d" && body.settings.screenshot === true && body.settings.cropPad === 72, JSON.stringify(body.settings));
+      harness.check("the defaults come back", body.ok === true && body.settings.lang === "auto" && body.settings.keys.comment === "c" && body.settings.keys.adjust === "v" && body.settings.keys.draw === "d" && body.settings.screenshot === true && body.settings.cropPad === 72 && body.settings.captureQuality === "padrao" && body.settings.captureTimeout === 12 && body.settings.auditLimit === 400 && body.settings.drawDock === "left", JSON.stringify(body.settings));
       harness.check("the settings expose the version and the repo", body.version === pluginVersion && body.current === pluginVersion && body.repo === "https://github.com/klaus-2/dsh-redline");
       harness.check("host: the defaults carry the dark theme", body.settings.theme === "dark", JSON.stringify(body.settings));
     }
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "pt", keys: { comment: "x", adjust: "z" }, screenshot: false, cropPad: 96 }) });
       const body = await response.json();
-      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 96, theme: "dark", templates: [] });
+      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 96, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [] });
     }
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "klingon", keys: { comment: "xx", adjust: "!" }, screenshot: "yes", cropPad: 5 }) });
@@ -294,6 +295,32 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.eq("the crop padding is clamped", body.settings.cropPad, 16);
       const high = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ cropPad: 9999 }) })).json();
       harness.eq("the crop padding is clamped at the top", high.settings.cropPad, 200);
+      const badQuality = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ captureQuality: "ultra" }) })).json();
+      harness.eq("an invalid capture quality is ignored", badQuality.settings.captureQuality, "padrao");
+      const altaQuality = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ captureQuality: "alta" }) })).json();
+      harness.eq("a valid capture quality is applied", altaQuality.settings.captureQuality, "alta");
+      const resetQuality = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ captureQuality: "padrao" }) })).json();
+      harness.eq("the capture quality resets to the default", resetQuality.settings.captureQuality, "padrao");
+      const longTimeout = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ captureTimeout: 500 }) })).json();
+      harness.eq("the capture timeout is clamped at the top", longTimeout.settings.captureTimeout, 60);
+      const offTimeout = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ captureTimeout: -5 }) })).json();
+      harness.eq("the capture timeout floors at zero", offTimeout.settings.captureTimeout, 0);
+      const backTimeout = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ captureTimeout: 12 }) })).json();
+      harness.eq("the capture timeout returns to the default", backTimeout.settings.captureTimeout, 12);
+      const bigAudit = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ auditLimit: 5000 }) })).json();
+      harness.eq("the audit limit is clamped at the top", bigAudit.settings.auditLimit, 2000);
+      const tinyAudit = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ auditLimit: 1 }) })).json();
+      harness.eq("the audit limit is clamped at the floor", tinyAudit.settings.auditLimit, 50);
+      const backAudit = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ auditLimit: 400 }) })).json();
+      harness.eq("the audit limit returns to the default", backAudit.settings.auditLimit, 400);
+      const badDock = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ drawDock: "center" }) })).json();
+      harness.eq("an invalid draw dock is ignored", badDock.settings.drawDock, "left");
+      const topDock = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ drawDock: "top" }) })).json();
+      harness.eq("a valid draw dock is applied", topDock.settings.drawDock, "top");
+      const rightDock = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ drawDock: "right" }) })).json();
+      harness.eq("the right draw dock is applied", rightDock.settings.drawDock, "right");
+      const backDock = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ drawDock: "left" }) })).json();
+      harness.eq("the draw dock returns to the default", backDock.settings.drawDock, "left");
     }
     {
       const restarted = await import(`${moduleUrl}?restart=2`);
@@ -301,8 +328,17 @@ export async function runHostSuite(harness, { pluginDir }) {
       const port2 = server2.port ?? server2.address().port;
       const response = await fetch(`http://127.0.0.1:${port2}/.lr/settings`, { headers: { [secretHeader]: secret } });
       const body = await response.json();
-      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200, theme: "dark", templates: [] });
+      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [] });
       server2.close();
+    }
+    {
+      const conflicted = await import(`${moduleUrl}?conflict=1`);
+      const first = await conflicted.startServer({ port: await freePort() });
+      const second = await conflicted.startServer({ port: first.port });
+      const conflictHealth = await (await fetch(`http://127.0.0.1:${second.port}/.lr/health`)).json();
+      harness.check("a second instance skips a port answered by another boot", second.port > first.port && conflictHealth.ok === true && typeof conflictHealth.bootId === "string", JSON.stringify({ first: first.port, second: second.port, bootId: conflictHealth.bootId }));
+      first.close();
+      second.close();
     }
 
     harness.section("host: hotkeys");
@@ -528,6 +564,21 @@ export async function runHostSuite(harness, { pluginDir }) {
         const oversized = formatContext({ pageUrl: "http://127.0.0.1:1/", pageTitle: "Alvo", pins: [{ id: "only", tag: "h1", selector: "body h1", comment: "the only comment", changes: oversizedChanges }], screenshotPath: null });
         harness.check("an oversized single comment is dropped and reported", !oversized.text.includes("the only comment") && oversized.text.includes("1 comment(s) omitted") && oversized.text.length <= MAX_CONTEXT_CHARS && oversized.blocks.length === 1, JSON.stringify({ textLength: oversized.text.length, blocks: oversized.blocks.length }));
       }
+      {
+        const droppedProbe = [];
+        const bigComment = "x".repeat(4000);
+        const overflowPins = [{ id: "fit-1", tag: "h1", selector: "body h1", comment: "cabe" }];
+        for (let index = 0; index < 19; index += 1) overflowPins.push({ id: `b${index}`, tag: "h1", selector: `body h${index}`, comment: bigComment });
+        const overflowSnapshot = { pageUrl: "http://127.0.0.1:1/", pageTitle: "Alvo", screenshotPath: null, pins: overflowPins };
+        const plainFormat = formatContext(overflowSnapshot);
+        const probedFormat = formatContext(overflowSnapshot, (item) => droppedProbe.push(item));
+        const droppedIds = droppedProbe.map((item) => item.id);
+        harness.check("host: formatContext collects the dropped pins without changing the output",
+          plainFormat.text === probedFormat.text && JSON.stringify(plainFormat.blocks) === JSON.stringify(probedFormat.blocks) &&
+          droppedIds.length >= 3 && droppedIds.every((id) => id !== "fit-1") && droppedIds.includes("b18") &&
+          droppedProbe.every((item) => item.reason === "context budget") && typeof droppedProbe[0].label === "string",
+          JSON.stringify({ identical: plainFormat.text === probedFormat.text, droppedIds }));
+      }
     }
     {
       const { text, blocks } = formatContext({ pageUrl: "http://127.0.0.1:1/", pageTitle: "Alvo", pins: [{ id: "1", tag: "h1", selector: "body h1", text: "Alvo", comment: "mude o titulo", changes: [{ prop: "color", before: "#000", after: "red" }], textChange: { before: "a", after: "b" } }], screenshotPath: null });
@@ -609,6 +660,14 @@ export async function runHostSuite(harness, { pluginDir }) {
         contractPost.ok === true && contractPin !== undefined && contractPin.afterShot === undefined && typeof contractPin.afterShotPath === "string" && contractPin.afterShotPath.startsWith(attachmentDir + path.sep) && typeof contractPin.screenshotPath === "string",
         JSON.stringify({ post: contractPost, afterShotPath: contractPin?.afterShotPath }));
 
+      await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: json(), body: JSON.stringify({ kind: "view", sessionId: "session-dedupe" }) });
+      const dedupePost = await (await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "proj-2", tag: "h1", selector: "body h1", comment: "dedupe", shot: SHOT }], screenshot: SHOT }) })).json();
+      const dedupeSnapshot = pendingBySession.get("session-dedupe")?.snapshot;
+      const dedupePin = dedupeSnapshot?.pins?.find((pin) => pin.id === "proj-2");
+      harness.check("host: identical shot data URLs reuse the same attachment file",
+        dedupePost.ok === true && dedupePin !== undefined && typeof dedupePin.screenshotPath === "string" && dedupePin.screenshotPath === contractPin.screenshotPath,
+        JSON.stringify({ dedupe: dedupePin?.screenshotPath, first: contractPin?.screenshotPath }));
+
       const projection = await (await fetch(`${base}/.lr/pending?sessionId=session-contract`, { headers: auth })).json();
       harness.check("host: GET /.lr/pending pins projection omits screenshot and grouping fields, with status added deliberately (D12: the dock shows what happened to each pin)",
         projection.count === 1 && projection.pins.length === 1 &&
@@ -635,6 +694,12 @@ export async function runHostSuite(harness, { pluginDir }) {
         reportJson.pins[0].groupId === "grp-proj" && reportJson.pins[0].viewportWidth === 768 &&
         !reportJsonText.includes("data:image"),
         reportJsonText.slice(0, 300));
+      const budgetPreview = await (await fetch(`${base}/.lr/preview?sessionId=session-contract`, { headers: auth })).json();
+      const contractContextLength = (pendingBySession.get("session-contract")?.context ?? "").length;
+      harness.check("host: the preview carries the context budget report",
+        budgetPreview.ok === true && budgetPreview.budget === 61440 && budgetPreview.chars === contractContextLength &&
+        Array.isArray(budgetPreview.dropped) && budgetPreview.dropped.length === 0,
+        JSON.stringify({ chars: budgetPreview.chars, budget: budgetPreview.budget, dropped: budgetPreview.dropped, stored: contractContextLength }));
       await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: json(), body: JSON.stringify({ kind: "view", sessionId: "session-after-deliver" }) });
       await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Entrega", pins: [{ id: "deliver-1", tag: "h1", selector: "#t", comment: "antes da entrega" }], screenshot: null }) });
       const beforeDeliver = await (await fetch(`${base}/.lr/report?sessionId=session-after-deliver`, { headers: auth })).text();
@@ -1041,7 +1106,7 @@ export async function runHostSuite(harness, { pluginDir }) {
 
       const shotDir = path.join(home, ".dsh", "attachments", "live-review");
       const shotCountBefore = existsSync(shotDir) ? readdirSync(shotDir).length : 0;
-      const viewportAnnotations = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "v1", tag: "h1", selector: "body h1", text: "Alvo", comment: "com viewport", changes: [] }], screenshot: SHOT }) });
+      const viewportAnnotations = await fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "v1", tag: "h1", selector: "body h1", text: "Alvo", comment: "com viewport", changes: [] }], screenshot: SHOT_ALT }) });
       const shotFiles = existsSync(shotDir) ? readdirSync(shotDir) : [];
       const shotName = shotFiles.length > shotCountBefore ? shotFiles[shotFiles.length - 1] : "";
       harness.check("the viewport screenshot is stored for delivery", viewportAnnotations.ok === true && shotName !== "", JSON.stringify({ ok: viewportAnnotations.ok, files: shotFiles.length }));
@@ -1406,8 +1471,8 @@ export async function runHostSuite(harness, { pluginDir }) {
         const unknownPreview = await (await fetch(`${base}/.lr/preview?sessionId=session-preview-unknown`, { headers: auth })).json();
         const absentPreview = await (await fetch(`${base}/.lr/preview`, { headers: auth })).json();
         harness.check("the preview route answers the empty shape for an unknown or absent session",
-          JSON.stringify(unknownPreview) === JSON.stringify({ ok: true, context: "", sections: [], pins: [] }) &&
-          JSON.stringify(absentPreview) === JSON.stringify({ ok: true, context: "", sections: [], pins: [] }),
+          JSON.stringify(unknownPreview) === JSON.stringify({ ok: true, context: "", sections: [], bytes: 0, captureQuality: "padrao", chars: 0, budget: 61440, dropped: [], pins: [] }) &&
+          JSON.stringify(absentPreview) === JSON.stringify({ ok: true, context: "", sections: [], bytes: 0, captureQuality: "padrao", chars: 0, budget: 61440, dropped: [], pins: [] }),
           JSON.stringify({ unknown: unknownPreview, absent: absentPreview }));
       }
 

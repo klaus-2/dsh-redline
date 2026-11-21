@@ -214,6 +214,28 @@ kbd {
 .pin-resolved .pin-body { opacity: 0.8; }
 .pin-queued .pin-body { background: white; color: var(--accent); border: 2px dashed var(--accent); }
 .pin.lr-pin-stale .pin-body { opacity: 0.55; outline: 2px dashed #e5484d; outline-offset: 2px; }
+.pin.lr-pin-pulse .pin-body { animation: lr-pin-pulse 1.4s ease; }
+@keyframes lr-pin-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  35% { box-shadow: 0 0 0 7px var(--accent); }
+}
+.lr-edge-pin {
+  all: unset; box-sizing: border-box; cursor: pointer;
+  position: fixed; z-index: 1;
+  min-width: 24px; height: 22px; padding: 0 6px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 3px;
+  border-radius: 11px;
+  background: var(--n-950); color: var(--n-100);
+  font-size: 11px; font-weight: 600;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+.lr-edge-pin:hover { background: var(--n-900); }
+.lr-edge-arrow { display: inline-flex; }
+.lr-edge-arrow svg { display: block; width: 11px; height: 11px; }
+.lr-edge-pin[data-side="top"] .lr-edge-arrow svg { transform: rotate(180deg); }
+.lr-edge-pin[data-side="left"] .lr-edge-arrow svg { transform: rotate(90deg); }
+.lr-edge-pin[data-side="right"] .lr-edge-arrow svg { transform: rotate(-90deg); }
 
 .pin-working .pin-body {
   isolation: isolate;

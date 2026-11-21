@@ -81,7 +81,7 @@ export async function runClientSuite(harness, { pluginDir }) {
   {
     const secretHeader = /SECRET_HEADER = "([^"]+)"/.exec(client)?.[1] ?? "";
     harness.check("the client knows the secret header", secretHeader !== "");
-    harness.includes("the client reads the secret from the host", client, "/api/dsh-redline.secret");
+    harness.includes("the client reads the secret from the host", client, "/api/${j.name}.secret");
     harness.excludes("the client never hands the secret to the page", client, "secret: INSTANCE_SECRET");
     harness.excludes("the page config never carries a secret", client, "__LR__.secret");
     harness.includes("the client keeps the page config it finds", client, "Object.assign({}, window.__LR__ || {}");
@@ -1091,11 +1091,13 @@ export async function runClientSuite(harness, { pluginDir }) {
     }
     {
       const reposition = extractFunction(overlay, "repositionPins");
-      const scrollLine = overlay.split("\n").find((line) => line.includes('addEventListener("scroll"') && line.includes("repositionPins")) ?? "";
-      const resizeLine = overlay.split("\n").find((line) => line.includes('addEventListener("resize"') && line.includes("repositionPins")) ?? "";
+      const schedule = extractFunction(overlay, "scheduleReposition");
+      const scrollLine = overlay.split("\n").find((line) => line.includes('addEventListener("scroll"') && line.includes("scheduleReposition")) ?? "";
+      const resizeLine = overlay.split("\n").find((line) => line.includes('addEventListener("resize"') && line.includes("scheduleReposition")) ?? "";
       harness.check("overlay: the scroll and resize paths reposition without classifying stale",
         reposition !== undefined && !reposition.includes("auditPinAnchors") &&
-        scrollLine.includes("repositionPins") && resizeLine.includes("repositionPins"),
+        schedule !== undefined && schedule.includes("repositionPins()") &&
+        scrollLine.includes("scheduleReposition") && resizeLine.includes("scheduleReposition"),
         JSON.stringify({ scroll: scrollLine.trim(), resize: resizeLine.trim() }));
     }
     {
@@ -1118,7 +1120,7 @@ export async function runClientSuite(harness, { pluginDir }) {
   harness.section("client: overlay before/after captures");
   {
     const captureSource = extractFunction(overlay, "captureBeforeAfter");
-    const runCapture = captureSource === undefined ? undefined : evaluateExpression(`(screenshotOnSend, captureCropFor, restoreAll, applyCommitted, adjustPatch, target, pin) => {\n${captureSource}\nreturn captureBeforeAfter(target, pin);\n}`, "captureBeforeAfter");
+    const runCapture = captureSource === undefined ? undefined : evaluateExpression(`(screenshotOnSend, captureCropFor, restoreAll, applyCommitted, adjustPatch, target, pin) => {\nlet captureCancelled = false;\n${captureSource}\nreturn captureBeforeAfter(target, pin);\n}`, "captureBeforeAfter");
     const captureTarget = { getBoundingClientRect: () => ({ left: 10, top: 20, width: 100, height: 50 }) };
     harness.check("the overlay keeps its capture chain", runCapture !== undefined);
     const makeStubs = () => {
@@ -1861,6 +1863,517 @@ return { keydown: meterAltKeydown, keyup: meterAltKeyup, state: () => ({ meterAl
       span.includes("renderMeter(event.target instanceof Element ? event.target : null)"),
       JSON.stringify({ inHostAt, meterAt, modeAt }));
   }
+  {
+    const scheduleSource = extractFunction(overlay, "scheduleHighlight");
+    const clearSource = extractFunction(overlay, "clearHighlight");
+    const pending = [];
+    const cancelled = [];
+    let rafHandle = 0;
+    const run = scheduleSource === undefined || clearSource === undefined ? undefined : evaluateExpression(`(requestAnimationFrame, cancelAnimationFrame) => {
+let highlightEl = null;
+let highlightLabel = null;
+let hovered = null;
+let hoverRaf = null;
+let hoverPendingTarget = null;
+let mode = "picking";
+let groupMode = false;
+let draft = null;
+let showCalls = [];
+function showHighlight(target) { showCalls.push(target); }
+${clearSource}
+${scheduleSource}
+return { schedule: scheduleHighlight, clear: clearHighlight, calls: () => showCalls, raf: () => hoverRaf, pendingTarget: () => hoverPendingTarget, setMode: (value) => { mode = value; } };
+}`, "scheduleHighlight");
+    const sandbox = run === undefined ? undefined : run((fn) => { pending.push(fn); return ++rafHandle; }, (handle) => cancelled.push(handle));
+    const first = { tag: "a" };
+    const second = { tag: "b" };
+    sandbox?.schedule(first);
+    sandbox?.schedule(second);
+    sandbox?.schedule(first);
+    const burstFrames = pending.length;
+    const burstCalls = sandbox?.calls().length;
+    pending[0]?.();
+    const afterFrame = { calls: sandbox?.calls().length, latest: sandbox?.calls()[0]?.tag, raf: sandbox?.raf() };
+    sandbox?.schedule(second);
+    sandbox?.clear();
+    const cleared = { cancelled: cancelled.length, handle: cancelled[0], pendingTarget: sandbox?.pendingTarget(), raf: sandbox?.raf() };
+    pending[1]?.();
+    const afterStaleFrame = sandbox?.calls().length;
+    sandbox?.setMode(null);
+    sandbox?.schedule(first);
+    pending[2]?.();
+    const gatedCalls = sandbox?.calls().length;
+    harness.check("overlay: the picker highlight is scheduled once per frame with the latest target and clear cancels the pending frame",
+      sandbox !== undefined && burstFrames === 1 && burstCalls === 0 &&
+      afterFrame.calls === 1 && afterFrame.latest === "a" && afterFrame.raf === null &&
+      cleared.cancelled === 1 && cleared.handle === 2 && cleared.pendingTarget === null && cleared.raf === null &&
+      afterStaleFrame === 1 && gatedCalls === 1,
+      JSON.stringify({ burstFrames, burstCalls, afterFrame, cleared, afterStaleFrame, gatedCalls }));
+    const mousemoveAt = overlay.indexOf("\"mousemove\"");
+    const pickerSpan = mousemoveAt === -1 ? "" : overlay.slice(mousemoveAt, mousemoveAt + 900);
+    harness.check("overlay: the picker mousemove branch schedules the highlight instead of painting it inline",
+      pickerSpan !== "" && pickerSpan.includes("scheduleHighlight(target)") && !pickerSpan.includes("showHighlight(target)"),
+      JSON.stringify({ hasScheduled: pickerSpan.includes("scheduleHighlight(target)"), hasInline: pickerSpan.includes("showHighlight(target)") }));
+  }
+
+  harness.section("client: overlay viewport pins");
+  {
+    const scheduleSource = extractFunction(overlay, "scheduleReposition");
+    const pending = [];
+    const run = scheduleSource === undefined ? undefined : evaluateExpression(`(requestAnimationFrame) => {
+let repositionRaf = null;
+let calls = 0;
+function repositionPins() { calls += 1; }
+${scheduleSource}
+return { schedule: scheduleReposition, calls: () => calls, raf: () => repositionRaf };
+}`, "scheduleReposition");
+    const sandbox = run === undefined ? undefined : run((fn) => { pending.push(fn); return 1; });
+    sandbox?.schedule();
+    sandbox?.schedule();
+    sandbox?.schedule();
+    const frames = pending.length;
+    const callsBefore = sandbox?.calls();
+    pending[0]?.();
+    const after = { calls: sandbox?.calls(), raf: sandbox?.raf() };
+    harness.check("overlay: scroll repositions run at most once per frame",
+      sandbox !== undefined && frames === 1 && callsBefore === 0 && after.calls === 1 && after.raf === null,
+      JSON.stringify({ frames, callsBefore, after }));
+  }
+  {
+    const repositionSource = extractFunction(overlay, "repositionPins");
+    const pinIsFarSource = extractFunction(overlay, "pinIsFar");
+    const ready = repositionSource !== undefined && pinIsFarSource !== undefined;
+    const makeNode = () => {
+      const classes = new Set();
+      return { style: {}, classes, classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) } };
+    };
+    const run = ready ? evaluateExpression(`(requestAnimationFrame) => {
+const pinNodes = new Map();
+const pins = [];
+const pinIoNear = new Map();
+const pinIoRects = new Map();
+const pinLastPoints = new Map();
+let anchorCalls = 0;
+function anchorPoint(pin) { anchorCalls += 1; return { x: 12, y: 34 }; }
+function repositionDraft() {}
+function repositionFocus() {}
+function updateEdgeMarkers() {}
+${pinIsFarSource}
+${repositionSource}
+return { run: repositionPins, nodes: pinNodes, pins, near: pinIoNear, rects: pinIoRects, last: pinLastPoints, anchorCalls: () => anchorCalls };
+}`, "repositionPins") : undefined;
+    const sandbox = run === undefined ? undefined : run((fn) => {});
+    const nearNode = makeNode();
+    sandbox?.nodes.set("a", { node: nearNode });
+    sandbox?.pins.push({ id: "a" });
+    sandbox?.run();
+    const nearState = { calls: sandbox?.anchorCalls(), transform: nearNode.style.transform, last: sandbox?.last.get("a") };
+    const farNode = makeNode();
+    sandbox?.nodes.set("b", { node: farNode });
+    sandbox?.pins.push({ id: "b", stale: true });
+    farNode.classList.add("lr-pin-stale");
+    sandbox?.near.set("b", false);
+    sandbox?.rects.set("b", { width: 60, height: 30 });
+    sandbox?.run();
+    const farState = { calls: sandbox?.anchorCalls(), transform: farNode.style.transform, staleKept: farNode.classes.has("lr-pin-stale") };
+    sandbox?.near.set("b", true);
+    sandbox?.run();
+    const caughtUp = { calls: sandbox?.anchorCalls(), transform: farNode.style.transform, staleCleared: !farNode.classes.has("lr-pin-stale") };
+    harness.check("overlay: reposition skips far pins and catches up when the observer reports them near",
+      sandbox !== undefined && nearState.calls === 1 && nearState.transform === "translate(12px, 34px)" && nearState.last?.x === 12 &&
+      farState.calls === 2 && farState.transform === undefined && farState.staleKept === true &&
+      caughtUp.calls === 4 && caughtUp.transform === "translate(12px, 34px)" && caughtUp.staleCleared === true,
+      JSON.stringify({ nearState, farState, caughtUp }));
+  }
+  {
+    const syncSource = extractFunction(overlay, "syncPinObserver");
+    class FakeIO {
+      constructor(callback, options) { this.callback = callback; this.options = options; this.observed = []; }
+      observe(element) { this.observed.push(element); }
+      unobserve(element) { this.observed = this.observed.filter((item) => item !== element); }
+    }
+    const elA = { tag: "a" };
+    let io = null;
+    const run = syncSource === undefined ? undefined : evaluateExpression(`(IntersectionObserver, locate) => {
+const pins = [];
+const pinIoIds = new Map();
+const pinIoNear = new Map();
+const pinIoRects = new Map();
+let repositionRaf = null;
+let pinObserver = null;
+let scheduled = 0;
+function scheduleReposition() { scheduled += 1; }
+${syncSource}
+return { sync: syncPinObserver, pins, ids: pinIoIds, near: pinIoNear, rects: pinIoRects, scheduled: () => scheduled, observer: () => pinObserver };
+}`, "syncPinObserver");
+    const sandbox = run === undefined ? undefined : run(class extends FakeIO { constructor(...args) { super(...args); io = this; } }, (selector) => (selector === "#a" ? elA : null));
+    sandbox?.pins.push({ id: "p1", selector: "#a" });
+    sandbox?.sync();
+    const wired = { options: io?.options, observed: io?.observed.length, id: sandbox?.ids.get(elA) };
+    io?.callback([{ target: elA, boundingClientRect: { left: 4, top: 6, width: 20, height: 10 }, isIntersecting: true }]);
+    const reported = { near: sandbox?.near.get("p1"), rect: sandbox?.rects.get("p1"), scheduled: sandbox?.scheduled() };
+    if (sandbox !== undefined) sandbox.pins.length = 0;
+    sandbox?.sync();
+    harness.check("overlay: the pin observer watches pinned elements, reports proximity and releases removed pins",
+      sandbox !== undefined && wired.options?.rootMargin === "480px" && wired.observed === 1 && wired.id === "p1" &&
+      reported.near === true && reported.rect?.left === 4 && reported.scheduled === 1 &&
+      io?.observed.length === 0 && sandbox.ids.size === 0 && sandbox.near.size === 0 && sandbox.rects.size === 0,
+      JSON.stringify({ wired, reported, remaining: io?.observed.length }));
+  }
+  {
+    const edgeSource = extractFunction(overlay, "updateEdgeMarkers");
+    const makeNode = () => {
+      const node = { tag: "button", props: {}, children: [], style: {}, listeners: {} };
+      node.append = (...kids) => { for (const kid of kids) node.children.push(kid); return node; };
+      node.remove = () => { node.removed = (node.removed ?? 0) + 1; };
+      node.addEventListener = (type, fn) => { node.listeners[type] = fn; };
+      return node;
+    };
+    const el = (tag, attrs = {}, ...children) => {
+      const node = makeNode();
+      node.tag = tag;
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === "class") node.props.class = v;
+        else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+        else node.props[k] = v;
+      }
+      for (const child of children) node.children.push(child);
+      return node;
+    };
+    const fixedLayer = { appended: [], append: (node) => fixedLayer.appended.push(node) };
+    const win = { innerWidth: 1200, innerHeight: 800 };
+    const elA = { scrollIntoView: (payload) => { elA.scrollPayload = payload; } };
+    const run = edgeSource === undefined ? undefined : evaluateExpression(`(window, fixedLayer, el, locate) => {
+const pins = [];
+let hidden = false;
+const pinIoNear = new Map();
+const pinIoRects = new Map();
+const pinLastPoints = new Map();
+const edgeChips = [];
+const pulseTimers = new Map();
+let repositionRaf = null;
+let pulsed = null;
+let repositionScheduled = 0;
+function pulsePin(id) { pulsed = id; }
+function scheduleReposition() { repositionScheduled += 1; }
+function pinIsFar() { return false; }
+const ICONS_CANVAS = { chev: "CHEV" };
+${edgeSource}
+return { update: updateEdgeMarkers, pins, setHidden: (v) => { hidden = v; }, layer: fixedLayer, chips: edgeChips, pulsed: () => pulsed, scheduled: () => repositionScheduled };
+}`, "updateEdgeMarkers");
+    const sandbox = run === undefined ? undefined : run(win, fixedLayer, el, (selector) => (selector === "#a" ? elA : null));
+    sandbox?.pins.push(
+      { id: "p1", selector: "#a", tag: "div", status: "queued", comment: "first", rect: { x: -40, y: 305 } },
+      { id: "p2", selector: "#gone", tag: "div", status: "queued", comment: "second", rect: { x: -42, y: 318 } },
+      { id: "p3", selector: "#c", tag: "div", status: "queued", comment: "right", rect: { x: 1250, y: 100 } },
+      { id: "p4", selector: "#d", tag: "div", status: "resolvido", comment: "resolved", rect: { x: -40, y: 700 } },
+      { id: "p5", selector: "#e", tag: "div", status: "queued", comment: "visible", rect: { x: 100, y: 100 } }
+    );
+    sandbox?.update();
+    const firstPass = fixedLayer.appended.length;
+    const chips = fixedLayer.appended.slice(0, 2);
+    const leftChip = chips[0];
+    const rightChip = chips[1];
+    const leftCount = leftChip?.children[1]?.children[0];
+    const rightCount = rightChip?.children[1]?.children[0];
+    leftChip?.listeners.click?.();
+    const clicked = { block: elA.scrollPayload?.block, pulsed: sandbox?.pulsed(), scheduled: sandbox?.scheduled() };
+    sandbox?.setHidden(true);
+    sandbox?.update();
+    const afterHidden = { chips: sandbox?.chips.length, removed: leftChip?.removed };
+    sandbox?.setHidden(false);
+    sandbox?.update();
+    const restored = { chips: sandbox?.chips.length };
+    harness.check("overlay: off-viewport pins get clustered edge chips with direction, count, scroll and pulse",
+      sandbox !== undefined && firstPass === 2 &&
+      leftChip?.props["data-side"] === "left" && leftChip?.style.left === "3px" && leftChip?.style.top === "294px" &&
+      leftCount === "2" && rightChip?.props["data-side"] === "right" && rightChip?.style.right === "3px" &&
+      rightChip?.style.top === "89px" && rightCount === "3" && leftChip?.children[0]?.props.html === "CHEV" &&
+      chips[0] !== undefined && chips[0].children[0].children.length === 0 &&
+      clicked.block === "center" && clicked.pulsed === "p1" && clicked.scheduled === 1 &&
+      afterHidden.chips === 0 && afterHidden.removed === 1 && restored.chips === 2,
+      JSON.stringify({ chips: chips.map((chip) => ({ side: chip.props["data-side"], style: chip.style, count: chip.children[1]?.children[0] })), clicked, afterHidden, restored }));
+  }
+  harness.check("overlay: scroll and resize schedule reposition and renderPins syncs the observer and chips",
+    overlay.includes("window.addEventListener(\"scroll\", scheduleReposition") &&
+    overlay.includes("window.addEventListener(\"resize\", scheduleReposition)") &&
+    overlay.includes("if (!hidden) syncPinObserver();") &&
+    overlay.includes("updateEdgeMarkers();") &&
+    overlay.includes("rootMargin: \"480px\""),
+    "wiring drift");
+
+  harness.section("client: overlay inspector filter");
+  {
+    const normalizeSource = extractFunction(overlay, "normalizeInspectorText");
+    const applySource = extractFunction(overlay, "applyInspectorFilter");
+    const run = normalizeSource === undefined || applySource === undefined ? undefined : evaluateExpression(`() => {
+${normalizeSource}
+${applySource}
+return { apply: applyInspectorFilter, normalize: normalizeInspectorText, mkEntry };
+function mkEntry(wasOpen, texts) {
+  const section = { style: {}, attrs: new Set(), setAttribute(n) { this.attrs.add(n); }, removeAttribute(n) { this.attrs.delete(n); }, hasAttribute(n) { return this.attrs.has(n); } };
+  const head = { aria: null, setAttribute(n, v) { this.aria = v; } };
+  const body = { style: {} };
+  return { section, head, body, wasOpen, rows: texts.map((text) => ({ row: { style: {} }, text })) };
+}
+}`, "applyInspectorFilter");
+    const sandbox = run === undefined ? undefined : run();
+    const a = sandbox?.mkEntry(true, ["border radius", "width"]);
+    const b = sandbox?.mkEntry(false, ["background color", "opacity"]);
+    const states = sandbox?.mkEntry(false, ["hover focus active states"]);
+    const emptyNote = { style: {} };
+    sandbox?.apply("", [a, b, states], emptyNote);
+    const restored = { aOpen: a.section.hasAttribute("data-open"), bOpen: b.section.hasAttribute("data-open"), bBody: b.body.style.display, aRows: a.rows.map((row) => row.row.style.display) };
+    sandbox?.apply("Radius", [a, b, states], emptyNote);
+    const filtered = { aOpen: a.section.hasAttribute("data-open"), aVisible: a.section.style.display, widthHidden: a.rows[1].row.style.display === "none", bHidden: b.section.style.display === "none", statesHidden: states.section.style.display === "none", emptyNote: emptyNote.style.display };
+    sandbox?.apply("active", [a, b, states], emptyNote);
+    const statesOnly = { statesVisible: states.section.style.display === "", aHidden: a.section.style.display === "none", emptyNote: emptyNote.style.display };
+    sandbox?.apply("zzz", [a, b, states], emptyNote);
+    const none = { emptyNote: emptyNote.style.display, allHidden: [a.section.style.display, b.section.style.display, states.section.style.display].every((d) => d === "none") };
+    harness.check("overlay: the inspector filter matches rows, keeps groups open and restores them on clear",
+      sandbox !== undefined && restored.aOpen === true && restored.bOpen === false && restored.bBody === "none" && restored.aRows.every((d) => d === "") &&
+      filtered.aOpen === true && filtered.aVisible === "" && filtered.widthHidden === true && filtered.bHidden === true && filtered.statesHidden === true && filtered.emptyNote === "none" &&
+      statesOnly.statesVisible === true && statesOnly.aHidden === true && statesOnly.emptyNote === "none" &&
+      none.emptyNote === "" && none.allHidden === true &&
+      sandbox.normalize("Configuração") === "configuracao",
+      JSON.stringify({ restored, filtered, statesOnly, none, normalized: sandbox?.normalize("Configuração") }));
+  }
+  harness.check("overlay: the adjust panel wires the filter bar and ships its strings in every language",
+    overlay.includes("wireInspectorFilter(body);") &&
+    overlay.includes("t(\"inspectorFilterPlaceholder\")") &&
+    overlay.includes("t(\"inspectorFilterNoResults\")") &&
+    overlay.includes("t(\"inspectorFilterClear\")") &&
+    overlay.includes("row.setAttribute(\"data-filter\", opts.filter)") &&
+    overlay.includes("filter: props4.join(\" \")") &&
+    overlay.includes("filter: \"font-weight font-style text-decoration\"") &&
+    overlay.includes(".lr-filter { all: unset"),
+    "filter wiring drift");
+
+  harness.section("client: overlay capture quality");
+  {
+    const presetSource = extractFunction(overlay, "capturePreset");
+    const run = presetSource === undefined ? undefined : evaluateExpression(`() => {
+let captureQuality = "bogus";
+${presetSource}
+return { value: () => capturePreset(captureQuality), set: (v) => { captureQuality = v; } };
+}`, "capturePreset");
+    const sandbox = run === undefined ? undefined : run();
+    const bogus = sandbox?.value();
+    sandbox?.set("leve");
+    const leve = sandbox?.value();
+    sandbox?.set("alta");
+    const alta = sandbox?.value();
+    harness.check("overlay: the capture preset picks the quality pair and falls back to the standard",
+      sandbox !== undefined && bogus?.maxEdge === 900 && bogus?.quality === 0.8 &&
+      leve?.maxEdge === 640 && leve?.quality === 0.7 &&
+      alta?.maxEdge === 1400 && alta?.quality === 0.92,
+      JSON.stringify({ bogus, leve, alta }));
+    harness.check("overlay: the capture quality arrives from settings and sizes the crop",
+      overlay.includes("if (typeof next.captureQuality === \"string\") captureQuality =") &&
+      overlay.includes("const preset = capturePreset(captureQuality);") &&
+      overlay.includes("preset.maxEdge / Math.max(sw, sh)") &&
+      overlay.includes("toDataURL(\"image/jpeg\", preset.quality)") &&
+      overlay.includes("let captureQuality = \"padrao\";") &&
+      !overlay.includes("CROP_MAX_EDGE"),
+      "capture quality wiring drift");
+  }
+
+  harness.section("client: overlay capture timeout");
+  {
+    const raceSource = extractFunction(overlay, "raceCapture");
+    const clearedTimers = [];
+    const run = raceSource === undefined ? undefined : evaluateExpression(`(setTimeout, clearTimeout) => {
+let captureAbort = null;
+${raceSource}
+return { race: raceCapture, abort: () => captureAbort?.(), armed: () => captureAbort !== null };
+}`, "raceCapture");
+    const sandbox = run === undefined ? undefined : run(setTimeout, (handle) => clearedTimers.push(handle));
+    let cancelled = null;
+    const first = sandbox?.race(new Promise(() => {}), 30000);
+    const armed = sandbox?.armed();
+    first?.then((value) => { cancelled = value; });
+    sandbox?.abort();
+    const afterAbort = sandbox?.armed();
+    let doneValue = null;
+    sandbox?.race(Promise.resolve("fast"), 30000).then((value) => { doneValue = value; });
+    await waitFor(() => doneValue !== null);
+    let timedOut = null;
+    sandbox?.race(new Promise(() => {}), 30).then((value) => { timedOut = value; });
+    await waitFor(() => timedOut !== null);
+    harness.check("overlay: the capture race resolves done, timeout and cancelled exactly once",
+      sandbox !== undefined && armed === true && cancelled?.status === "cancelled" && afterAbort === false &&
+      doneValue?.status === "done" && doneValue?.canvas === "fast" && clearedTimers.length >= 2 && timedOut?.status === "timeout",
+      JSON.stringify({ armed, cancelled, afterAbort, doneValue, clearedTimers: clearedTimers.length, timedOut }));
+  }
+  {
+    const raceSource = extractFunction(overlay, "raceCapture");
+    const cropSource = extractFunction(overlay, "captureCropFor");
+    const run = cropSource === undefined ? undefined : evaluateExpression(`(setTimeout, clearTimeout) => {
+let captureTimeout = 0.05;
+let captureCancelled = false;
+let captureAbort = null;
+let CROP_PAD = 72;
+const CAPTURE_SIMPLIFIED_TAGS = new Set(["IMG", "VIDEO", "IFRAME", "OBJECT", "EMBED"]);
+const toasts = [];
+const calls = [];
+function t(key) { return key; }
+function toast(text) { toasts.push(text); }
+function reportDiag() {}
+function showCaptureToast() {}
+function hideCaptureToast() {}
+function cropCanvas() { return "CROPPED"; }
+const window = { html2canvas: (body, options) => { calls.push(options); return calls.length === 1 || calls.length === 4 ? new Promise(() => {}) : Promise.resolve({ width: 100 }); }, innerWidth: 1200, innerHeight: 800, scrollX: 0, scrollY: 0 };
+const document = { body: {} };
+async function ensureHtml2Canvas() { return true; }
+${raceSource}
+${cropSource}
+return { capture: captureCropFor, calls: () => calls, toasts: () => toasts, cancelled: () => captureCancelled, abort: () => captureAbort?.(), armed: () => captureAbort !== null };
+}`, "captureCropFor");
+    const sandbox = run === undefined ? undefined : run(setTimeout, clearTimeout);
+    const guarded = (promise, label) => Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(label), 6000))]);
+    const retriedPromise = sandbox?.capture({ x: 0, y: 0, w: 10, h: 10 });
+    await waitFor(() => (sandbox?.calls().length ?? 0) >= 2, 4000, 20);
+    const retried = await guarded(retriedPromise, "retried-stuck");
+    const firstIgnore = sandbox?.calls()[0]?.ignoreElements;
+    const secondIgnore = sandbox?.calls()[1]?.ignoreElements;
+    const classified = { firstPlain: firstIgnore?.({ id: "", tagName: "DIV" }), simplifiedImg: secondIgnore?.({ id: "", tagName: "IMG" }), simplifiedHost: secondIgnore?.({ id: "dsh-redline-host", tagName: "DIV" }), simplifiedPlain: secondIgnore?.({ id: "", tagName: "DIV" }) };
+    const normal = await guarded(sandbox?.capture({ x: 0, y: 0, w: 10, h: 10 }), "normal-stuck");
+    const cancelledPromise = sandbox?.capture({ x: 0, y: 0, w: 10, h: 10 });
+    await waitFor(() => sandbox?.armed() === true, 4000, 20);
+    sandbox?.abort();
+    const cancelled = await guarded(cancelledPromise, "cancelled-stuck");
+    const cancelledState = { value: cancelled, cancelled: sandbox?.cancelled(), calls: sandbox?.calls().length };
+    harness.check("overlay: a timed out capture retries simplified and a cancelled capture returns null",
+      sandbox !== undefined && retried === "CROPPED" && sandbox?.toasts()[0] === "captureTimeoutFallback" &&
+      classified.firstPlain === false && classified.simplifiedImg === true && classified.simplifiedHost === true && classified.simplifiedPlain === false &&
+      normal === "CROPPED" && cancelledState.value === null && cancelledState.cancelled === true && cancelledState.calls === 4,
+      JSON.stringify({ retried, toasts: sandbox?.toasts(), classified, normal, cancelledState }));
+  }
+  {
+    const beforeSource = extractFunction(overlay, "captureBeforeAfter");
+    const run = beforeSource === undefined ? undefined : evaluateExpression(`(screenshotOnSend, captureCropFor, restoreAll, applyCommitted, adjustPatch, target, pin) => {
+let captureCancelled = false;
+${beforeSource}
+return { run: (theTarget, thePin) => captureBeforeAfter(theTarget, thePin), cancel: () => { captureCancelled = true; } };
+}`, "captureBeforeAfter");
+    const target = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 50, height: 50 }) };
+    const captures = [];
+    const restored = [];
+    const applied = [];
+    const capture = async () => { captures.push("c"); return null; };
+    const restore = () => restored.push("restore");
+    const apply = () => applied.push("apply");
+    const patch = { originalText: null };
+    const pin = { changes: [{ prop: "color", after: "red" }] };
+    const cancelledBox = run === undefined ? undefined : run(true, capture, restore, apply, patch, target, pin);
+    cancelledBox?.cancel();
+    await cancelledBox?.run(target, pin);
+    const cancelledFlow = { captures: captures.length, restored: restored.length, applied: applied.length };
+    const normalBox = run === undefined ? undefined : run(true, async () => { captures.push("c"); return "shot"; }, restore, apply, patch, target, pin);
+    const baseCaptures = captures.length;
+    const baseRestored = restored.length;
+    const baseApplied = applied.length;
+    await normalBox?.run(target, pin);
+    const normalFlow = { captures: captures.length - baseCaptures, restored: restored.length - baseRestored, applied: applied.length - baseApplied };
+    harness.check("overlay: a cancelled before-capture still commits the changes and skips the second shot",
+      cancelledBox !== undefined && cancelledFlow.captures === 1 && cancelledFlow.restored === 1 && cancelledFlow.applied === 1 &&
+      normalFlow.captures === 2 && normalFlow.restored === 1 && normalFlow.applied === 1,
+      JSON.stringify({ cancelledFlow, normalFlow }));
+  }
+
+  harness.section("client: overlay capture reuse");
+  {
+    const raceSource = extractFunction(overlay, "raceCapture");
+    const cropSource = extractFunction(overlay, "captureCropFor");
+    const run = cropSource === undefined ? undefined : evaluateExpression(`(setTimeout, clearTimeout) => {
+let captureTimeout = 0;
+let captureCancelled = false;
+let captureAbort = null;
+let CROP_PAD = 72;
+const CAPTURE_SIMPLIFIED_TAGS = new Set(["IMG", "VIDEO", "IFRAME", "OBJECT", "EMBED"]);
+const calls = [];
+const scroll = { x: 0, y: 0 };
+function cropCanvas(canvas, rect) { return \`crop-\${rect.x}\`; }
+const window = { html2canvas: () => { calls.push("render"); return Promise.resolve({ width: 100 }); }, innerWidth: 1200, innerHeight: 800, get scrollX() { return scroll.x; }, get scrollY() { return scroll.y; } };
+const document = { body: {} };
+async function ensureHtml2Canvas() { return true; }
+function showCaptureToast() {}
+function hideCaptureToast() {}
+function toast() {}
+function reportDiag() {}
+function t(key) { return key; }
+function groupCanvasKey() { return \`\${window.scrollX}|\${window.scrollY}|\${window.innerWidth}|\${window.innerHeight}\`; }
+${raceSource}
+${cropSource}
+return { capture: captureCropFor, calls: () => calls, scroll, armed: () => captureAbort !== null };
+}`, "captureCropFor");
+    const sandbox = run === undefined ? undefined : run(setTimeout, clearTimeout);
+    const guarded = (promise, label) => Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(label), 6000))]);
+    const reuse = { canvas: null, key: null, at: 0 };
+    const first = await guarded(sandbox?.capture({ x: 0, y: 0, w: 10, h: 10 }, 72, false, reuse), "first-stuck");
+    const second = await guarded(sandbox?.capture({ x: 5, y: 5, w: 10, h: 10 }, 72, false, reuse), "second-stuck");
+    if (sandbox !== undefined) sandbox.scroll.y = 300;
+    const scrolled = await guarded(sandbox?.capture({ x: 0, y: 0, w: 10, h: 10 }, 72, false, reuse), "scrolled-stuck");
+    harness.check("overlay: group captures reuse the rendered canvas until the page or viewport changes",
+      sandbox !== undefined && first === "crop-0" && second === "crop-5" && scrolled === "crop-0" &&
+      sandbox?.calls().length === 2,
+      JSON.stringify({ first, second, scrolled, renders: sandbox?.calls().length }));
+  }
+
+  harness.section("client: overlay audit batching");
+  {
+    const auditSource = extractFunction(overlay, "runPageAudit");
+    const run = auditSource === undefined ? undefined : evaluateExpression(`(setTimeout, clearTimeout) => {
+const A11Y_AUDIT_FAMILY_SELECTORS = { interactive: "i", images: "img", semantic: "s" };
+const elements = [];
+for (let index = 0; index < 100; index += 1) elements.push({ __fail: index % 10 === 0, tag: "div" });
+const root = { querySelectorAll: (selector) => (selector === "i" ? elements : []) };
+const document = { body: root };
+let probes = 0;
+function collectAuditCandidates(families, budget) { return families.interactive(); }
+function pickAuditCandidates(list, cap) { return list.slice(0, cap); }
+function auditElement(element) { probes += 1; return [{ check: "contrast", status: element.__fail === true ? "fail" : "pass", value: "1" }]; }
+function cssPath() { return "path"; }
+function quickLabel() { return "label"; }
+${auditSource}
+return { run: runPageAudit, probes: () => probes };
+}`, "runPageAudit");
+    const sandbox = run === undefined ? undefined : run(setTimeout, clearTimeout);
+    const guarded = (promise, label) => Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(label), 6000))]);
+    const updates = [];
+    const result = await guarded(sandbox?.run({ limit: 400, onProgress: (update) => updates.push({ done: update.done, total: update.total, findings: update.findings.length }), shouldStop: null }), "audit-stuck");
+    const chunking = { updates: updates.map((update) => update.done), total: updates[0]?.total, findings: result?.findings.length, scanned: result?.scanned };
+    const stopUpdates = [];
+    const stopResult = await guarded(sandbox?.run({ limit: 400, onProgress: (update) => stopUpdates.push(update.done), shouldStop: () => stopUpdates.length >= 1 }), "stop-stuck");
+    harness.check("overlay: the page audit runs in chunks with progress and honors a stop",
+      sandbox !== undefined && JSON.stringify(chunking.updates) === "[40,80,100]" && chunking.total === 100 && chunking.findings === 10 && chunking.scanned === 100 && sandbox?.probes() === 140 &&
+      stopResult?.stopped === true && stopResult?.scanned === 40 && JSON.stringify(stopUpdates) === "[40]",
+      JSON.stringify({ chunking, stopUpdates, stopScanned: stopResult?.scanned, stopped: stopResult?.stopped }));
+    harness.check("overlay: the audit panel streams progress and the limit arrives from settings",
+      overlay.includes("async function runPageAudit(options)") &&
+      overlay.includes("shouldStop: () => auditRunToken !== token") &&
+      overlay.includes("auditRunToken += 1;") &&
+      overlay.includes("t(\"auditCancel\")") &&
+      overlay.includes("t(\"auditPartial\")") &&
+      overlay.includes("limit: auditLimit") &&
+      overlay.includes("if (Number.isFinite(Number(next.auditLimit))) auditLimit = Math.max(50, Math.min(2000, Math.round(Number(next.auditLimit))));") &&
+      overlay.includes(".lr-audit-progress-track"),
+      "audit batching wiring drift");
+  }
+  harness.check("the card renders the context budget with removable dropped pins",
+    client.includes("dockPreviewChars") && client.includes("dockPreviewDropped") &&
+    client.includes("lr-preview-dropped-row") && client.includes("removePreviewPin") &&
+    client.includes("chars: Number.isFinite(Number(data.chars))"),
+    "card budget wiring drift");
+  harness.check("overlay: the drawing dock defaults to the left column and follows the setting",
+    overlay.includes("let drawDock = \"left\";") &&
+    overlay.includes(".lr-drawbar[data-dock=\"top\"]") &&
+    overlay.includes(".lr-drawbar[data-dock=\"right\"]") &&
+    overlay.includes(".lr-drawbar[data-dock=\"bottom\"]") &&
+    overlay.includes("drawBar.setAttribute(\"data-dock\", drawDock)") &&
+    overlay.includes("if (typeof next.drawDock === \"string\") drawDock = [\"left\", \"top\", \"right\", \"bottom\"].includes(next.drawDock) ? next.drawDock : \"left\";") &&
+    overlay.includes("drawBar?.setAttribute(\"data-dock\", drawDock);"),
+    "draw dock wiring drift");
 
   harness.section("client: overlay ui polish");
   {
@@ -2492,7 +3005,7 @@ return { apply: applyForceStates, clear: clearForceStates, force: (pseudo) => fo
         JSON.stringify(created.map((pin) => ({ shot: pin.shot, rect: pin.rect }))));
     }
     {
-      const pick = pickSource === undefined ? undefined : evaluateExpression(`(Element, modeBox, target, groupPicks, captureCropFor, screenshotOnSend, cssPath, groupPickMarker) => {\nconst readGroupMode = () => modeBox.value;\n${pickSource.replace(/groupMode/g, "readGroupMode()")}\nreturn groupPick(target);\n}`, "groupPick");
+      const pick = pickSource === undefined ? undefined : evaluateExpression(`(Element, modeBox, target, groupPicks, captureCropFor, screenshotOnSend, cssPath, groupPickMarker) => {\nlet CROP_PAD = 72;\nconst groupCaptureCache = null;\nconst readGroupMode = () => modeBox.value;\n${pickSource.replace(/groupMode/g, "readGroupMode()")}\nreturn groupPick(target);\n}`, "groupPick");
       if (pick !== undefined) {
         const ElementClass = class Element {};
         const makeElement = (tagName) => {
