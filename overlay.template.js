@@ -5181,14 +5181,22 @@
     const head = secHead(label, open);
     const body = el("div", { class: "lr-sec-body" });
     if (!open) body.style.display = "none";
+    let built = open === true;
+    const ensureBuild = () => {
+      if (built) return;
+      built = true;
+      build(body);
+    };
     head.addEventListener("click", () => {
       const isOpen = section.hasAttribute("data-open");
       if (isOpen) section.removeAttribute("data-open");
       else section.setAttribute("data-open", "");
       body.style.display = isOpen ? "none" : "";
       head.setAttribute("aria-expanded", isOpen ? "false" : "true");
+      ensureBuild();
     });
-    build(body);
+    section.__ensure = ensureBuild;
+    if (built) build(body);
     section.append(head, body);
     return section;
   }
@@ -5245,6 +5253,19 @@
     emptyNote.style.display = needle !== "" && visible === 0 ? "" : "none";
   }
   function wireInspectorFilter(body) {
+    const sectionEntry = (section) => {
+      const head = section.querySelector(".lr-sec-head");
+      const secBody = section.querySelector(".lr-sec-body");
+      if (head === null || secBody === null) return null;
+      const rows = [];
+      for (const row of secBody.children) {
+        if (!(row instanceof Element) || !row.classList.contains("lr-row")) continue;
+        const label = row.querySelector(".lr-row-label");
+        rows.push({ row, text: normalizeInspectorText(`${label?.textContent ?? ""} ${row.getAttribute("data-filter") ?? ""}`) });
+      }
+      if (rows.length === 0) return null;
+      return { section, head, body: secBody, rows, wasOpen: section.hasAttribute("data-open") };
+    };
     const entries = [];
     for (const section of body.children) {
       if (!(section instanceof Element)) continue;
@@ -5254,19 +5275,12 @@
         continue;
       }
       if (!section.classList.contains("lr-sec")) continue;
-      const head = section.querySelector(".lr-sec-head");
-      const secBody = section.querySelector(".lr-sec-body");
-      if (head === null || secBody === null) continue;
-      const rows = [];
-      for (const row of secBody.children) {
-        if (!(row instanceof Element) || !row.classList.contains("lr-row")) continue;
-        const label = row.querySelector(".lr-row-label");
-        rows.push({ row, text: normalizeInspectorText(`${label?.textContent ?? ""} ${row.getAttribute("data-filter") ?? ""}`) });
-      }
-      if (rows.length === 0) continue;
-      entries.push({ section, head, body: secBody, rows, wasOpen: section.hasAttribute("data-open") });
+      const entry = sectionEntry(section);
+      if (entry === null) continue;
+      entries.push(entry);
     }
     if (entries.length === 0) return;
+    const known = new Set(entries.map((entry) => entry.section));
     const emptyNote = el("div", { class: "lr-filter-empty" }, t("inspectorFilterNoResults"));
     emptyNote.style.display = "none";
     const input = el("input", { class: "lr-filter", type: "text", placeholder: t("inspectorFilterPlaceholder"), "aria-label": t("inspectorFilterPlaceholder") });
@@ -5274,6 +5288,16 @@
     clearBtn.style.display = "none";
     const run = () => {
       clearBtn.style.display = input.value === "" ? "none" : "";
+      if (input.value !== "") {
+        for (const section of body.children) {
+          if (!(section instanceof Element) || known.has(section) || typeof section.__ensure !== "function") continue;
+          section.__ensure();
+          const entry = sectionEntry(section);
+          if (entry === null) continue;
+          known.add(section);
+          entries.push(entry);
+        }
+      }
       applyInspectorFilter(input.value, entries, emptyNote);
     };
     input.addEventListener("input", run);

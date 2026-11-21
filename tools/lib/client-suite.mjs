@@ -1160,6 +1160,19 @@ export async function runClientSuite(harness, { pluginDir }) {
       "reserved key hint missing");
   }
 
+  harness.section("client: overlay inspector lazy sections");
+  {
+    harness.check("overlay: closed inspector sections defer their build until expanded",
+      template.includes("section.__ensure = ensureBuild;") && template.includes("if (built) build(body);") && template.includes("ensureBuild();"),
+      "lazy build missing");
+    harness.check("overlay: the filter force-builds deferred sections before matching",
+      template.includes("known.has(section)") && template.includes("section.__ensure();") && template.includes("const entry = sectionEntry(section);"),
+      "filter force-build missing");
+    harness.check("overlay: the filter wiring still mounts on the adjust body",
+      template.includes("wireInspectorFilter(body);"),
+      "filter mount missing");
+  }
+
   harness.section("client: locale integrity");
   {
     const overlayLiteral = extractObjectLiteral(overlay, "const UI_LOCALES");
