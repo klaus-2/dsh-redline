@@ -58,6 +58,13 @@
   "dictateDenied": "O acesso ao microfone foi negado",
   "dictateError": "Falha no ditado",
   "dictateUnsupported": "Este navegador não oferece ditado",
+  "tourSkip": "Pular",
+  "tourNext": "Próximo",
+  "tourFinish": "Concluir",
+  "tourComment": "Modo comentário: aponte para qualquer elemento e escreva o que deve mudar.",
+  "tourAdjust": "Modo ajuste: edite estilos ao vivo com desfazer e refazer.",
+  "tourDraw": "Modo desenho: rabisque sobre a página com pincel e borracha.",
+  "tourSend": "Envie o comentário e o contador de pendentes aparece aqui até o agente resolver.",
   "imgDetailsFormat": "Formato",
   "imgDetailsSize": "Natural → renderizado",
   "imgDetailsUpscaled": "Servida menor que o exibido ({p}% maior)",
@@ -316,4 +323,7 @@
   "tplEmpty": "Nenhum modelo personalizado - os padrão são usados.",
   "tplReset": "Restaurar padrão",
   "tplPlaceholder": "Texto do modelo"
+,
+  "tourReplay": "Ver o tour novamente",
+  "tourReplayDesc": "O tour volta na próxima página em que o overlay for injetado."
 }

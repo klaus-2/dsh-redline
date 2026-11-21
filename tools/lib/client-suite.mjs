@@ -43,6 +43,8 @@ const REQUIRED_OVERLAY_SYMBOLS = [
   "function overflowWidth",
   "function dictateLocale",
   "function dictateButton",
+  "function tourSteps",
+  "function tourBubblePosition",
   "const EDITABLE_PROPS",
   "const PROP_META",
   "const t = (key) =>"
@@ -1107,6 +1109,37 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("overlay: a detached textarea ends its dictation session",
       template.includes("if (!btn.isConnected) {") && template.includes("recognition.onend = () => finish(session);"),
       "session cleanup missing");
+  }
+
+  harness.section("client: overlay intro tour");
+  {
+    const stepsOf = extractFunction(overlay, "tourSteps");
+    const run = stepsOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${stepsOf}
+      return JSON.stringify([tourSteps({ comment: "c", adjust: "a", draw: null, pending: "p" }).map((step) => step.key), tourSteps({}).length]);
+    }`, "tourSteps")());
+    harness.eq("overlay: the tour skips steps whose anchor is missing", run, [["tourComment", "tourAdjust", "tourSend"], 0]);
+    const positionOf = extractFunction(overlay, "tourBubblePosition");
+    const runPos = positionOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${positionOf}
+      return JSON.stringify([tourBubblePosition({ left: 100, top: 300, bottom: 330 }, 1280, 800), tourBubblePosition({ left: 40, top: 50, bottom: 80 }, 1280, 800), tourBubblePosition({ left: 1500, top: 400, bottom: 430 }, 1280, 800)]);
+    }`, "tourBubblePosition")());
+    harness.eq("overlay: the tour bubble clamps to the viewport and flips above tall targets", runPos, [
+      { left: 60, top: 204, above: true },
+      { left: 8, top: 88, above: false },
+      { left: 1012, top: 304, above: true }
+    ]);
+    harness.check("overlay: the first settings answer arms the tour when the flag is still false",
+      template.includes("if (next.tourDone === false && !tourShown && tourNode === null) scheduleTour();") &&
+      template.includes('bridgeSend("settings.update", { tourDone: true })'),
+      "tour trigger missing");
+    harness.check("overlay: the settings panel replays the tour",
+      client.includes("save({ tourDone: false })") && client.includes("tourReplay"),
+      "replay row missing");
   }
 
   harness.section("client: locale integrity");

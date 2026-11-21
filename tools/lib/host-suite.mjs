@@ -190,7 +190,10 @@ export async function runHostSuite(harness, { pluginDir }) {
       const widths = await post("settings.update", { viewportPresets: [100, 5000, "x", 900, 900, 1000] }, { origin: base });
       const afterWidths = await (await post("state.get", {}, { origin: base })).json();
       harness.eq("the bridge settings update stores only the clamped custom widths", afterWidths.settings.viewportPresets, [900, 1000]);
-      await post("settings.update", { viewportPresets: [] }, { origin: base });
+      await post("settings.update", { tourDone: true }, { origin: base });
+      const afterTour = await (await post("state.get", {}, { origin: base })).json();
+      harness.eq("the bridge settings update records the tour seen-flag as a boolean", afterTour.settings.tourDone, true);
+      await post("settings.update", { tourDone: false, viewportPresets: [] }, { origin: base });
       const withSecret = await post("state.get", {}, { ...auth });
       harness.check("the bridge accepts the instance secret too", withSecret.status === 200);
       const malformed = await fetch(`${base}/.lr/bridge`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: "not json" });
@@ -290,7 +293,7 @@ export async function runHostSuite(harness, { pluginDir }) {
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "pt", keys: { comment: "x", adjust: "z" }, screenshot: false, cropPad: 96 }) });
       const body = await response.json();
-      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 96, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [], viewportPresets: [] });
+      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 96, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [], viewportPresets: [], tourDone: false });
     }
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "klingon", keys: { comment: "xx", adjust: "!" }, screenshot: "yes", cropPad: 5 }) });
@@ -334,7 +337,7 @@ export async function runHostSuite(harness, { pluginDir }) {
       const port2 = server2.port ?? server2.address().port;
       const response = await fetch(`http://127.0.0.1:${port2}/.lr/settings`, { headers: { [secretHeader]: secret } });
       const body = await response.json();
-      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [], viewportPresets: [] });
+      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [], viewportPresets: [], tourDone: false });
       server2.close();
     }
     {

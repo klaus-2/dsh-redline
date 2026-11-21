@@ -58,6 +58,13 @@
   "dictateDenied": "麦克风访问被拒绝",
   "dictateError": "口述失败",
   "dictateUnsupported": "此浏览器不支持口述",
+  "tourSkip": "跳过",
+  "tourNext": "下一步",
+  "tourFinish": "完成",
+  "tourComment": "评论模式：指向任意元素并写下要修改的内容。",
+  "tourAdjust": "调整模式：实时编辑样式，支持撤销与重做。",
+  "tourDraw": "绘制模式：用画笔和橡皮在页面上涂画。",
+  "tourSend": "发送评论后，待处理计数会显示在这里，直到智能体处理完成。",
   "imgDetailsFormat": "格式",
   "imgDetailsSize": "原始 → 渲染",
   "imgDetailsUpscaled": "原图小于显示尺寸（放大 {p}%）",
@@ -316,4 +323,7 @@
   "tplEmpty": "暂无自定义模板 - 使用内置模板。",
   "tplReset": "恢复默认",
   "tplPlaceholder": "模板文本"
+,
+  "tourReplay": "再次显示引导",
+  "tourReplayDesc": "引导会在下一个注入浮层的页面重新出现。"
 }

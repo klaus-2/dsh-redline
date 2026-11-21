@@ -121,6 +121,13 @@
       "dictateDenied": "Microphone access was denied",
       "dictateError": "Dictation failed",
       "dictateUnsupported": "Dictation is not supported in this browser",
+      "tourSkip": "Skip",
+      "tourNext": "Next",
+      "tourFinish": "Finish",
+      "tourComment": "Comment mode: point at any element and write what should change.",
+      "tourAdjust": "Adjust mode: edit styles live with undo and redo.",
+      "tourDraw": "Draw mode: sketch over the page with brush and eraser.",
+      "tourSend": "Send the comment and the pending counter appears here until the agent resolves it.",
       "imgDetailsFormat": "Format",
       "imgDetailsSize": "Natural → rendered",
       "imgDetailsUpscaled": "Served smaller than displayed ({p}% larger)",
@@ -370,6 +377,13 @@
       "dictateDenied": "O acesso ao microfone foi negado",
       "dictateError": "Falha no ditado",
       "dictateUnsupported": "Este navegador não oferece ditado",
+      "tourSkip": "Pular",
+      "tourNext": "Próximo",
+      "tourFinish": "Concluir",
+      "tourComment": "Modo comentário: aponte para qualquer elemento e escreva o que deve mudar.",
+      "tourAdjust": "Modo ajuste: edite estilos ao vivo com desfazer e refazer.",
+      "tourDraw": "Modo desenho: rabisque sobre a página com pincel e borracha.",
+      "tourSend": "Envie o comentário e o contador de pendentes aparece aqui até o agente resolver.",
       "imgDetailsFormat": "Formato",
       "imgDetailsSize": "Natural → renderizado",
       "imgDetailsUpscaled": "Servida menor que o exibido ({p}% maior)",
@@ -619,6 +633,13 @@
       "dictateDenied": "麦克风访问被拒绝",
       "dictateError": "口述失败",
       "dictateUnsupported": "此浏览器不支持口述",
+      "tourSkip": "跳过",
+      "tourNext": "下一步",
+      "tourFinish": "完成",
+      "tourComment": "评论模式：指向任意元素并写下要修改的内容。",
+      "tourAdjust": "调整模式：实时编辑样式，支持撤销与重做。",
+      "tourDraw": "绘制模式：用画笔和橡皮在页面上涂画。",
+      "tourSend": "发送评论后，待处理计数会显示在这里，直到智能体处理完成。",
       "imgDetailsFormat": "格式",
       "imgDetailsSize": "原始 → 渲染",
       "imgDetailsUpscaled": "原图小于显示尺寸（放大 {p}%）",
@@ -2127,6 +2148,96 @@
     });
     return el("span", { class: "lr-vp-custom" }, field, add);
   }
+  function tourSteps(present) {
+    const steps = [
+      { key: "tourComment", target: present.comment },
+      { key: "tourAdjust", target: present.adjust },
+      { key: "tourDraw", target: present.draw },
+      { key: "tourSend", target: present.pending }
+    ];
+    return steps.filter((step) => step.target !== null && step.target !== undefined);
+  }
+  function tourBubblePosition(rect, viewportWidth, viewportHeight) {
+    const width = 260;
+    const vw = Number(viewportWidth);
+    const vh = Number(viewportHeight);
+    const left = Math.min(Math.max(8, rect.left - 40), Math.max(8, (Number.isFinite(vw) ? vw : 0) - width - 8));
+    const above = rect.top > 220;
+    const top = above ? Math.max(8, rect.top - 96) : Math.min(Math.max(8, rect.bottom + 8), Math.max(8, (Number.isFinite(vh) ? vh : 0) - 120));
+    return { left, top, above };
+  }
+  let tourShown = false;
+  let tourNode = null;
+  let tourCleanup = null;
+  function markTourDone() {
+    bridgeSend("settings.update", { tourDone: true }).catch(() => {});
+  }
+  function endTour() {
+    if (tourCleanup !== null) tourCleanup();
+    tourNode?.remove();
+    tourNode = null;
+    tourCleanup = null;
+  }
+  function startTour() {
+    if (tourShown || tourNode !== null) return;
+    tourShown = true;
+    const steps = tourSteps({ comment: commentBtn, adjust: adjustBtn, draw: drawBtn, pending: pendingSpan });
+    if (steps.length === 0) {
+      markTourDone();
+      return;
+    }
+    mountShadow();
+    let index = 0;
+    const textNode = el("div", { class: "lr-tour-text" });
+    const countNode = el("span", { class: "lr-tour-count" });
+    const skipBtn = el("button", { class: "lr-tour-btn", type: "button" }, t("tourSkip"));
+    const nextBtn = el("button", { class: "lr-tour-btn", type: "button", "data-primary": "" }, t("tourNext"));
+    const bubble = el("div", { class: "popover lr-tour" }, textNode, el("div", { class: "lr-tour-foot" }, countNode, skipBtn, nextBtn));
+    const place = () => {
+      const target = steps[index].target;
+      const rect = typeof target.getBoundingClientRect === "function" ? target.getBoundingClientRect() : { left: 8, top: 8, right: 8, bottom: 8 };
+      const vw = document.documentElement?.clientWidth || (typeof window === "object" ? window.innerWidth : 0) || 0;
+      const vh = document.documentElement?.clientHeight || (typeof window === "object" ? window.innerHeight : 0) || 0;
+      const position = tourBubblePosition(rect, vw, vh);
+      bubble.style.left = `${position.left}px`;
+      bubble.style.top = `${position.top}px`;
+    };
+    const renderStep = () => {
+      textNode.textContent = t(steps[index].key);
+      countNode.textContent = `${index + 1}/${steps.length}`;
+      nextBtn.textContent = index === steps.length - 1 ? t("tourFinish") : t("tourNext");
+      place();
+    };
+    skipBtn.addEventListener("click", () => {
+      endTour();
+      markTourDone();
+    });
+    nextBtn.addEventListener("click", () => {
+      if (index === steps.length - 1) {
+        endTour();
+        markTourDone();
+        return;
+      }
+      index += 1;
+      renderStep();
+    });
+    const onKey = (event) => {
+      if (event.key !== "Escape") return;
+      endTour();
+      markTourDone();
+    };
+    document.addEventListener("keydown", onKey, true);
+    tourCleanup = () => document.removeEventListener("keydown", onKey, true);
+    tourNode = bubble;
+    renderStep();
+    fixedLayer.append(bubble);
+  }
+  function scheduleTour() {
+    if (tourShown || tourNode !== null) return;
+    setTimeout(() => {
+      if (!tourShown && tourNode === null) startTour();
+    }, 1200);
+  }
   const gridBtn = el("button", { class: "tool", title: t("layoutGrid"), "aria-label": t("layoutGrid"), html: ICONS_CANVAS.grid });
   gridBtn.addEventListener("click", () => {
     if (gridStepper !== null) setGrid(false);
@@ -2237,6 +2348,7 @@
     if (Number.isFinite(Number(next.auditLimit))) auditLimit = Math.max(50, Math.min(2000, Math.round(Number(next.auditLimit))));
     if (typeof next.drawDock === "string") drawDock = ["left", "top", "right", "bottom"].includes(next.drawDock) ? next.drawDock : "left";
     drawBar?.setAttribute("data-dock", drawDock);
+    if (next.tourDone === false && !tourShown && tourNode === null) scheduleTour();
     const presets = normalizeViewportPresets(next.viewportPresets);
     if (JSON.stringify(presets) !== JSON.stringify(viewportPresets)) viewportPresets = presets;
     if (next.keys === null || typeof next.keys !== "object") return;

@@ -58,6 +58,13 @@
   "dictateDenied": "Microphone access was denied",
   "dictateError": "Dictation failed",
   "dictateUnsupported": "Dictation is not supported in this browser",
+  "tourSkip": "Skip",
+  "tourNext": "Next",
+  "tourFinish": "Finish",
+  "tourComment": "Comment mode: point at any element and write what should change.",
+  "tourAdjust": "Adjust mode: edit styles live with undo and redo.",
+  "tourDraw": "Draw mode: sketch over the page with brush and eraser.",
+  "tourSend": "Send the comment and the pending counter appears here until the agent resolves it.",
   "imgDetailsFormat": "Format",
   "imgDetailsSize": "Natural → rendered",
   "imgDetailsUpscaled": "Served smaller than displayed ({p}% larger)",
@@ -316,4 +323,7 @@
   "tplEmpty": "No custom templates - the built-in ones are used.",
   "tplReset": "Restore defaults",
   "tplPlaceholder": "Template text"
+,
+  "tourReplay": "Show the tour again",
+  "tourReplayDesc": "The intro tour returns on the next page the overlay injects."
 }
