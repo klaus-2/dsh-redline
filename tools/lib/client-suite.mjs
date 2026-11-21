@@ -38,6 +38,8 @@ const REQUIRED_OVERLAY_SYMBOLS = [
   "function pxToRem",
   "function remToPx",
   "function rootFontSizePx",
+  "function normalizeViewportPresets",
+  "function viewportCustomRow",
   "const EDITABLE_PROPS",
   "const PROP_META",
   "const t = (key) =>"
@@ -441,7 +443,7 @@ export async function runClientSuite(harness, { pluginDir }) {
     // The relay failure paths: a page must never wait forever.
     const emptyError = await mediated.window.__LR_BRIDGE__.send("", {}).then(() => "resolved", (error) => String(error?.message ?? error));
     harness.check("the relay refuses a message without a type", emptyError.includes("without a type"), emptyError);
-    const unknownError = await mediated.window.__LR_BRIDGE__.send("settings.update", {}).then(() => "resolved", (error) => String(error?.message ?? error));
+    const unknownError = await mediated.window.__LR_BRIDGE__.send("nosuch.message", {}).then(() => "resolved", (error) => String(error?.message ?? error));
     harness.check("the relay refuses a message outside the allowlist", unknownError.includes("does not carry"), unknownError);
 
     const timers = [];
@@ -1036,6 +1038,27 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("overlay: the row refresh re-renders through the unit display",
       template.includes('scrub.__refresh(toDisplay(adjustValues.get(prop) ?? ""))'),
       "refresh conversion missing");
+  }
+
+  harness.section("client: overlay custom viewport widths");
+  {
+    const normalize = extractFunction(overlay, "normalizeViewportPresets");
+    const run = normalize === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${normalize}
+      return JSON.stringify([normalizeViewportPresets([100, 5000, "x", 900, 900, 1000]), normalizeViewportPresets([800.7, 200]), normalizeViewportPresets(null)]);
+    }`, "normalizeViewportPresets")());
+    harness.eq("overlay: custom widths clamp to three integers between 200 and 4000", run, [[900, 1000], [801, 200], []]);
+    harness.check("overlay: the viewport menu lists the saved widths and the custom input row",
+      template.includes('...viewportPresets.map((px) => ({ value: { kind: "width", px }, label: `${px}px` }))') && template.includes("{ node: viewportCustomRow() }"),
+      "custom rows missing");
+    harness.check("overlay: a saved width persists through the settings bridge message",
+      template.includes('bridgeSend("settings.update", { viewportPresets })'),
+      "bridge send missing");
+    harness.check("overlay: the host answer updates the saved widths on the next poll",
+      template.includes("const presets = normalizeViewportPresets(next.viewportPresets);"),
+      "applySettings read missing");
   }
 
   harness.section("client: locale integrity");

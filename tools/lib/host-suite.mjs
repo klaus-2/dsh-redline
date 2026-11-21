@@ -183,8 +183,14 @@ export async function runHostSuite(harness, { pluginDir }) {
       const state = await own.json();
       harness.check("the bridge state is the narrow projection", state.ok === true && typeof state.lang === "string" && Array.isArray(state.pendingIds) && Array.isArray(state.deliveredIds) && state.settings !== undefined && state.events === undefined && state.diag === undefined, JSON.stringify(state).slice(0, 160));
       harness.eq("the bridge state carries exactly the narrow keys, now including resolvedIds — the projection is deliberately widened to carry the resolved status (D12)", Object.keys(state).sort(), ["active", "deliveredIds", "lang", "ok", "pendingIds", "resolvedIds", "settings"]);
-      const unsupported = await post("settings.update", {}, { ...auth });
-      harness.check("the bridge refuses a message outside the allowlist", unsupported.status === 400);
+      const before = await (await post("state.get", {}, { origin: base })).json();
+      const hijack = await post("settings.update", { auditLimit: 5000, lang: "zh" }, { origin: base });
+      const afterHijack = await (await post("state.get", {}, { origin: base })).json();
+      harness.check("the bridge settings update drops every field outside its whitelist", hijack.status === 200 && afterHijack.settings.auditLimit === before.settings.auditLimit && afterHijack.settings.lang === before.settings.lang, JSON.stringify({ auditLimit: afterHijack.settings.auditLimit, lang: afterHijack.settings.lang }));
+      const widths = await post("settings.update", { viewportPresets: [100, 5000, "x", 900, 900, 1000] }, { origin: base });
+      const afterWidths = await (await post("state.get", {}, { origin: base })).json();
+      harness.eq("the bridge settings update stores only the clamped custom widths", afterWidths.settings.viewportPresets, [900, 1000]);
+      await post("settings.update", { viewportPresets: [] }, { origin: base });
       const withSecret = await post("state.get", {}, { ...auth });
       harness.check("the bridge accepts the instance secret too", withSecret.status === 200);
       const malformed = await fetch(`${base}/.lr/bridge`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: "not json" });
@@ -284,7 +290,7 @@ export async function runHostSuite(harness, { pluginDir }) {
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "pt", keys: { comment: "x", adjust: "z" }, screenshot: false, cropPad: 96 }) });
       const body = await response.json();
-      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 96, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [] });
+      harness.eq("a valid change is applied", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 96, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [], viewportPresets: [] });
     }
     {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "klingon", keys: { comment: "xx", adjust: "!" }, screenshot: "yes", cropPad: 5 }) });
@@ -328,7 +334,7 @@ export async function runHostSuite(harness, { pluginDir }) {
       const port2 = server2.port ?? server2.address().port;
       const response = await fetch(`http://127.0.0.1:${port2}/.lr/settings`, { headers: { [secretHeader]: secret } });
       const body = await response.json();
-      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [] });
+      harness.eq("the settings survive a restart", body.settings, { lang: "pt", keys: { comment: "x", adjust: "z", draw: "d", hidePins: "h" }, screenshot: false, cropPad: 200, captureQuality: "padrao", captureTimeout: 12, auditLimit: 400, drawDock: "left", theme: "dark", templates: [], viewportPresets: [] });
       server2.close();
     }
     {
