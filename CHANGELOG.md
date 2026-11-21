@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Voice dictation in the composer.** A microphone button transcribes speech into the comment through the Web Speech API in the overlay language with live interim text; browsers without support render no button, and denied microphones report back instead of failing silently. ([`5ee7318`](https://github.com/klaus-2/dsh-redline/commit/5ee7318))
 - **A guided intro tour.** On first use the toolbar walks through the comment, adjust and draw modes and the pending counter with skippable bubbles; finishing or skipping is remembered in the settings, and the panel replays the tour on the next injected page on demand. ([`e7a3efe`](https://github.com/klaus-2/dsh-redline/commit/e7a3efe))
 - **The hide-pins shortcut is configurable.** The settings panel captures the hide-pins key like the other modes, and a key the browser or the app keeps for itself is reported instead of silently dropped. ([`98529d4`](https://github.com/klaus-2/dsh-redline/commit/98529d4))
+- **The tour bubble can be dragged anywhere.** Grabbing the bubble moves it with the same drag discipline as the panels (threshold, rAF paint, viewport clamping, pointer capture); buttons stay clickable, and moving to the next step re-anchors the bubble as usual. ([`4064c71`](https://github.com/klaus-2/dsh-redline/commit/4064c71))
 
 ### Changed
 
