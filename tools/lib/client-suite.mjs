@@ -50,6 +50,9 @@ const REQUIRED_OVERLAY_SYMBOLS = [
   "function releasePinShots",
   "function overlaySuspended",
   "function syncOverlaySuspension",
+  "function pasteWorkerSource",
+  "function decodePastedImageInWorker",
+  "function bufferToBase64",
   "const EDITABLE_PROPS",
   "const PROP_META",
   "const t = (key) =>"
@@ -1227,6 +1230,32 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("overlay: every interaction entry point resyncs the suspension",
       (template.match(/syncOverlaySuspension\(\);/gu) ?? []).length >= 7,
       "resume call sites missing");
+  }
+
+  harness.section("client: overlay paste worker");
+  {
+    const b64Of = extractFunction(overlay, "bufferToBase64");
+    const run = b64Of === undefined
+      ? undefined
+      : evaluateExpression(`(btoa) => {
+      ${b64Of}
+      return bufferToBase64(new Uint8Array([104, 105]).buffer);
+    }`, "bufferToBase64")((binary) => Buffer.from(binary, "binary").toString("base64"));
+    harness.eq("overlay: the worker answer encodes the jpeg buffer as base64", run, "aGk=");
+    const source = extractFunction(overlay, "pasteWorkerSource");
+    const workerSource = source === undefined ? "" : evaluateExpression(`() => {
+      ${source}
+      return pasteWorkerSource();
+    }`, "pasteWorkerSource")();
+    harness.check("overlay: the paste worker decodes and resizes off the main thread",
+      workerSource.includes("createImageBitmap(event.data)") && workerSource.includes("new OffscreenCanvas") && workerSource.includes("convertToBlob"),
+      "worker source missing");
+    harness.check("overlay: the paste decode tries the worker first and falls back to the main thread",
+      template.includes('typeof Worker === "function" && typeof OffscreenCanvas === "function"') && template.includes("return await decodePastedImageInWorker(file);") && template.includes("canvas.toDataURL(\"image/jpeg\", 0.8)"),
+      "worker fallback missing");
+    harness.check("overlay: a worker answer is terminated after one message",
+      template.includes("worker.terminate();"),
+      "worker teardown missing");
   }
 
   harness.section("client: locale integrity");

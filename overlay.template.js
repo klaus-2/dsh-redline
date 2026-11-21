@@ -3342,7 +3342,52 @@
   let composerNode = null;
   let placeComposerDefault = null;
 
+  function bufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let index = 0; index < bytes.length; index += 0x8000) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(index, index + 0x8000));
+    }
+    return btoa(binary);
+  }
+  function pasteWorkerSource() {
+    return "self.onmessage = async (event) => { try { const bitmap = await createImageBitmap(event.data); const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height)); const canvas = new OffscreenCanvas(Math.max(1, Math.round(bitmap.width * scale)), Math.max(1, Math.round(bitmap.height * scale))); canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close(); const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.8 }); const buffer = await blob.arrayBuffer(); self.postMessage({ ok: true, buffer }, [buffer]); } catch (error) { self.postMessage({ ok: false, error: String(error) }); } };";
+  }
+  let pasteWorkerUrl = null;
+  function decodePastedImageInWorker(file) {
+    return new Promise((resolve, reject) => {
+      if (pasteWorkerUrl === null) {
+        pasteWorkerUrl = URL.createObjectURL(new Blob([pasteWorkerSource()], { type: "text/javascript" }));
+      }
+      let worker;
+      try {
+        worker = new Worker(pasteWorkerUrl);
+      } catch (error) {
+        reject(error);
+        return;
+      }
+      worker.onmessage = (event) => {
+        worker.terminate();
+        const data = event.data;
+        if (data !== null && typeof data === "object" && data.ok === true) resolve(`data:image/jpeg;base64,${bufferToBase64(data.buffer)}`);
+        else reject(new Error(String(data?.error ?? "the paste worker failed")));
+      };
+      worker.onerror = (event) => {
+        worker.terminate();
+        reject(new Error(String(event?.message ?? "the paste worker crashed")));
+      };
+      worker.postMessage(file);
+    });
+  }
   async function decodePastedImage(file) {
+    if (typeof Worker === "function" && typeof OffscreenCanvas === "function") {
+      try {
+        return await decodePastedImageInWorker(file);
+      } catch {
+        // A page that forbids blob workers (or an unsupported build) falls back
+        // to decoding on the main thread; the paste still works either way.
+      }
+    }
     let bitmap = null;
     try {
       bitmap = await createImageBitmap(file);
