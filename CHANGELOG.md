@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **The intro tour bubble is readable and stays inside the viewport.** The bubble now carries its own padding and border, shows the step as dots instead of a squeezed counter, measures its own height before placing itself (flipping below the anchor when there is no room above), and is revealed only after it is positioned. When the step anchor is hidden (the pending counter with nothing pending), the bubble centres itself above the toolbar instead of flying to the corner. ([`b1d82b7`](https://github.com/klaus-2/dsh-redline/commit/b1d82b7)) ([`4b55cc8`](https://github.com/klaus-2/dsh-redline/commit/4b55cc8))
+- **The adjust panel no longer prints `[object Object]` next to the state chips.** A misplaced closing parenthesis passed the states row's filter options to the chip span as a child instead of to the row; the options now reach the row and the states row is filterable again. ([`17e5729`](https://github.com/klaus-2/dsh-redline/commit/17e5729))
 
 ## [1.7.0] - 2026-11-21
 
