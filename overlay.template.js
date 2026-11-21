@@ -1645,6 +1645,7 @@
 
   function toggleDraw(on) {
     drawMode = typeof on === "boolean" ? on : !drawMode;
+    syncOverlaySuspension();
     if (drawMode) { setMode(null); if (groupMode) setGroupMode(false); closePanels(); }
     closeDrawMenu();
     drawSel = null;
@@ -2561,6 +2562,22 @@
     return true;
   }
 
+  function overlaySuspended() {
+    return hidden === true && drawMode === false && draft === null && adjustPanel === null && composerNode === null && openPinId === null && groupComposerNode === null && !pins.some((p) => p.status === "queued");
+  }
+  let pageObserverActive = true;
+  function syncOverlaySuspension() {
+    const suspended = overlaySuspended();
+    if (suspended === pageObserverActive) return;
+    pageObserverActive = !suspended;
+    if (suspended) {
+      pageObserver.disconnect();
+      pinObserver?.disconnect();
+    } else {
+      pageObserver.observe(document.body ?? document.documentElement, { childList: true, subtree: true, attributes: true });
+      syncPinObserver();
+    }
+  }
   function setHidden(next) {
     hidden = next;
     if (hidden) {
@@ -2573,6 +2590,7 @@
       discardDraft();
       if (groupComposerNode !== null) setGroupMode(false);
     }
+    syncOverlaySuspension();
     updateToolbar();
     renderPins();
   }
@@ -2833,6 +2851,7 @@
 
   function setMode(next) {
     mode = mode === next ? null : next;
+    syncOverlaySuspension();
     if (mode !== "picking" && duplicateArmed !== null) duplicateArmed = null;
     if (mode !== "picking" && mode !== "adjust") clearHighlight();
     if (mode === "picking") {
@@ -3114,13 +3133,14 @@
   window.addEventListener("scroll", scheduleReposition, { passive: true });
   window.addEventListener("resize", scheduleReposition);
   let mutationTimer = null;
-  new MutationObserver(() => {
+  const pageObserver = new MutationObserver(() => {
     clearTimeout(mutationTimer);
     mutationTimer = setTimeout(() => {
       scheduleReposition();
       auditPinAnchors();
     }, 400);
-  }).observe(document.body ?? document.documentElement, { childList: true, subtree: true, attributes: true });
+  });
+  pageObserver.observe(document.body ?? document.documentElement, { childList: true, subtree: true, attributes: true });
 
 
   const DRAG_THRESHOLD = 4;
@@ -4024,6 +4044,7 @@
   function setGroupMode(on) {
     if (on === groupMode) return;
     groupMode = on;
+    syncOverlaySuspension();
     if (on) {
       setMode(null);
       if (drawMode) toggleDraw(false);
@@ -4509,6 +4530,7 @@
   function openAuditPanel() {
     closeAuditPanel();
     mountShadow();
+    syncOverlaySuspension();
     const token = auditRunToken + 1;
     auditRunToken = token;
     a11yFixHandler.current = {
@@ -5858,6 +5880,7 @@
 
   function openAdjustPanel(target) {
     closePanels();
+    syncOverlaySuspension();
     adjustTarget = target ?? document.body;
     forceTarget = adjustTarget;
     forceStates = new Set();
@@ -6095,6 +6118,7 @@
 
 
   async function pollStatus() {
+    if (overlaySuspended()) return;
     try {
       const data = await bridgeSend("state.get", {});
       if (data === null || typeof data !== "object" || data.ok !== true) return;
@@ -6118,6 +6142,7 @@
           closePanels();
           clearHighlight();
           toast(t("deliveredToast"), 3200);
+          syncOverlaySuspension();
         }
       }
       if (data.active === true) lastAgentActivity = Date.now();

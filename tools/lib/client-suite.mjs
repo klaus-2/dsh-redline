@@ -48,6 +48,8 @@ const REQUIRED_OVERLAY_SYMBOLS = [
   "function shrinkScale",
   "function shrinkShot",
   "function releasePinShots",
+  "function overlaySuspended",
+  "function syncOverlaySuspension",
   "const EDITABLE_PROPS",
   "const PROP_META",
   "const t = (key) =>"
@@ -1192,6 +1194,39 @@ export async function runClientSuite(harness, { pluginDir }) {
     harness.check("overlay: the group capture canvas is dropped once its reuse window expires",
       template.includes("Date.now() - reuse.at >= 10000") && template.includes("reuse.canvas = null;"),
       "cache expiry release missing");
+  }
+
+  harness.section("client: overlay idle suspension");
+  {
+    const suspendedOf = extractFunction(overlay, "overlaySuspended");
+    const run = suspendedOf === undefined
+      ? undefined
+      : JSON.parse(evaluateExpression(`() => {
+      ${suspendedOf}
+      let hidden = true, drawMode = false, draft = null, adjustPanel = null, composerNode = null, openPinId = null, groupComposerNode = null;
+      const pins = [];
+      const results = [overlaySuspended()];
+      pins.push({ status: "queued" });
+      results.push(overlaySuspended());
+      pins[0].status = "resolvido";
+      draft = { anchorEl: {} };
+      results.push(overlaySuspended());
+      draft = null;
+      hidden = false;
+      results.push(overlaySuspended());
+      return JSON.stringify(results);
+    }`, "overlaySuspended")());
+    harness.eq("overlay: suspension requires a hidden overlay with nothing outstanding", run, [true, false, false, false]);
+    harness.check("overlay: suspending disconnects the page and pin observers and reobserves on resume",
+      template.includes("pageObserver.disconnect();") && template.includes("pinObserver?.disconnect();") &&
+      (template.match(/pageObserver\.observe\(/gu) ?? []).length >= 2,
+      "observer suspension wiring missing");
+    harness.check("overlay: the status poll skips network while suspended",
+      template.includes("async function pollStatus() {\n    if (overlaySuspended()) return;"),
+      "poll guard missing");
+    harness.check("overlay: every interaction entry point resyncs the suspension",
+      (template.match(/syncOverlaySuspension\(\);/gu) ?? []).length >= 7,
+      "resume call sites missing");
   }
 
   harness.section("client: locale integrity");
