@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.7.0] - 2026-11-21
 
 ### Added
 
@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Drawing captures no longer composite the drawing canvas twice.** The drawing overlay was drawn onto the capture twice in a duplicated block, doubling its opacity in sent screenshots. ([`bf20bb1`](https://github.com/klaus-2/dsh-redline/commit/bf20bb1))
+- **The plugin boots on the current Harness client runtime.** The Harness moved plugin clients to a module-system boot graph; the client now registers through `window.__ModuleLoader__.load` with its package name, loads eagerly via `dsh.client.immediately`, and declares the services (`slots`, `uiConversation`) its settings card and chat node consume. ([`ff50a7e`](https://github.com/klaus-2/dsh-redline/commit/ff50a7e)) ([`0da5f2e`](https://github.com/klaus-2/dsh-redline/commit/0da5f2e)) ([`709accd`](https://github.com/klaus-2/dsh-redline/commit/709accd))
+- **Copies of the plugin under a different package name (dev clones) run in isolation.** The plugin identity now comes from its `package.json` name: the secret route, state directories, attachments directory and the attachments serving route follow it, so a dev clone no longer collides with the installed plugin; the annotation `source.kind` stays a stable `dsh-redline` so the chat card and the agent keep matching snapshots. ([`ff50a7e`](https://github.com/klaus-2/dsh-redline/commit/ff50a7e)) ([`0da5f2e`](https://github.com/klaus-2/dsh-redline/commit/0da5f2e)) ([`c2d1206`](https://github.com/klaus-2/dsh-redline/commit/c2d1206)) ([`a90be67`](https://github.com/klaus-2/dsh-redline/commit/a90be67))
+- **A plugin reload no longer leaves a second server bound.** Re-applying the plugin closes the previous server before starting the new one, and each bind is confirmed with a boot-id health self-check so a silently duplicated Windows bind is detected and the port advances. ([`ff50a7e`](https://github.com/klaus-2/dsh-redline/commit/ff50a7e))
 
 ## [1.6.0] - 2026-11-19
 
