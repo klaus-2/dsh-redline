@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **An idle overlay suspends its observers.** With the overlay hidden and no draft, panel, mode or queued pin, the page MutationObserver, the pin IntersectionObserver and the status poll stop touching the page; any interaction resumes them. ([`f9c7b57`](https://github.com/klaus-2/dsh-redline/commit/f9c7b57))
 - **Pasted images decode in a worker.** Decoding and resizing move to an OffscreenCanvas worker, falling back to the main thread where blob workers are forbidden. ([`736d2f0`](https://github.com/klaus-2/dsh-redline/commit/736d2f0))
 
+### Fixed
+
+- **The intro tour bubble is readable and stays inside the viewport.** The bubble now carries its own padding and border, shows the step as dots instead of a squeezed counter, measures its own height before placing itself (flipping below the anchor when there is no room above), and is revealed only after it is positioned. ([`b1d82b7`](https://github.com/klaus-2/dsh-redline/commit/b1d82b7))
+
 ## [1.7.0] - 2026-11-21
 
 ### Added
