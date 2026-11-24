@@ -16,7 +16,6 @@ const SHOT_ALT = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgc
 const PROTECTED_ROUTES = [
   { path: "/.lr/status", method: "GET" },
   { path: "/.lr/settings", method: "GET" },
-  { path: "/.lr/update", method: "GET" },
   { path: "/.lr/drawings", method: "GET" },
   { path: "/.lr/pending", method: "GET" },
   { path: "/.lr/pending-pins", method: "GET" },
@@ -287,7 +286,7 @@ export async function runHostSuite(harness, { pluginDir }) {
       const response = await fetch(`${base}/.lr/settings`, { headers: auth });
       const body = await response.json();
       harness.check("the defaults come back", body.ok === true && body.settings.lang === "auto" && body.settings.keys.comment === "c" && body.settings.keys.adjust === "v" && body.settings.keys.draw === "d" && body.settings.screenshot === true && body.settings.cropPad === 72 && body.settings.captureQuality === "padrao" && body.settings.captureTimeout === 12 && body.settings.auditLimit === 400 && body.settings.drawDock === "left", JSON.stringify(body.settings));
-      harness.check("the settings expose the version and the repo", body.version === pluginVersion && body.current === pluginVersion && body.repo === "https://github.com/klaus-2/dsh-redline");
+      harness.check("the settings expose the version and the repo", body.version === pluginVersion && body.repo === "https://github.com/klaus-2/dsh-redline");
       harness.check("host: the defaults carry the dark theme", body.settings.theme === "dark", JSON.stringify(body.settings));
     }
     {
@@ -999,63 +998,66 @@ export async function runHostSuite(harness, { pluginDir }) {
 
     harness.section("host: version and update");
     {
-      await withStubbedFetch([
-        { match: "registry.npmjs.org/dsh-redline", reply: async () => new Response(JSON.stringify({ version: "99.0.0" }), { status: 200, headers: { "content-type": "application/json" } }) }
-      ], async () => {
-        const update = await (await fetch(`${base}/.lr/update`, { headers: auth })).json();
-        harness.check("the update route answers", update.ok === true && update.update.latest === "v99.0.0" && update.update.newer === true, JSON.stringify(update.update));
-        const settings = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
-        harness.check("the settings carry the update information", settings.update !== null && settings.update.latest === "v99.0.0");
-      });
-      await withStubbedFetch([
-        { match: "api.github.com", reply: async () => { throw new Error("the GitHub API must not be asked for the version"); } },
-        { match: "registry.npmjs.org/dsh-redline", reply: async () => new Response(JSON.stringify({ version: "99.0.0" }), { status: 200, headers: { "content-type": "application/json" } }) }
-      ], async () => {
-        const withoutNotes = await (await fetch(`${base}/.lr/update`, { headers: auth })).json();
-        harness.check("the version comes from the registry alone", withoutNotes.error === undefined && withoutNotes.update.latest === "v99.0.0", JSON.stringify(withoutNotes).slice(0, 140));
-        harness.check("the release is still offered without the notes", withoutNotes.update.newer === true, JSON.stringify(withoutNotes.update).slice(0, 140));
-      });
-      await withStubbedFetch([
-        { match: "registry.npmjs.org/dsh-redline", reply: async () => { throw new Error("This operation was aborted"); } }
-      ], async () => {
-        const brokenRegistry = await (await fetch(`${base}/.lr/update`, { headers: auth })).json();
-        harness.check("a registry failure answers with an error", brokenRegistry.update?.error !== undefined, JSON.stringify(brokenRegistry).slice(0, 140));
-      });
-      const running = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
-      harness.check("the running copy is not reported as a pending install", running.update.installed === undefined, JSON.stringify({ installed: running.installed, updateInstalled: running.update.installed }));
-      harness.check("the top level still names the version on disk", running.installed === pluginVersion, JSON.stringify({ installed: running.installed, pluginVersion }));
+      const settings = await (await fetch(`${base}/.lr/settings`, { headers: auth })).json();
+      harness.check("the settings read carries no update check", settings.update === undefined && settings.installed === undefined, JSON.stringify(Object.keys(settings)));
+      const retired = await fetch(`${base}/.lr/update`, { headers: auth });
+      harness.check("the old update route is gone", retired.status === 404, `status=${retired.status}`);
+      const { checkUpdate, releaseNotes, shippedNotes, parseVersion, newer } = await import(moduleUrl);
+      harness.eq("a v-prefixed tag parses", parseVersion("v1.2.3"), [1, 2, 3]);
+      harness.eq("a tag with a suffix does not parse", parseVersion("1.2.3-beta"), undefined);
+      harness.check("newer compares by number", newer("1.10.0", "1.9.9") === true && newer("1.8.0", "1.8.0") === false && newer("x", "1.0.0") === false);
+      const asked = [];
+      const reply = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+      const fetchFor = (release, npmStatus) => async (url) => {
+        asked.push(String(url));
+        if (String(url).startsWith("https://api.github.com/")) return release;
+        if (String(url).startsWith("https://registry.npmjs.org/")) return new Response("{}", { status: npmStatus });
+        throw new Error(`unexpected ${url}`);
+      };
+      const body = "# dsh-redline v99.0.0\n\n### Added\n\n- thing\n\n## What this release ships\n\ninstall footer";
+      const offered = await checkUpdate(fetchFor(reply(200, { tag_name: "v99.0.0", html_url: "https://github.com/klaus-2/dsh-redline/releases/tag/v99.0.0", body }), 200), { name: "dsh-redline", version: pluginVersion });
+      harness.check("the latest GitHub release is offered once npm has it", offered.latest === "99.0.0" && offered.newer === true && offered.managed === true && offered.current === pluginVersion && offered.name === "dsh-redline", JSON.stringify(offered));
+      harness.check("the GitHub releases API is asked first and npm checks the exact version", asked[0] === "https://api.github.com/repos/klaus-2/dsh-redline/releases/latest" && asked[1] === "https://registry.npmjs.org/dsh-redline/99.0.0", asked.join(" | "));
+      harness.eq("the release page link is kept", offered.url, "https://github.com/klaus-2/dsh-redline/releases/tag/v99.0.0");
+      harness.check("the notes stop before the install footer", offered.notes.includes("- thing") && !offered.notes.includes("install footer"), offered.notes);
+      const notOnNpm = await checkUpdate(fetchFor(reply(200, { tag_name: "v99.0.0" }), 404), { name: "dsh-redline", version: pluginVersion });
+      harness.eq("a release npm does not have yet is not offered", notOnNpm.newer, false);
+      const dev = await checkUpdate(fetchFor(reply(200, { tag_name: "v99.0.0" }), 200), { name: "dsh-redline-dev", version: pluginVersion });
+      harness.check("a copy under another package name is not managed", dev.managed === false && dev.newer === true, JSON.stringify(dev));
+      const foreignUrl = await checkUpdate(fetchFor(reply(200, { tag_name: "v99.0.0", html_url: "https://example.com/x" }), 200), { name: "dsh-redline", version: pluginVersion });
+      harness.eq("a release link outside GitHub is dropped", foreignUrl.url, undefined);
+      let refused = "";
+      try { await checkUpdate(fetchFor(reply(403, {}), 200), { name: "dsh-redline", version: pluginVersion }); } catch (error) { refused = String(error?.message ?? error); }
+      harness.check("a GitHub refusal is an error, not an answer", refused.includes("403"), refused);
+      let untagged = "";
+      try { await checkUpdate(fetchFor(reply(200, { tag_name: "latest" }), 200), { name: "dsh-redline", version: pluginVersion }); } catch (error) { untagged = String(error?.message ?? error); }
+      harness.check("a release without an x.y.z tag is an error", untagged.includes("x.y.z"), untagged);
+      harness.eq("long release notes are capped", releaseNotes("a".repeat(30000)).length, 20000);
+      harness.eq("shipped notes for another version are ignored", shippedNotes({ version: "0.0.1", notes: { en: "x" } }), undefined);
+      harness.eq("shipped notes keep only language-tagged strings", shippedNotes({ version: pluginVersion, notes: { en: "a", "pt-BR": "b", "not a tag": "c", zh: 3 } }), { en: "a", "pt-BR": "b" });
+      const shipped = JSON.parse(readFileSync(path.join(pluginDir, "release-notes.json"), "utf8"));
+      harness.eq("the shipped release notes name the package version", shipped.version, pluginVersion);
+      harness.check("the shipped release notes cover en, pt-BR and zh-CN", ["en", "pt-BR", "zh-CN"].every((lang) => typeof shipped.notes?.[lang] === "string" && shipped.notes[lang].trim() !== ""), JSON.stringify(Object.keys(shipped.notes ?? {})));
     }
 
 
     harness.section("host: a newer copy on disk waits for the next start");
     {
-      // The copy that runs is the released one; a copy with a bumped major sits
-      // in the package folder waiting for a restart.
       const [newerMajor] = pluginVersion.split(".");
       const newerVersion = `${Number(newerMajor) + 1}.0.0`;
       const staged = await mkdtemp(path.join(tmpdir(), "dsh-regression-newer-"));
       try {
         await mkdir(path.join(staged, "lib"), { recursive: true });
-        await writeFile(path.join(staged, "package.json"), JSON.stringify({ name: "dsh-redline", version: newerVersion }));
+        await writeFile(path.join(staged, "package.json"), JSON.stringify({ name: "dsh-redline", version: pluginVersion }));
         await copyFile(path.join(pluginDir, "lib", "index.js"), path.join(staged, "lib", "index.js"));
         await copyFile(path.join(pluginDir, "lib", "overlay.js"), path.join(staged, "lib", "overlay.js"));
         await copyFile(path.join(pluginDir, "lib", "bridge.js"), path.join(staged, "lib", "bridge.js"));
-        const stagedUrl = pathToFileURL(path.join(staged, "lib", "index.js")).href;
-        const stagedModule = await import(stagedUrl);
-        const newerServer = await stagedModule.startServer({ port: await freePort() });
-        const newerPort = newerServer.port ?? newerServer.address().port;
-        const newerBase = `http://127.0.0.1:${newerPort}`;
-        const newerAuth = { [secretHeader]: secret };
-        try {
-          const newer = await (await fetch(`${newerBase}/.lr/settings`, { headers: newerAuth })).json();
-          harness.eq("the newer copy on disk is the pending install", newer.installed, newerVersion);
-          harness.eq("the update route names the newer copy too", newer.update.installed, newerVersion);
-          harness.eq("the running copy is still the one that runs", newer.version, pluginVersion);
-          const newerUpdate = await (await fetch(`${newerBase}/.lr/update`, { headers: newerAuth })).json();
-          harness.eq("the update route reports the newer copy as installed", newerUpdate.update.installed, newerVersion);
-        } finally {
-          newerServer.close();
-        }
+        const stagedModule = await import(pathToFileURL(path.join(staged, "lib", "index.js")).href);
+        harness.eq("the running copy is not reported as a pending install", stagedModule.installedUpdate(), undefined);
+        await writeFile(path.join(staged, "package.json"), JSON.stringify({ name: "dsh-redline", version: newerVersion }));
+        harness.eq("the newer copy on disk is the pending install", stagedModule.installedUpdate(), newerVersion);
+        await writeFile(path.join(staged, "package.json"), "not json");
+        harness.eq("an unreadable package.json names nothing", stagedModule.installedUpdate(), undefined);
       } finally {
         await rm(staged, { recursive: true, force: true });
       }
@@ -1072,6 +1074,21 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.eq("the secret route buffers the body", secretRoute.requestBody, "buffered");
       const secretBody = await (await secretRoute.fetch(new Request("http://x/api/dsh-redline.secret"))).json();
       harness.check("the secret route hands the instance secret over", secretBody.ok === true && secretBody.secret === secret);
+      const updateRoute = host.routes.get("/api/dsh-redline.update");
+      harness.check("the update route is registered on the Harness channel", updateRoute !== undefined && updateRoute.requestBody === "buffered");
+      harness.eq("the update route declares GET", updateRoute?.methods, ["GET"]);
+      if (updateRoute !== undefined) {
+        const currentAnswer = await withStubbedFetch([{ match: "https://", reply: async () => { throw new Error("the current mode must not touch the network"); } }], async () => (await updateRoute.fetch(new Request("http://x/api/dsh-redline.update?current=1"))).json());
+        harness.check("the current mode names the running version with the shipped notes", currentAnswer.ok === true && currentAnswer.current === pluginVersion && typeof currentAnswer.notes?.en === "string", JSON.stringify(currentAnswer).slice(0, 160));
+        const offeredAnswer = await withStubbedFetch([
+          { match: "api.github.com", reply: async () => new Response(JSON.stringify({ tag_name: "v99.0.0", html_url: "https://github.com/klaus-2/dsh-redline/releases/tag/v99.0.0" }), { status: 200, headers: { "content-type": "application/json" } }) },
+          { match: "registry.npmjs.org", reply: async () => new Response("{}", { status: 200 }) }
+        ], async () => (await updateRoute.fetch(new Request("http://x/api/dsh-redline.update"))).json());
+        harness.check("the update route offers a newer release", offeredAnswer.ok === true && offeredAnswer.latest === "99.0.0" && offeredAnswer.newer === true && offeredAnswer.managed === true && offeredAnswer.installed === undefined, JSON.stringify(offeredAnswer).slice(0, 200));
+        const failed = await withStubbedFetch([{ match: "api.github.com", reply: async () => { throw new Error("This operation was aborted"); } }], async () => updateRoute.fetch(new Request("http://x/api/dsh-redline.update")));
+        const failedBody = await failed.json();
+        harness.check("a failed check answers 502 with the reason", failed.status === 502 && failedBody.ok === false && failedBody.error.includes("aborted"), JSON.stringify(failedBody));
+      }
       harness.check("the system prompt section is registered", host.sections.some((section) => section.name === "plugin:dsh-redline"));
       harness.check("the slash command is registered", host.commands.has("redline-send"));
       harness.check("the pre-step hook is registered", host.listeners.has("agent/pre-step"));

@@ -1,0 +1,8 @@
+{
+  "version": "1.8.0",
+  "notes": {
+    "en": "New in 1.8.0: pin popovers on images show the source, format and natural versus rendered size, with warnings for oversized files and a missing alt.\nThe responsive preview accepts custom widths, and the page audit flags elements wider than the viewport.\nDictate comments by voice from the composer microphone.\nA guided intro tour walks through the toolbar on first use and can be replayed from the settings.\nThe hide-pins shortcut is configurable, and the inspector can show px or rem.",
+    "pt-BR": "Novidades na 1.8.0: os popovers de pins em imagens mostram a origem, o formato e o tamanho natural versus o exibido, com avisos para arquivos grandes demais e alt ausente.\nA pré-visualização responsiva aceita larguras personalizadas, e a auditoria da página aponta elementos mais largos que a viewport.\nDite comentários por voz pelo microfone do compositor.\nUm tour guiado apresenta a barra de ferramentas no primeiro uso e pode ser repetido pelas configurações.\nO atalho de ocultar pins é configurável, e o inspetor pode mostrar px ou rem.",
+    "zh-CN": "1.8.0 新增：图片上的标注弹窗显示来源、格式以及原始与渲染尺寸，并对过大的文件和缺失的 alt 给出提示。\n响应式预览支持自定义宽度，页面审计会标出宽于视口的元素。\n可通过输入框的麦克风语音输入评论。\n首次使用时的引导会介绍工具栏，并可在设置中重新播放。\n隐藏标注的快捷键可配置，检查器可显示 px 或 rem。"
+  }
+}

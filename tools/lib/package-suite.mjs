@@ -76,6 +76,7 @@ export async function runPackageSuite(harness, { pluginDir, packageName }) {
         "lib/overlay.js",
         "lib/bridge.js",
         "cordis.patch.yml",
+        "release-notes.json",
         "package.json",
         "tencil-overlay.css",
         "vendor/html2canvas.min.js",

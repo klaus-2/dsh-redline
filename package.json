@@ -43,6 +43,7 @@
     "vendor",
     "tencil-overlay.css",
     "THIRD-PARTY-NOTICES.md",
+    "release-notes.json",
     "cordis.patch.yml",
     "README.md"
   ],
@@ -67,7 +68,8 @@
     "client": {
       "inject": [
         "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-conversation"
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-api-remotes"
       ],
       "platform": "web",
       "immediately": true

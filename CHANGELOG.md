@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A "What's new" dialog opens once after an update.** When the updated copy first runs, a dialog lists the release notes in the panel language, links the release page and asks for a GitHub star while the banner is unanswered. Answering in the dialog or in the banner counts for both. The update row can reopen the notes of the running version.
+
+### Changed
+
+- **Updates install through the Harness plugin manager.** The update row asks the Harness for the latest GitHub release and offers it only once npm serves that version. **Update now** installs the exact version, and the row says when a restart is needed. A copy that was not installed from npm gets a manual-update message instead of an install button.
+- **The settings panel no longer waits on the network.** Reading the settings no longer checks npm for a newer version, so the panel opens without the update lookup.
+
+### Removed
+
+- **The pnpm held-back warning is gone.** The row no longer warns when pnpm installs an older version because of `minimumReleaseAge`. The release skill documents that case.
+
 ## [1.8.0] - 2026-11-24
 
 ### Added
