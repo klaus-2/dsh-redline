@@ -7,34 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-24
+
 ### Added
 
-- **Image details in the pin popover.** Popovers on an `img` target show the source URL, the detected format and the natural versus rendered size, and warn when the file is served larger or smaller than displayed (beyond a 5% tolerance) or when the `alt` attribute is missing. ([`795604b`](https://github.com/klaus-2/dsh-redline/commit/795604b))
-- **Custom preview widths.** The responsive preview menu accepts a typed width (200–4000 px) and keeps up to three saved widths persisted in the host settings; the page writes them through the bridge with a strict one-field whitelist, so nothing else in the settings is reachable from a page. ([`a4bb40d`](https://github.com/klaus-2/dsh-redline/commit/a4bb40d))
-- **A horizontal overflow check in the page audit.** The audit scans up to 3000 elements, reports each outermost element wider than the viewport with the overflow in px (children of a flagged element are skipped), and clicking a finding locates and highlights it on the page. ([`bd69914`](https://github.com/klaus-2/dsh-redline/commit/bd69914))
-- **Voice dictation in the composer.** A microphone button transcribes speech into the comment through the Web Speech API in the overlay language with live interim text; browsers without support render no button, and denied microphones report back instead of failing silently. ([`5ee7318`](https://github.com/klaus-2/dsh-redline/commit/5ee7318))
-- **A guided intro tour.** On first use the toolbar walks through the comment, adjust and draw modes and the pending counter with skippable bubbles; finishing or skipping is remembered in the settings, and the panel replays the tour on the next injected page on demand. ([`e7a3efe`](https://github.com/klaus-2/dsh-redline/commit/e7a3efe))
-- **The hide-pins shortcut is configurable.** The settings panel captures the hide-pins key like the other modes, and a key the browser or the app keeps for itself is reported instead of silently dropped. ([`98529d4`](https://github.com/klaus-2/dsh-redline/commit/98529d4))
-- **The tour bubble can be dragged anywhere.** Grabbing the bubble moves it with the same drag discipline as the panels (threshold, rAF paint, viewport clamping, pointer capture); buttons stay clickable, and moving to the next step re-anchors the bubble as usual. ([`4064c71`](https://github.com/klaus-2/dsh-redline/commit/4064c71))
-- **A support banner in the settings panel.** Under the header, a dedicated banner carries the friendly ask ("if the overlay saves you time, a ⭐ on GitHub takes seconds and helps other people find it") and a gold call-to-action that opens the repository: the star twinkles with a soft glow, two sparkles drift around it, the button lifts on hover and pops with an elastic flourish when clicked. The answer is remembered in the settings — starring thanks the user for a few seconds and the banner never returns, and the dismiss button hides it for good — so the ask never nags. The animations travel as a `<style>` element inside the panel itself, so they work wherever the harness mounts it. ([`92de15a`](https://github.com/klaus-2/dsh-redline/commit/92de15a)) ([`03403f1`](https://github.com/klaus-2/dsh-redline/commit/03403f1))
+- **Pin popovers on images show the image details.** Popovers on an `img` target list the source URL, the detected format and the natural versus rendered size, and warn when the file is served larger or smaller than displayed (beyond a 5% tolerance) or when the `alt` attribute is missing. ([`795604b`](https://github.com/klaus-2/dsh-redline/commit/795604b))
+
+- **The responsive preview accepts custom widths.** The preview menu takes a typed width from 200 to 4000 px and keeps up to three saved widths in the host settings. The page writes them through the bridge with a strict one-field whitelist, so no other setting is reachable from a page. ([`a4bb40d`](https://github.com/klaus-2/dsh-redline/commit/a4bb40d))
+
+- **The page audit flags horizontal overflow.** The audit scans up to 3000 elements and reports each outermost element wider than the viewport with its overflow in px, skipping the children of a flagged element. Clicking a finding locates and highlights it on the page. ([`bd69914`](https://github.com/klaus-2/dsh-redline/commit/bd69914))
+
+- **Comments can be dictated by voice.** A microphone button in the composer transcribes speech through the Web Speech API in the overlay language, with live interim text. Browsers without support show no button, and a denied microphone is reported instead of failing silently. ([`5ee7318`](https://github.com/klaus-2/dsh-redline/commit/5ee7318))
+
+- **A guided intro tour introduces the toolbar.** On first use, skippable bubbles walk through the comment, adjust and draw modes and the pending counter. Finishing or skipping is remembered in the settings, and the settings panel can replay the tour on the next injected page. ([`e7a3efe`](https://github.com/klaus-2/dsh-redline/commit/e7a3efe))
+
+- **The hide-pins shortcut is configurable.** The settings panel captures the hide-pins key like the other mode shortcuts, and a key the browser or the app reserves for itself is reported instead of silently dropped. ([`98529d4`](https://github.com/klaus-2/dsh-redline/commit/98529d4))
+
+- **The tour bubble can be dragged anywhere on the page.** The bubble moves with the same drag behavior as the panels, including the drag threshold and viewport clamping. Its buttons stay clickable, and moving to the next step re-anchors the bubble. ([`4064c71`](https://github.com/klaus-2/dsh-redline/commit/4064c71))
+
+- **The settings panel shows a one-time GitHub star banner.** A banner under the header asks for a star on GitHub and opens the repository from its call-to-action button. The answer is remembered in the plugin settings: starring shows a short thank-you and the banner does not return, and the dismiss button hides it for good. The banner's animations ship as a stylesheet inside the panel, so they render wherever the Harness mounts it. ([`92de15a`](https://github.com/klaus-2/dsh-redline/commit/92de15a)) ([`03403f1`](https://github.com/klaus-2/dsh-redline/commit/03403f1)) ([`e6bd55b`](https://github.com/klaus-2/dsh-redline/commit/e6bd55b))
 
 ### Changed
 
-- **px and rem display toggle in the inspector.** Every numeric field shows px or rem through a unit chip, converting the displayed value through the root font size while applying the same result; the choice resets with the adjust panel. ([`2b52363`](https://github.com/klaus-2/dsh-redline/commit/2b52363))
+- **Inspector number fields can display px or rem.** A unit chip on every numeric field switches the displayed value through the root font size while the applied result stays the same; the choice resets when the adjust panel resets. ([`2b52363`](https://github.com/klaus-2/dsh-redline/commit/2b52363))
 
-### Performance
+- **An idle overlay stops touching the page.** With the overlay hidden and no draft, panel, mode or queued pin, the page MutationObserver, the pin IntersectionObserver and the status poll are suspended; any interaction resumes them. ([`f9c7b57`](https://github.com/klaus-2/dsh-redline/commit/f9c7b57))
 
-- **Popovers contain their layout** so their reflows and repaints stay out of the page, and the pin layer renders on its own compositing layer. ([`688eb79`](https://github.com/klaus-2/dsh-redline/commit/688eb79))
-- **Inspector sections build on first expand.** Closed sections defer their controls until opened, and the property filter force-builds deferred sections before matching. ([`9496c10`](https://github.com/klaus-2/dsh-redline/commit/9496c10))
-- **Captures are released to thumbnails once a pin resolves**, keeping the sent full-size shots only until then, and the group-capture canvas is dropped when its reuse window expires. ([`1dd22f7`](https://github.com/klaus-2/dsh-redline/commit/1dd22f7))
-- **An idle overlay suspends its observers.** With the overlay hidden and no draft, panel, mode or queued pin, the page MutationObserver, the pin IntersectionObserver and the status poll stop touching the page; any interaction resumes them. ([`f9c7b57`](https://github.com/klaus-2/dsh-redline/commit/f9c7b57))
-- **Pasted images decode in a worker.** Decoding and resizing move to an OffscreenCanvas worker, falling back to the main thread where blob workers are forbidden. ([`736d2f0`](https://github.com/klaus-2/dsh-redline/commit/736d2f0))
+- **Captures use less memory after a pin resolves.** Full-size shots are kept only until the pin resolves and are then released down to thumbnails, and the group-capture canvas is dropped when its reuse window expires. ([`1dd22f7`](https://github.com/klaus-2/dsh-redline/commit/1dd22f7))
+
+- **Pasted images decode off the main thread.** Decoding and resizing run in an OffscreenCanvas worker, falling back to the main thread on pages that forbid blob workers. ([`736d2f0`](https://github.com/klaus-2/dsh-redline/commit/736d2f0))
+
+- **Inspector sections build on first expand.** Closed sections defer their controls until opened, and the property filter builds deferred sections before matching. ([`9496c10`](https://github.com/klaus-2/dsh-redline/commit/9496c10))
+
+- **Popover reflows stay out of the page layout.** Popovers contain their layout and paint, and the pin layer renders on its own compositing layer. ([`688eb79`](https://github.com/klaus-2/dsh-redline/commit/688eb79))
 
 ### Fixed
 
-- **The intro tour bubble is readable and stays inside the viewport.** The bubble now carries its own padding and border, shows the step as dots instead of a squeezed counter, measures its own height before placing itself (flipping below the anchor when there is no room above), and is revealed only after it is positioned. When the step anchor is hidden (the pending counter with nothing pending), the bubble centres itself above the toolbar instead of flying to the corner. ([`b1d82b7`](https://github.com/klaus-2/dsh-redline/commit/b1d82b7)) ([`4b55cc8`](https://github.com/klaus-2/dsh-redline/commit/4b55cc8))
-- **The adjust panel no longer prints `[object Object]` next to the state chips.** A misplaced closing parenthesis passed the states row's filter options to the chip span as a child instead of to the row; the options now reach the row and the states row is filterable again. ([`17e5729`](https://github.com/klaus-2/dsh-redline/commit/17e5729))
-- **The updates row no longer shows an `[object Object]` tooltip on hover.** The shared row helper put its description straight into the `title` attribute, and the updates row passes a rendered status block as the description; the helper now only sets a tooltip for plain-text descriptions. ([`48ae364`](https://github.com/klaus-2/dsh-redline/commit/48ae364))
+- **The intro tour bubble is readable and stays inside the viewport.** The bubble carries its own padding and border, shows the step as dots instead of a squeezed counter, measures its height before placing itself (flipping below the anchor when there is no room above) and appears only once positioned. When the step anchor is hidden, as with the pending counter when nothing is pending, the bubble centres above the toolbar instead of flying to the corner. ([`b1d82b7`](https://github.com/klaus-2/dsh-redline/commit/b1d82b7)) ([`4b55cc8`](https://github.com/klaus-2/dsh-redline/commit/4b55cc8))
+
+- **The adjust panel no longer prints `[object Object]` next to the state chips.** A misplaced closing parenthesis passed the states row's filter options to a chip as a child instead of to the row; the options now reach the row and the states row is filterable again. ([`17e5729`](https://github.com/klaus-2/dsh-redline/commit/17e5729))
+
+- **The updates row no longer shows an `[object Object]` tooltip on hover.** The shared row helper put its description straight into the `title` attribute, and the updates row passes a rendered status block as its description; the helper now sets a tooltip only for plain-text descriptions. ([`48ae364`](https://github.com/klaus-2/dsh-redline/commit/48ae364))
 
 ## [1.7.0] - 2026-11-21
 
