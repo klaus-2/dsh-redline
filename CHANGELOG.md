@@ -7,18 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-24
+
 ### Added
 
-- **A "What's new" dialog opens once after an update.** When the updated copy first runs, a dialog lists the release notes in the panel language, links the release page and asks for a GitHub star while the banner is unanswered. Answering in the dialog or in the banner counts for both. The update row can reopen the notes of the running version.
+- **A "What's new" dialog opens once after an update.** When the updated copy first runs, a dialog lists the release notes shipped in the package, in the panel language, and links the release page. While the settings banner is unanswered it also asks for a GitHub star, and an answer given in the dialog or in the banner counts for both. The update row can reopen the notes of the running version. ([`7c99680`](https://github.com/klaus-2/dsh-redline/commit/7c99680))
 
 ### Changed
 
-- **Updates install through the Harness plugin manager.** The update row asks the Harness for the latest GitHub release and offers it only once npm serves that version. **Update now** installs the exact version, and the row says when a restart is needed. A copy that was not installed from npm gets a manual-update message instead of an install button.
-- **The settings panel no longer waits on the network.** Reading the settings no longer checks npm for a newer version, so the panel opens without the update lookup.
+- **Updates install through the Harness plugin manager.** The update row asks the Harness for the latest GitHub release and offers it only once npm serves that version. **Update now** installs that exact version through the plugin manager and the row says when a restart is needed. A copy that was not installed from npm gets a manual-update message instead of an install button. ([`7c99680`](https://github.com/klaus-2/dsh-redline/commit/7c99680))
+
+- **The settings panel no longer waits on the network.** Reading the settings used to check npm for a newer version on every request; the update lookup now has its own route, so the panel loads its settings without it. ([`7c99680`](https://github.com/klaus-2/dsh-redline/commit/7c99680))
 
 ### Removed
 
-- **The pnpm held-back warning is gone.** The row no longer warns when pnpm installs an older version because of `minimumReleaseAge`. The release skill documents that case.
+- **The pnpm held-back warning is gone.** The update row no longer warns when pnpm installs an older version because of `minimumReleaseAge`. A manual `pnpm add` can still hit that limit; `--config.minimumReleaseAge=0` bypasses it. ([`7c99680`](https://github.com/klaus-2/dsh-redline/commit/7c99680))
 
 ## [1.8.0] - 2026-11-24
 

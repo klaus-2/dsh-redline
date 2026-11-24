@@ -1,8 +1,8 @@
 {
-  "version": "1.8.0",
+  "version": "1.9.0",
   "notes": {
-    "en": "New in 1.8.0: pin popovers on images show the source, format and natural versus rendered size, with warnings for oversized files and a missing alt.\nThe responsive preview accepts custom widths, and the page audit flags elements wider than the viewport.\nDictate comments by voice from the composer microphone.\nA guided intro tour walks through the toolbar on first use and can be replayed from the settings.\nThe hide-pins shortcut is configurable, and the inspector can show px or rem.",
-    "pt-BR": "Novidades na 1.8.0: os popovers de pins em imagens mostram a origem, o formato e o tamanho natural versus o exibido, com avisos para arquivos grandes demais e alt ausente.\nA pré-visualização responsiva aceita larguras personalizadas, e a auditoria da página aponta elementos mais largos que a viewport.\nDite comentários por voz pelo microfone do compositor.\nUm tour guiado apresenta a barra de ferramentas no primeiro uso e pode ser repetido pelas configurações.\nO atalho de ocultar pins é configurável, e o inspetor pode mostrar px ou rem.",
-    "zh-CN": "1.8.0 新增：图片上的标注弹窗显示来源、格式以及原始与渲染尺寸，并对过大的文件和缺失的 alt 给出提示。\n响应式预览支持自定义宽度，页面审计会标出宽于视口的元素。\n可通过输入框的麦克风语音输入评论。\n首次使用时的引导会介绍工具栏，并可在设置中重新播放。\n隐藏标注的快捷键可配置，检查器可显示 px 或 rem。"
+    "en": "- Updates now install through the Harness plugin manager: Update now installs the exact version and says when a restart is needed.\n- A version is offered only once npm serves it.\n- This dialog opens once after each update with the notes of the new version.\n- The settings panel loads without waiting for the update check.",
+    "pt-BR": "- As atualizações agora são instaladas pelo gerenciador de plugins do Harness: Atualizar agora instala a versão exata e avisa quando é preciso reiniciar.\n- Uma versão só é oferecida depois que o npm a disponibiliza.\n- Esta janela abre uma vez depois de cada atualização com as notas da nova versão.\n- O painel de configurações carrega sem esperar a verificação de atualizações.",
+    "zh-CN": "- 更新现在通过 Harness 插件管理器安装：立即更新会安装确切版本，并在需要重启时提示。\n- 只有在 npm 提供该版本后才会推荐更新。\n- 每次更新后，此窗口会打开一次并显示新版本的说明。\n- 设置面板加载时不再等待更新检查。"
   }
 }
