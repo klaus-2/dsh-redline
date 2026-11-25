@@ -3,6 +3,7 @@
   "notes": {
     "en": "- Updates now install through the Harness plugin manager: Update now installs the exact version and says when a restart is needed.\n- A version is offered only once npm serves it.\n- This dialog opens once after each update with the notes of the new version.\n- The settings panel loads without waiting for the update check.",
     "pt-BR": "- As atualizações agora são instaladas pelo gerenciador de plugins do Harness: Atualizar agora instala a versão exata e avisa quando é preciso reiniciar.\n- Uma versão só é oferecida depois que o npm a disponibiliza.\n- Esta janela abre uma vez depois de cada atualização com as notas da nova versão.\n- O painel de configurações carrega sem esperar a verificação de atualizações.",
-    "zh-CN": "- 更新现在通过 Harness 插件管理器安装：立即更新会安装确切版本，并在需要重启时提示。\n- 只有在 npm 提供该版本后才会推荐更新。\n- 每次更新后，此窗口会打开一次并显示新版本的说明。\n- 设置面板加载时不再等待更新检查。"
+    "zh-CN": "- 更新现在通过 Harness 插件管理器安装：立即更新会安装确切版本，并在需要重启时提示。\n- 只有在 npm 提供该版本后才会推荐更新。\n- 每次更新后，此窗口会打开一次并显示新版本的说明。\n- 设置面板加载时不再等待更新检查。",
+    "ru": "- Обновления теперь ставятся через менеджер плагинов Harness: «Обновить» устанавливает точную версию и сообщает, когда нужен перезапуск.\n- Версия предлагается только после того, как её начал отдавать npm.\n- Этот диалог открывается один раз после каждого обновления с заметками новой версии.\n- Панель настроек загружается, не дожидаясь проверки обновлений."
   }
 }
