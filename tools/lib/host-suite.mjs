@@ -1231,7 +1231,15 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.section("host: capture-session race");
       {
         await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: json(), body: JSON.stringify({ kind: "view", sessionId: "session-race-a" }) });
+        // The switch must reach the host after the submit's body has been read, or the host
+        // rightly captures session B and the check fails on a busy machine.
+        let bodyRead;
+        const submitBodyRead = new Promise((resolve) => { bodyRead = resolve; });
+        const onRequest = (req) => { if (req.url === "/.lr/annotations") req.once("end", bodyRead); };
+        server.on("request", onRequest);
         const submitting = fetch(`${base}/.lr/annotations`, { method: "POST", headers: json(), body: JSON.stringify({ pageUrl: targetUrl, pageTitle: "Alvo", pins: [{ id: "race-pin", tag: "h1", selector: "#t", comment: "captura em curso", shot: SHOT }] }) }).then((response) => response.json());
+        await submitBodyRead;
+        server.off("request", onRequest);
         await fetch(`${base}/.lr/client-ping`, { method: "POST", headers: json(), body: JSON.stringify({ kind: "view", sessionId: "session-race-b" }) });
         const raced = await submitting;
         const storedA = pendingBySession.get("session-race-a")?.snapshotId ?? null;
