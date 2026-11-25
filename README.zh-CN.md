@@ -1,6 +1,6 @@
 # dsh-redline
 
-[English](README.md) · [Português (Brasil)](README.pt-BR.md) · 简体中文
+[English](README.md) · [Português (Brasil)](README.pt-BR.md) · 简体中文 · [Русский](README.ru.md)
 
 [![npm](https://img.shields.io/npm/v/dsh-redline)](https://www.npmjs.com/package/dsh-redline) [![downloads](https://img.shields.io/npm/dm/dsh-redline)](https://www.npmjs.com/package/dsh-redline) [![license](https://img.shields.io/github/license/klaus-2/dsh-redline)](LICENSE) [![release](https://img.shields.io/github/v/release/klaus-2/dsh-redline)](https://github.com/klaus-2/dsh-redline/releases) [![discussions](https://img.shields.io/github/discussions/klaus-2/dsh-redline)](https://github.com/klaus-2/dsh-redline/discussions)
 
@@ -75,7 +75,7 @@ dsh plugin --profile web add dsh-redline
 - 在卡片中选中多个 pin，一次性解决或删除。
 - 标注附加到当前查看会话的下一条消息，渲染为一条认领该消息的 Redline 聊天行（通用上下文折叠被替换而非重复），且该行在会话刷新后仍然存在
 - 从卡片中移除 pin 也会将其从页面覆盖层中移除；已解决的 pin 会被保留并标记为已解决。
-- 浮层界面支持 English / Português (Brasil) / 简体中文，按浏览器语言自动选择
+- 浮层界面支持 English / Português (Brasil) / 简体中文 / Русский，按浏览器语言自动选择
 
 ## 安装
 
@@ -106,6 +106,8 @@ dsh plugin --profile web add ./dsh-redline
 三个模式按键都可以在插件设置里改，快捷键也可以带修饰键：`Ctrl+Shift+A` 同样算一个快捷键。修饰键必须完全一致——`Ctrl+A` 不会触发配置为 `Ctrl+Shift+A` 的快捷键，按住修饰键时普通按键也不会触发。两个模式不能共用同一个快捷键，设置会拒绝第二个。
 
 因为修饰键必须完全一致，`Shift+C` 不再进入评论模式：`Shift` 和其他修饰键一样，所以按住 Shift 时触发的是 `Shift+C`。
+
+快捷键按键盘报告的按键匹配；在非拉丁键盘布局下，物理按键同样有效：俄语布局中，`С` 键（物理 `C` 键）进入评论模式。
 
 pin 会在 composer 上方的卡片里收集。**发送**会把它们随你的下一条消息一起分发；✕ 则丢弃它们，页面浮层会自行更新。
 

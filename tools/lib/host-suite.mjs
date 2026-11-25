@@ -307,6 +307,12 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.eq("the support answer returns to the ask state", back.settings.support, "");
     }
     {
+      const ru = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "ru" }) })).json();
+      harness.eq("the host accepts the Russian language", ru.settings.lang, "ru");
+      const back = await (await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "pt" }) })).json();
+      harness.eq("the language goes back", back.settings.lang, "pt");
+    }
+    {
       const response = await fetch(`${base}/.lr/settings`, { method: "POST", headers: json(), body: JSON.stringify({ lang: "klingon", keys: { comment: "xx", adjust: "!" }, screenshot: "yes", cropPad: 5 }) });
       const body = await response.json();
       harness.eq("an invalid language is ignored", body.settings.lang, "pt");
@@ -1037,7 +1043,7 @@ export async function runHostSuite(harness, { pluginDir }) {
       harness.eq("shipped notes keep only language-tagged strings", shippedNotes({ version: pluginVersion, notes: { en: "a", "pt-BR": "b", "not a tag": "c", zh: 3 } }), { en: "a", "pt-BR": "b" });
       const shipped = JSON.parse(readFileSync(path.join(pluginDir, "release-notes.json"), "utf8"));
       harness.eq("the shipped release notes name the package version", shipped.version, pluginVersion);
-      harness.check("the shipped release notes cover en, pt-BR and zh-CN", ["en", "pt-BR", "zh-CN"].every((lang) => typeof shipped.notes?.[lang] === "string" && shipped.notes[lang].trim() !== ""), JSON.stringify(Object.keys(shipped.notes ?? {})));
+      harness.check("the shipped release notes cover en, pt-BR, zh-CN and ru", ["en", "pt-BR", "zh-CN", "ru"].every((lang) => typeof shipped.notes?.[lang] === "string" && shipped.notes[lang].trim() !== ""), JSON.stringify(Object.keys(shipped.notes ?? {})));
     }
 
 

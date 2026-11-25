@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Russian (ru) interface.** The overlay, the settings panel, the chat card, the updates dialog, the plugin metadata and the release notes speak Russian, and the language picker offers **Русский**. The host accepts `lang: "ru"`, including on a reload.
+
+- **Russian README.** `README.ru.md` joins the English, Portuguese and Chinese ones, and every README links the others.
+
+### Fixed
+
+- **Shortcuts work on a non-Latin layout.** A plain key press whose character is not Latin is now matched by its physical key, so with a Cyrillic layout the `С` key enters comment mode. Latin characters keep their existing match, so switching layouts does not revive a shortcut the character does not name.
+
 ## [1.9.0] - 2026-11-24
 
 ### Added

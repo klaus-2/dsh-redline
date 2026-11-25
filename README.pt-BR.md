@@ -1,6 +1,6 @@
 # dsh-redline
 
-[English](README.md) · Português (Brasil) · [简体中文](README.zh-CN.md)
+[English](README.md) · Português (Brasil) · [简体中文](README.zh-CN.md) · [Русский](README.ru.md)
 
 [![npm](https://img.shields.io/npm/v/dsh-redline)](https://www.npmjs.com/package/dsh-redline) [![downloads](https://img.shields.io/npm/dm/dsh-redline)](https://www.npmjs.com/package/dsh-redline) [![license](https://img.shields.io/github/license/klaus-2/dsh-redline)](LICENSE) [![release](https://img.shields.io/github/v/release/klaus-2/dsh-redline)](https://github.com/klaus-2/dsh-redline/releases) [![discussions](https://img.shields.io/github/discussions/klaus-2/dsh-redline)](https://github.com/klaus-2/dsh-redline/discussions)
 
@@ -75,7 +75,7 @@ Para cada pin, um bloco em um único snapshot:
 - Selecione vários pins no cartão e resolva ou exclua de uma vez.
 - Anotações anexam à próxima mensagem da sessão que você está visualizando, renderizadas como uma única linha de chat do Redline que reivindica a mensagem (a divulgação genérica de contexto é substituída, não duplicada), e a linha sobrevive a um reload da sessão
 - Remover um pin do cartão também o remove da sobreposição da página; um pin resolvido é mantido e marcado como resolvido.
-- Interface em English / Português (Brasil) / 简体中文, escolhida pelo idioma do navegador
+- Interface em English / Português (Brasil) / 简体中文 / Русский, escolhida pelo idioma do navegador
 
 ## Instalação
 
@@ -112,6 +112,9 @@ as configurações recusam o segundo.
 Como os modificadores precisam bater exatamente, `Shift+C` não entra mais no modo comentário:
 `Shift` é um modificador como qualquer outro, então o atalho que dispara com o Shift pressionado
 é `Shift+C`.
+
+Os atalhos são comparados com a tecla que o teclado informa, e num layout não latino a tecla física
+também funciona: no layout russo, a tecla `С` (física `C`) entra no modo comentário.
 
 Os pins se acumulam no card acima do composer. **Enviar** os despacha junto da sua próxima mensagem; o ✕ os descarta, e o overlay da página se atualiza sozinho.
 

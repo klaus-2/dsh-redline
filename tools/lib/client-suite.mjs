@@ -945,7 +945,7 @@ export async function runClientSuite(harness, { pluginDir }) {
     const locales = localeKeys(overlay);
     if (harness.check("the overlay carries the locale dictionaries", locales !== undefined)) {
       const codes = Object.keys(locales);
-      harness.eq("the overlay ships three languages", codes.sort(), ["en", "pt", "zh"]);
+      harness.eq("the overlay ships four languages", codes.sort(), ["en", "pt", "ru", "zh"]);
       const reference = locales[codes[0]].slice().sort();
       for (const code of codes) {
         harness.eq(`the ${code} dictionary has the same keys`, locales[code].slice().sort(), reference);
@@ -984,7 +984,7 @@ export async function runClientSuite(harness, { pluginDir }) {
       // overlay's and the settings panel's.
       const panel = evaluateObjectLiteral(extractObjectLiteral(client, "const L = {"), "L") ?? {};
       const updateTable = evaluateObjectLiteral(extractObjectLiteral(client, "const UPDATE_DICTS"), "UPDATE_DICTS") ?? {};
-      const mirrorOf = { en: "en.json", pt: "pt-BR.json", zh: "zh-CN.json" };
+      const mirrorOf = { en: "en.json", pt: "pt-BR.json", zh: "zh-CN.json", ru: "ru.json" };
       const drifted = [];
       for (const [code, file] of Object.entries(mirrorOf)) {
         const mirror = JSON.parse(readFileSync(path.join(pluginDir, "locale", file), "utf8"));
@@ -1135,9 +1135,9 @@ export async function runClientSuite(harness, { pluginDir }) {
       ? undefined
       : JSON.parse(evaluateExpression(`(navigator) => {
       ${localeOf}
-      return JSON.stringify([dictateLocale("pt"), dictateLocale("zh"), dictateLocale("en"), dictateLocale("auto"), dictateLocale("fr")]);
+      return JSON.stringify([dictateLocale("pt"), dictateLocale("zh"), dictateLocale("ru"), dictateLocale("en"), dictateLocale("auto"), dictateLocale("fr")]);
     }`, "dictateLocale")({ language: "pt-BR" }));
-    harness.eq("overlay: dictation maps the overlay language to a speech locale, falling back to the navigator", run, ["pt-BR", "zh-CN", "en-US", "pt-BR", "pt-BR"]);
+    harness.eq("overlay: dictation maps the overlay language to a speech locale, falling back to the navigator", run, ["pt-BR", "zh-CN", "ru-RU", "en-US", "pt-BR", "pt-BR"]);
     harness.check("overlay: the composer carries the dictate control with a feature detect",
       template.includes("const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;") &&
       template.includes('renderTemplateRow(textarea), shotToggle, dictateButton(textarea)'),
@@ -1319,9 +1319,9 @@ export async function runClientSuite(harness, { pluginDir }) {
       return found;
     };
     const duplicates = [
-      ...duplicatesOf(overlayLiteral, ["en", "pt", "zh"], true).map((entry) => `overlay:${entry}`),
-      ...duplicatesOf(cardLiteral, ["en", "pt", "zh"], true).map((entry) => `card:${entry}`),
-      ...duplicatesOf(panelLiteral, ["en", "pt", "zh"], false).map((entry) => `panel:${entry}`)
+      ...duplicatesOf(overlayLiteral, ["en", "pt", "zh", "ru"], true).map((entry) => `overlay:${entry}`),
+      ...duplicatesOf(cardLiteral, ["en", "pt", "zh", "ru"], true).map((entry) => `card:${entry}`),
+      ...duplicatesOf(panelLiteral, ["en", "pt", "zh", "ru"], false).map((entry) => `panel:${entry}`)
     ];
     harness.check("no locale dictionary defines a key twice", duplicates.length === 0, duplicates.slice(0, 8).join(", "));
 
@@ -3452,6 +3452,11 @@ return { apply: applyForceStates, clear: clearForceStates, force: (pseudo) => fo
       const plain = parse("c");
       harness.check("the key alone fires", matches({ key: "c" }, plain) === true);
       harness.check("the key fires whatever the case", matches({ key: "C" }, plain) === true);
+      // A non-Latin layout reports another character for the same physical key, so a plain press
+      // matches through the key the layout labels: the Russian С key is still C.
+      harness.check("a Cyrillic layout fires the hotkey through the physical key", matches({ key: "с", code: "KeyC" }, plain) === true);
+      harness.check("another physical key does not fire it", matches({ key: "с", code: "KeyV" }, plain) === false);
+      harness.check("a Latin character is not remapped to its physical key", matches({ key: "j", code: "KeyC" }, plain) === false);
       harness.check("a modified key does not fire the plain hotkey", matches({ key: "c", ctrlKey: true }, plain) === false);
       harness.check("a shifted key does not fire the plain hotkey", matches({ key: "c", shiftKey: true }, plain) === false);
 
@@ -3924,7 +3929,7 @@ return { apply: applyForceStates, clear: clearForceStates, force: (pseudo) => fo
 
   harness.section("client: plugin manager metadata");
   {
-    for (const code of ["en", "pt-BR", "zh-CN"]) {
+    for (const code of ["en", "pt-BR", "zh-CN", "ru"]) {
       const file = path.join(pluginDir, "locale", `${code}.json`);
       if (!harness.check(`the ${code} locale file exists`, existsSync(file))) continue;
       const data = JSON.parse(readFileSync(file, "utf8"));
@@ -5044,13 +5049,13 @@ return { focusState, timer: focusRepositionTimer };
       const dictionaries = evaluateObjectLiteral(extractObjectLiteral(overlay, "const UI_LOCALES"), "UI_LOCALES");
       const templateKeys = ["templatesLabel", "templateAlignDesign", "templateReduceSpacing", "templateIncreaseContrast", "templateFixOverflow", "templateExplainWhy"];
       const templateMissing = [];
-      for (const code of ["en", "pt", "zh"]) {
+      for (const code of ["en", "pt", "zh", "ru"]) {
         for (const key of templateKeys) {
           const value = dictionaries?.[code]?.[key];
           if (typeof value !== "string" || value === "") templateMissing.push(`${code}:${key}`);
         }
       }
-      harness.check("overlay: the five comment templates exist in all three languages", templateMissing.length === 0, templateMissing.slice(0, 6).join(", "));
+      harness.check("overlay: the five comment templates exist in all four languages", templateMissing.length === 0, templateMissing.slice(0, 6).join(", "));
       const templateRowSource = extractFunction(overlay, "renderTemplateRow");
       harness.check("overlay: the template popup dismiss resolves shadow-retargeted events through composedPath",
         templateRowSource !== undefined && templateRowSource.includes("composedPath?.()") &&

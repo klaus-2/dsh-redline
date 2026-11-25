@@ -1,6 +1,6 @@
 # dsh-redline
 
-English · [Português (Brasil)](README.pt-BR.md) · [简体中文](README.zh-CN.md)
+English · [Português (Brasil)](README.pt-BR.md) · [简体中文](README.zh-CN.md) · [Русский](README.ru.md)
 
 [![npm](https://img.shields.io/npm/v/dsh-redline)](https://www.npmjs.com/package/dsh-redline) [![downloads](https://img.shields.io/npm/dm/dsh-redline)](https://www.npmjs.com/package/dsh-redline) [![license](https://img.shields.io/github/license/klaus-2/dsh-redline)](LICENSE) [![release](https://img.shields.io/github/v/release/klaus-2/dsh-redline)](https://github.com/klaus-2/dsh-redline/releases) [![discussions](https://img.shields.io/github/discussions/klaus-2/dsh-redline)](https://github.com/klaus-2/dsh-redline/discussions)
 
@@ -75,7 +75,7 @@ For each pin, one block in a single snapshot:
 - Select several pins in the card and resolve or delete them at once.
 - Annotations attach to the next message of the session you are viewing, rendered as one Redline chat row that claims the message (the generic context disclosure is replaced, not duplicated), and the row survives a session reload
 - Removing a pin from the card removes it from the page overlay too; a resolved pin is kept and marked as resolved.
-- English, Português (Brasil) and 简体中文 in the overlay UI, chosen from the browser locale
+- English, Português (Brasil), 简体中文 and Русский in the overlay UI, chosen from the browser locale
 
 ## Install
 
@@ -110,6 +110,9 @@ held. Two modes cannot share the same shortcut; the settings refuse the second o
 
 Because the modifiers must match exactly, `Shift+C` no longer enters comment mode: `Shift` is a
 modifier like any other, so the shortcut that fires with Shift held is `Shift+C`.
+
+Shortcuts are compared with the key the keyboard reports, and on a non-Latin layout the physical
+key works too: with a Russian layout, the `С` key (physical `C`) enters comment mode.
 
 Pins collect in the card above the composer. **Send** dispatches them with your next message; the ✕ discards them, and the page overlay updates itself.
 

@@ -43,12 +43,12 @@ export async function runPackageSuite(harness, { pluginDir, packageName }) {
   for (const entry of manifest.files ?? []) {
     harness.check(`the published entry ${entry} exists`, existsSync(path.join(pluginDir, entry)), entry);
   }
-  for (const readme of ["README.md", "README.pt-BR.md", "README.zh-CN.md"]) {
+  for (const readme of ["README.md", "README.pt-BR.md", "README.zh-CN.md", "README.ru.md"]) {
     if (!harness.check(`the ${readme} exists`, existsSync(path.join(pluginDir, readme)))) continue;
     harness.check(`the ${readme} is not a stub`, readFileSync(path.join(pluginDir, readme), "utf8").length > 500);
   }
   {
-    const readmes = ["README.md", "README.pt-BR.md", "README.zh-CN.md"];
+    const readmes = ["README.md", "README.pt-BR.md", "README.zh-CN.md", "README.ru.md"];
     const sectionCounts = readmes.map((readme) => {
       const file = path.join(pluginDir, readme);
       if (!existsSync(file)) return -1;
@@ -83,6 +83,7 @@ export async function runPackageSuite(harness, { pluginDir, packageName }) {
         "locale/en.json",
         "locale/pt-BR.json",
         "locale/zh-CN.json",
+        "locale/ru.json",
         "docs/assets/icon.png"
       ];
       const missing = required.filter((file) => !files.includes(file));
