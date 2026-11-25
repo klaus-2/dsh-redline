@@ -9,13 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Russian (ru) interface.** The overlay, the settings panel, the chat card, the updates dialog, the plugin metadata and the release notes speak Russian, and the language picker offers **Русский**. The host accepts `lang: "ru"`, including on a reload.
+- **The interface is available in Russian.** The overlay, the settings panel, the chat card, the updates dialog, the plugin metadata and the release notes have Russian text, and the language picker offers **Русский**. The host keeps `lang: "ru"` across reloads. Thanks to @sc5976 for the contribution. ([#5](https://github.com/klaus-2/dsh-redline/pull/5))
 
-- **Russian README.** `README.ru.md` joins the English, Portuguese and Chinese ones, and every README links the others.
+- **A Russian README joins the others.** `README.ru.md` sits beside the English, Portuguese and Chinese READMEs, and each README links the rest. ([#5](https://github.com/klaus-2/dsh-redline/pull/5))
 
 ### Fixed
 
-- **Shortcuts work on a non-Latin layout.** A plain key press whose character is not Latin is now matched by its physical key, so with a Cyrillic layout the `С` key enters comment mode. Latin characters keep their existing match, so switching layouts does not revive a shortcut the character does not name.
+- **Shortcuts work on a non-Latin keyboard layout.** The overlay matched a plain shortcut on the character the key produces, so on a Cyrillic layout the C key produced `с` and comment mode never opened. A plain press whose character is not a Latin letter or digit is now matched by its physical key, and the settings panel records such a press as the Latin key, so a shortcut can also be set from a Cyrillic layout. Latin characters keep their character match, so on a Dvorak layout the physical C key does not fire `c`. ([#5](https://github.com/klaus-2/dsh-redline/pull/5))
 
 ## [1.9.0] - 2026-11-24
 

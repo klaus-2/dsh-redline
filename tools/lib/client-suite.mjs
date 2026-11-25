@@ -3452,8 +3452,6 @@ return { apply: applyForceStates, clear: clearForceStates, force: (pseudo) => fo
       const plain = parse("c");
       harness.check("the key alone fires", matches({ key: "c" }, plain) === true);
       harness.check("the key fires whatever the case", matches({ key: "C" }, plain) === true);
-      // A non-Latin layout reports another character for the same physical key, so a plain press
-      // matches through the key the layout labels: the Russian С key is still C.
       harness.check("a Cyrillic layout fires the hotkey through the physical key", matches({ key: "с", code: "KeyC" }, plain) === true);
       harness.check("another physical key does not fire it", matches({ key: "с", code: "KeyV" }, plain) === false);
       harness.check("a Latin character is not remapped to its physical key", matches({ key: "j", code: "KeyC" }, plain) === false);
@@ -3495,6 +3493,17 @@ return { apply: applyForceStates, clear: clearForceStates, force: (pseudo) => fo
         harness.check("the client and the overlay show the same shortcut",
           typeof clientFormat === "function" && shared.every((text) => clientFormat(text, "?") === show(parse(text))),
           JSON.stringify(shared.map((text) => [text, typeof clientFormat === "function" ? clientFormat(text, "?") : null, show(parse(text))])));
+      }
+      const clientKeySource = extractArrowConst(clientSource, "shortcutKey");
+      harness.check("the client keeps its shortcut key reader", typeof clientKeySource === "string");
+      if (typeof clientKeySource === "string") {
+        const captured = evaluateExpression(`(event, modifiers) => (${clientKeySource.replace(/^const shortcutKey = /, "").replace(/;\s*$/, "")})(event, modifiers)`, "clientShortcutKey");
+        harness.eq("the settings capture takes a Cyrillic press by its physical key", captured({ key: "с", code: "KeyC" }, []), "c");
+        harness.eq("the settings capture keeps a Latin character over its physical key", captured({ key: "j", code: "KeyC" }, []), "j");
+        harness.eq("the settings capture takes a modified press by its physical key", captured({ key: "!", code: "Digit1" }, ["Shift"]), "1");
+        harness.eq("the settings capture reports a key with no letter or digit as it is", captured({ key: "F5", code: "F5" }, []), "f5");
+        harness.check("the settings capture and the overlay agree on a Cyrillic press",
+          matches({ key: "м", code: "KeyV" }, parse(captured({ key: "м", code: "KeyV" }, []))) === true);
       }
     }
   }
