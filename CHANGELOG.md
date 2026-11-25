@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The Russian locale reads with one voice.** The two element-click hints use the imperative like the other hints, the drawing colours use parentheses instead of a colon, and `tplEmpty`, `dockPreviewWeight` and `timeoutDesc` lose an ASCII hyphen standing in for a dash and a clipped infinitive.
+
+- **Two comments name the non-Latin case again.** The `hotkeyMatches` and `shortcutKey` comments say that the physical key wins when no modifier is held and the character is not Latin, which is the branch they implement.
+
 ## [1.10.0] - 2026-11-25
 
 ### Added
