@@ -1,9 +1,9 @@
 {
-  "version": "1.10.0",
+  "version": "1.10.1",
   "notes": {
-    "en": "- The interface is available in Russian: pick Русский in the language setting.\n- Shortcuts work on a non-Latin keyboard layout, and the settings panel can record them from one.",
-    "pt-BR": "- A interface está disponível em russo: escolha Русский na configuração de idioma.\n- Os atalhos funcionam em layouts de teclado não latinos, e o painel de configurações consegue gravá-los a partir deles.",
-    "zh-CN": "- 界面现已支持俄语：在语言设置中选择 Русский。\n- 快捷键在非拉丁键盘布局下也能使用，设置面板也能在这类布局下录制快捷键。",
-    "ru": "- Интерфейс доступен на русском: выберите «Русский» в настройке языка.\n- Горячие клавиши работают на нелатинской раскладке, и панель настроек умеет записывать их с неё."
+    "en": "- The Russian text reads more naturally: the click hints share one voice, and a few strings lose a stray hyphen.",
+    "pt-BR": "- O texto em russo ficou mais natural: as dicas de clique usam a mesma voz, e algumas frases perderam um hífen solto.",
+    "zh-CN": "- 俄语界面文字更自然：点击提示的语气统一，几处多余的连字符已去除。",
+    "ru": "- Русский текст стал естественнее: подсказки о клике звучат в одном стиле, а из нескольких строк убран лишний дефис."
   }
 }

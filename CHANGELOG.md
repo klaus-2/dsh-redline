@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-11-25
+
 ### Changed
 
-- **The Russian locale reads with one voice.** The two element-click hints use the imperative like the other hints, the drawing colours use parentheses instead of a colon, and `tplEmpty`, `dockPreviewWeight` and `timeoutDesc` lose an ASCII hyphen standing in for a dash and a clipped infinitive.
+- **The Russian locale reads with one voice.** The two element-click hints use the imperative like the other hints, the drawing colours use parentheses instead of a colon, and `tplEmpty`, `dockPreviewWeight` and `timeoutDesc` lose an ASCII hyphen standing in for a dash and a clipped infinitive. Thanks to @sc5976 for the review and the fix. ([`d498ac1`](https://github.com/klaus-2/dsh-redline/commit/d498ac1), [#6](https://github.com/klaus-2/dsh-redline/pull/6))
 
-- **Two comments name the non-Latin case again.** The `hotkeyMatches` and `shortcutKey` comments say that the physical key wins when no modifier is held and the character is not Latin, which is the branch they implement.
+- **Two comments name the non-Latin case again.** The `hotkeyMatches` and `shortcutKey` comments say that the physical key wins when no modifier is held and the character is not Latin, which is the branch they implement. ([`d498ac1`](https://github.com/klaus-2/dsh-redline/commit/d498ac1), [#6](https://github.com/klaus-2/dsh-redline/pull/6))
 
 ## [1.10.0] - 2026-11-25
 
